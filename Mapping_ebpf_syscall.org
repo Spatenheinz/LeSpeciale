@@ -1,0 +1,674 @@
+#+title: Mapping eBPF syscall
+
+This document tries to map out how the pipeline for the eBPF syscall,
+more specifically we use this document to map out the structure for calls with command EBPF_PROG_LOAD.
+This is to investigate the feasibility to extend the current bpf syscall with another struct
+which can have a pointer to a proof.
+
+
+* PRELIMINARY:
+all paths will start at the linux root unless something else is specified, the kernel version i am using for this thesis is v6.2-8rc.
+
+* How is syscalls structured?
+the file ~include/uapi/asm-generic/unistd.h~
+is a set of macros which translates macros of the form:
+__NR_syscall_name syscall_number. For instance we have:
+
+#+begin_src c
+#define __NR_read 63
+__SYSCALL(__NR_read, sys_read)
+#+end_src
+
+If we try to add a new syscall we can add the following line
+
+#+begin_src c
+#define __NR_hellothesis 451
+__SYSCALL(__NR_hellothesis, sys_hellothesis)
+#+end_src
+
+which will make a new syscall with the 451 since its the new highest number.
+
+We then need to add a function prototype in ~include/linux/syscall.h~ as such:
+
+#+begin_src c
+asmlinkage long sys_hellothesis();
+#+end_src
+
+For the actual implementation of the function we should really add it to an appropriate folder, however for ease we can define a new folder we call it ~thesis~.
+
+In here we can make a file ~hellosyscall.c~ defined as follows:
+#+begin_src c
+#include <linux/kernel.h>
+#include <linux/syscalls.h>
+
+SYSCALL_DEFINE0(hellothesis)
+
+{
+    printk("Hello from the thesis syscall\n");
+    return 0;
+}
+#+end_src
+
+Lastly we need to add the syscall to the system call table located in ~arch/x86/entry/syscalls/syscall_64.tbl~
+as such
+#+begin_src
+451 common  hellothesis  sys_hellothesis
+#+end_src
+This should make a new syscall
+BEWARE: some step are missing to make compatability with other architectures.
+
+* finding the BPF syscall
+The implementations of different syscalls are scattered around the linux file tree, for instance the definition for the read syscall is in the file ~fs/read_write.c.~ For the bpf syscall we can find the approriate code in the ~kernel/bpf/~ folder. This is where all bpf related code lives, (except for tools). It defines the following function:
+#+begin_src c
+
+SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
+{
+	return __sys_bpf(cmd, USER_BPFPTR(uattr), size);
+}
+#+end_src
+We see it follows a similar macro to that of out own syscall.
+it defines the function through a macro ~SYSCALL_DEFINEn~ where n in this case is 3.
+The actual implementation of this is not important but simply makes a common interface for defining syscalls.
+We notice it takes 7 arguments,
+the first argument bpf, is the entrypoint or name of the syscall,
+the following arguments are pairwise a type and a parameter, that is, the bpf syscall is gonna look like:
+
+#+begin_src c
+
+asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
+#+end_src
+
+We further follow the ~__sys_bpf~ function.
+** __sys_bpf
+Taking the functions in steps we see:
+#+begin_src c
+static int __sys_bpf(int cmd, bpfptr_t uattr, unsigned int size)
+{
+	union bpf_attr attr;
+	bool capable;
+	int err;
+
+	capable = bpf_capable() || !sysctl_unprivileged_bpf_disabled;
+#+end_src
+
+we start by checking the capability, either if ~sysctl_unprivileged_bpf_disabled=0~,
+meaning regular users may use bpf.
+or if ~bpf_capable()~ TODO: how exactly does this work?
+The capability is important since only capable users may create maps and load programs as seen here:
+
+#+begin_src c
+	if (!capable &&
+	    (cmd == BPF_MAP_CREATE || cmd == BPF_PROG_LOAD))
+		return -EPERM;
+#+end_src
+
+We then check the struct uattr, by first calling ~bpf_check_uarg_tail_zero~, which will:
+1. return ~E2BIG~ if size is larger than a page (which is very unlikely).
+2. return 0 if sizeof(attr) < size
+3. checks if the all "unknown" bits are 0. In this case it returns 0.
+#+begin_src c
+	err = bpf_check_uarg_tail_zero(uattr, sizeof(attr), size);
+	if (err)
+		return err;
+	size = min_t(u32, size, sizeof(attr));
+#+end_src
+we then copy from the pointer and check the security (TODO: what does this part actually mean?)
+#+begin_src c
+	memset(&attr, 0, sizeof(attr));
+	if (copy_from_bpfptr(&attr, uattr, size) != 0)
+		return -EFAULT;
+
+	err = security_bpf(cmd, &attr, size);
+	if (err < 0)
+		return err;
+#+end_src
+Then we get to the fun part:
+the switch statement over cmd, and we only care about the program load part:
+#+begin_src c
+	case BPF_PROG_LOAD:
+		err = bpf_prog_load(&attr, uattr);
+		break;
+#+end_src
+** bpf_prog_load
+We use the following structure from the union:
+#+begin_src c
+	struct { /* anonymous struct used by BPF_PROG_LOAD command */
+		__u32		prog_type;	/* one of enum bpf_prog_type */
+		__u32		insn_cnt;
+		__aligned_u64	insns;
+		__aligned_u64	license;
+		__u32		log_level;	/* verbosity level of verifier */
+		__u32		log_size;	/* size of user buffer */
+		__aligned_u64	log_buf;	/* user supplied buffer */
+		__u32		kern_version;	/* not used */
+		__u32		prog_flags;
+		char		prog_name[BPF_OBJ_NAME_LEN];
+		__u32		prog_ifindex;	/* ifindex of netdev to prep for */
+		/* For some prog types expected attach type must be known at
+		 * load time to verify attach type specific parts of prog
+		 * (context accesses, allowed helpers, etc).
+		 */
+		__u32		expected_attach_type;
+		__u32		prog_btf_fd;	/* fd pointing to BTF type data */
+		__u32		func_info_rec_size;	/* userspace bpf_func_info size */
+		__aligned_u64	func_info;	/* func info */
+		__u32		func_info_cnt;	/* number of bpf_func_info records */
+		__u32		line_info_rec_size;	/* userspace bpf_line_info size */
+		__aligned_u64	line_info;	/* line info */
+		__u32		line_info_cnt;	/* number of bpf_line_info records */
+		__u32		attach_btf_id;	/* in-kernel BTF type id to attach to */
+		union {
+			/* valid prog_fd to attach to bpf prog */
+			__u32		attach_prog_fd;
+			/* or valid module BTF object fd or 0 to attach to vmlinux */
+			__u32		attach_btf_obj_fd;
+		};
+		__u32		core_relo_cnt;	/* number of bpf_core_relo */
+		__aligned_u64	fd_array;	/* array of FDs */
+		__aligned_u64	core_relos;
+		__u32		core_relo_rec_size; /* sizeof(struct bpf_core_relo) */
+	};
+#+end_src
+
+initial setup of the function will set the type of the program and the variables.
+
+#+begin_src c
+static int bpf_prog_load(union bpf_attr *attr, bpfptr_t uattr)
+{
+	enum bpf_prog_type type = attr->prog_type;
+	struct bpf_prog *prog, *dst_prog = NULL;
+	struct btf *attach_btf = NULL;
+	int err;
+	char license[128];
+	bool is_gpl;
+#+end_src
+The initial checks of the function goes as follows:
+1. ~CHECK_ATTR~ checks that unused parts of the union is 0.
+#+begin_src c
+	if (CHECK_ATTR(BPF_PROG_LOAD))
+		return -EINVAL;
+#+end_src
+2. if any flags not provided not in the bitwise disjuction then return with an error.
+#+begin_src c
+	if (attr->prog_flags & ~(BPF_F_STRICT_ALIGNMENT |
+				 BPF_F_ANY_ALIGNMENT |
+				 BPF_F_TEST_STATE_FREQ |
+				 BPF_F_SLEEPABLE |
+				 BPF_F_TEST_RND_HI32 |
+				 BPF_F_XDP_HAS_FRAGS))
+		return -EINVAL;
+#+end_src
+3. TODO
+  #+begin_src c
+	if (!IS_ENABLED(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS) &&
+	    (attr->prog_flags & BPF_F_ANY_ALIGNMENT) &&
+	    !bpf_capable())
+		return -EPERM;
+  #+end_src
+Next we set is_gpl to true if licence of the program is GPL.
+#+begin_src c
+	if (strncpy_from_bpfptr(license,
+				make_bpfptr(attr->license, uattr.is_kernel),
+				sizeof(license) - 1) < 0)
+		return -EFAULT;
+	license[sizeof(license) - 1] = 0;
+
+	/* eBPF programs must be GPL compatible to use GPL-ed functions */
+	is_gpl = license_is_gpl_compatible(license);
+#+end_src
+programs may have between 1 and either 4096 or 1M instructions depending on bpf_capability.
+#+begin_src c
+	if (attr->insn_cnt == 0 ||
+	    attr->insn_cnt > (bpf_capable() ? BPF_COMPLEXITY_LIMIT_INSNS : BPF_MAXINSNS))
+		return -E2BIG;
+#+end_src
+Most types of programs require bpf_capable(), so if prog type is not a socket filter or a cgroup (control group) socket programs.
+#+begin_src c
+	if (type != BPF_PROG_TYPE_SOCKET_FILTER &&
+	    type != BPF_PROG_TYPE_CGROUP_SKB &&
+	    !bpf_capable())
+		return -EPERM;
+#+end_src
+network style programs require network capabilities. (and perfmon)
+#+begin_src c
+	if (is_net_admin_prog_type(type) && !capable(CAP_NET_ADMIN) && !capable(CAP_SYS_ADMIN))
+		return -EPERM;
+	if (is_perfmon_prog_type(type) && !perfmon_capable())
+		return -EPERM;
+#+end_src
+next we check for bpf_prog or btf. wont go into so much detail. (look at source code).
+fixup the types, again not important.
+#+begin_src c
+	bpf_prog_load_fixup_attach_type(attr);
+	if (bpf_prog_load_check_attach(type, attr->expected_attach_type,
+				       attach_btf, attr->attach_btf_id,
+				       dst_prog)) {
+		if (dst_prog)
+			bpf_prog_put(dst_prog);
+		if (attach_btf)
+			btf_put(attach_btf);
+		return -EINVAL;
+	}
+#+end_src
+Next we get to the interesting stuff. We start allocate the program. Initially we do:
+#+begin_src c
+	prog = bpf_prog_alloc(bpf_prog_size(attr->insn_cnt), GFP_USER);
+	if (!prog) {
+		if (dst_prog)
+			bpf_prog_put(dst_prog);
+		if (attach_btf)
+			btf_put(attach_btf);
+		return -ENOMEM;
+	}
+#+end_src
+
+%GFP_USER is for userspace allocations that also need to be directly
+ * accessibly by the kernel or hardware. It is typically used by hardware
+ * for buffers that are mapped to userspace (e.g. graphics) that hardware
+ * still must DMA to. cpuset limits are enforced for these allocations
+
+The put functions is used for cleanup, dereferencing etc.
+
+We then update the ~prog~ struct.
+#+begin_src c
+	prog->expected_attach_type = attr->expected_attach_type;
+	prog->aux->attach_btf = attach_btf;
+	prog->aux->attach_btf_id = attr->attach_btf_id;
+	prog->aux->dst_prog = dst_prog;
+	prog->aux->offload_requested = !!attr->prog_ifindex;
+	prog->aux->sleepable = attr->prog_flags & BPF_F_SLEEPABLE;
+	prog->aux->xdp_has_frags = attr->prog_flags & BPF_F_XDP_HAS_FRAGS;
+#+end_src
+Then allocate security??
+#+begin_src c
+	err = security_bpf_prog_alloc(prog->aux);
+	if (err)
+		goto free_prog;
+#+end_src
+setup some more.
+#+begin_src c
+	prog->aux->user = get_current_user();
+	prog->len = attr->insn_cnt;
+#+end_src
+Then move instructions ~insns~ from ~attr~ to ~prog~.
+#+begin_src c
+	if (copy_from_bpfptr(prog->insns,
+			     make_bpfptr(attr->insns, uattr.is_kernel),
+			     bpf_prog_insn_size(prog)) != 0)
+		goto free_prog_sec;
+#+end_src
+Now we set, ~orig_prog~, ~jited~ the ref count and the gpl compatability.
+#+begin_src c
+	prog->orig_prog = NULL;
+	prog->jited = 0;
+
+	atomic64_set(&prog->aux->refcnt, 1);
+	prog->gpl_compatible = is_gpl ? 1 : 0;
+#+end_src
+Then something else that does not seem important for us:
+#+begin_src c
+	if (bpf_prog_is_dev_bound(prog->aux)) {
+		err = bpf_prog_offload_init(prog, attr);
+		if (err)
+			goto free_prog_sec;
+	}
+	err = find_prog_type(type, prog);
+	if (err < 0)
+		goto free_prog_sec;
+
+	prog->aux->load_time = ktime_get_boottime_ns();
+	err = bpf_obj_name_cpy(prog->aux->name, attr->prog_name,
+			       sizeof(attr->prog_name));
+	if (err < 0)
+		goto free_prog_sec;
+#+end_src
+Finally we check with the verifier:
+#+begin_src c
+	err = bpf_check(&prog, attr, uattr);
+	if (err < 0)
+		goto free_used_maps;
+#+end_src
+We call it with the program struct ~prog~ we have build up, the ~attr~ and ~uattr~, which was (TODO)
+*** bpf_check
+some initial setup
+#+begin_src c
+int bpf_check(struct bpf_prog **prog, union bpf_attr *attr, bpfptr_t uattr)
+{
+	u64 start_time = ktime_get_ns();
+	struct bpf_verifier_env *env;
+	struct bpf_verifier_log *log;
+	int i, len, ret = -EINVAL;
+	bool is_priv;
+#+end_src
+Then kindof weird check. (Also should it not be EINVAL?)
+#+begin_src c
+	/* no program is valid */
+	if (array_size(bpf_verifier_ops) == 0)
+		return -einval;
+#+end_src
+then allocate an env:
+#+begin_src c
+	/* 'struct bpf_verifier_env' can be global, but since it's not small,
+	 * allocate/free it every time bpf_check() is called
+	 */
+	env = kzalloc(sizeof(struct bpf_verifier_env), GFP_KERNEL);
+	if (!env)
+		return -ENOMEM;
+	log = &env->log;
+	len = (*prog)->len;
+	env->insn_aux_data =
+		vzalloc(array_size(sizeof(struct bpf_insn_aux_data), len));
+	ret = -ENOMEM;
+	if (!env->insn_aux_data)
+		goto err_free_env;
+	for (i = 0; i < len; i++)
+		env->insn_aux_data[i].orig_idx = i;
+	env->prog = *prog;
+	env->ops = bpf_verifier_ops[env->prog->type];
+	env->fd_array = make_bpfptr(attr->fd_array, uattr.is_kernel);
+	is_priv = bpf_capable();
+
+	bpf_get_btf_vmlinux();
+#+end_src
+some mutex and logging is set:
+#+begin_src c
+	/* grab the mutex to protect few globals used by verifier */
+	if (!is_priv)
+		mutex_lock(&bpf_verifier_lock);
+
+	if (attr->log_level || attr->log_buf || attr->log_size) {
+		/* user requested verbose verifier output
+		 * and supplied buffer to store the verification trace
+		 */
+		log->level = attr->log_level;
+		log->ubuf = (char __user *) (unsigned long) attr->log_buf;
+		log->len_total = attr->log_size;
+
+		/* log attributes have to be sane */
+		if (!bpf_verifier_log_attr_valid(log)) {
+			ret = -EINVAL;
+			goto err_unlock;
+		}
+	}
+#+end_src
+new slate for verifier state (registers and stack has not been accessed).
+#+begin_src c
+	mark_verifier_state_clean(env);
+#+end_src
+more error checking, if gcc or pahole are not working correctly.
+#+begin_src c
+	if (IS_ERR(btf_vmlinux)) {
+		/* Either gcc or pahole or kernel are broken. */
+		verbose(env, "in-kernel BTF is malformed\n");
+		ret = PTR_ERR(btf_vmlinux);
+		goto skip_full_check;
+	}
+#+end_src
+alignment checks that we dont want to mess with:
+#+begin_src c
+	env->strict_alignment = !!(attr->prog_flags & BPF_F_STRICT_ALIGNMENT);
+	if (!IS_ENABLED(CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS))
+		env->strict_alignment = true;
+	if (attr->prog_flags & BPF_F_ANY_ALIGNMENT)
+		env->strict_alignment = false;
+#+end_src
+something else we dont really want to care about:
+#+begin_src c
+	env->allow_ptr_leaks = bpf_allow_ptr_leaks();
+	env->allow_uninit_stack = bpf_allow_uninit_stack();
+	env->bypass_spec_v1 = bpf_bypass_spec_v1();
+	env->bypass_spec_v4 = bpf_bypass_spec_v4();
+	env->bpf_capable = bpf_capable();
+	env->rcu_tag_supported = btf_vmlinux &&
+		btf_find_by_name_kind(btf_vmlinux, "rcu", BTF_KIND_TYPE_TAG) > 0;
+
+	if (is_priv)
+		env->test_state_freq = attr->prog_flags & BPF_F_TEST_STATE_FREQ;
+#+end_src
+we then allocated virtual memory for explored states, if fails then we skip the full check?
+#+begin_src c
+	env->explored_states = kvcalloc(state_htab_size(env),
+				       sizeof(struct bpf_verifier_state_list *),
+				       GFP_USER);
+	ret = -ENOMEM;
+	if (!env->explored_states)
+		goto skip_full_check;
+#+end_src
+Then we look at subprograms and kernel functions:
+**** add_subprogram_and_kfunc
+#+begin_src c
+static int add_subprog_and_kfunc(struct bpf_verifier_env *env)
+{
+	struct bpf_subprog_info *subprog = env->subprog_info;
+	struct bpf_insn *insn = env->prog->insnsi;
+	int i, ret, insn_cnt = env->prog->len;
+
+	/* Add entry function. */
+	ret = add_subprog(env, 0);
+#+end_src
+first we look at subprograms:
+#+begin_src c
+static int add_subprog(struct bpf_verifier_env *env, int off)
+{
+	int insn_cnt = env->prog->len;
+	int ret;
+
+	if (off >= insn_cnt || off < 0) {
+		verbose(env, "call to invalid destination\n");
+		return -EINVAL;
+	}
+	ret = find_subprog(env, off);
+
+#+end_src
+offset must be in range (0, ~insn_cnt~).
+- find_subprog
+        this function will find the index at which subprogram is located at offset. that is at which instruction the entry point is for the offset. So in our initial call we find subprogram at the start of the program?
+        #+begin_src c
+        static int find_subprog(struct bpf_verifier_env *env, int off)
+        {
+            struct bpf_subprog_info *p;
+
+            p = bsearch(&off, env->subprog_info, env->subprog_cnt,
+                    sizeof(env->subprog_info[0]), cmp_subprogs);
+            if (!p)
+                return -ENOENT;
+            return p - env->subprog_info;
+
+        }
+        #+end_src
+in case a ~find_subprogram~ fails, then we check if there are too many subprograms.
+I am actually a little confused?
+otherwise we set the offset to the last subprog, increment and sort. return the last subprog count.
+#+begin_src c
+static int add_subprog(struct bpf_verifier_env *env, int off)
+{
+    ...
+	if (ret >= 0)
+		return ret;
+	if (env->subprog_cnt >= BPF_MAX_SUBPROGS) {
+		verbose(env, "too many subprograms\n");
+		return -E2BIG;
+	}
+	/* determine subprog starts. The end is one before the next starts */
+	env->subprog_info[env->subprog_cnt++].start = off;
+	sort(env->subprog_info, env->subprog_cnt,
+	     sizeof(env->subprog_info[0]), cmp_subprogs, NULL);
+	return env->subprog_cnt - 1;
+#+end_src
+
+~add_subprog~ will return 0 if no subprograms are "added". If error occurs it will return.
+
+**** Going back to add_subprog_and_kfunc
+we go over each instruction and check if it is function call, if not we continue, then if we are not bpf_capable then error, since only capable bpf may call other functions or kernel functions.
+we then add the subprogram.
+or the ~kfunc~
+#+begin_src c
+static int add_subprog_and_kfunc(struct bpf_verifier_env *env)
+{
+	for (i = 0; i < insn_cnt; i++, insn++) {
+		if (!bpf_pseudo_func(insn) && !bpf_pseudo_call(insn) &&
+		    !bpf_pseudo_kfunc_call(insn))
+			continue;
+
+		if (!env->bpf_capable) {
+			verbose(env, "loading/calling other bpf or kernel functions are allowed for CAP_BPF and CAP_SYS_ADMIN\n");
+			return -EPERM;
+		}
+
+		if (bpf_pseudo_func(insn) || bpf_pseudo_call(insn))
+			ret = add_subprog(env, i + insn->imm + 1);
+		else
+			ret = add_kfunc_call(env, insn->imm, insn->off);
+
+		if (ret < 0)
+			return ret;
+	}
+#+end_src
+Lastly:
+#+begin_src c
+	/* Add a fake 'exit' subprog which could simplify subprog iteration
+	 * logic. 'subprog_cnt' should not be increased.
+	 */
+	subprog[env->subprog_cnt].start = insn_cnt;
+
+	if (env->log.level & BPF_LOG_LEVEL2)
+		for (i = 0; i < env->subprog_cnt; i++)
+			verbose(env, "func#%d @%d\n", i, subprog[i].start);
+
+	return 0;
+#+end_src
+Then we check subprograms:
+**** check_subprogs
+Initial setup
+#+begin_src c
+static int check_subprogs(struct bpf_verifier_env *env)
+{
+	int i, subprog_start, subprog_end, off, cur_subprog = 0;
+	struct bpf_subprog_info *subprog = env->subprog_info;
+	struct bpf_insn *insn = env->prog->insnsi;
+	int insn_cnt = env->prog->len;
+
+	/* now check that all jumps are within the same subprog */
+	subprog_start = subprog[cur_subprog].start;
+	subprog_end = subprog[cur_subprog + 1].start;
+#+end_src
+next we check all instructions for:
+1. if it has tail calls,
+2. if it has ld_abs, which is a specific form of load of which is deprecated.
+3. if it is not a jump go next or if instruction is an ebpf call or an exit. go to next.
+4. it is not allowed to jump outside of the subprogram.
+#+begin_src c
+	for (i = 0; i < insn_cnt; i++) {
+		u8 code = insn[i].code;
+
+		if (code == (BPF_JMP | BPF_CALL) &&
+		    insn[i].imm == BPF_FUNC_tail_call &&
+		    insn[i].src_reg != BPF_PSEUDO_CALL)
+			subprog[cur_subprog].has_tail_call = true;
+		if (BPF_CLASS(code) == BPF_LD &&
+		    (BPF_MODE(code) == BPF_ABS || BPF_MODE(code) == BPF_IND))
+			subprog[cur_subprog].has_ld_abs = true;
+		if (BPF_CLASS(code) != BPF_JMP && BPF_CLASS(code) != BPF_JMP32)
+			goto next;
+		if (BPF_OP(code) == BPF_EXIT || BPF_OP(code) == BPF_CALL)
+			goto next;
+		off = i + insn[i].off + 1;
+		if (off < subprog_start || off >= subprog_end) {
+			verbose(env, "jump out of range from insn %d to %d\n", i, off);
+			return -EINVAL;
+		}
+#+end_src
+if the current iteration of the loop is the last instruction in a subprogram, thenit must be a jump or exit. and continue iteration.
+#+begin_src c
+next:
+		if (i == subprog_end - 1) {
+			/* to avoid fall-through from one subprog into another
+			 ,* the last insn of the subprog should be either exit
+			 ,* or unconditional jump back
+			 ,*/
+			if (code != (BPF_JMP | BPF_EXIT) &&
+			    code != (BPF_JMP | BPF_JA)) {
+				verbose(env, "last insn is not an exit or jmp\n");
+				return -EINVAL;
+			}
+			subprog_start = subprog_end;
+			cur_subprog++;
+			if (cur_subprog < env->subprog_cnt)
+				subprog_end = subprog[cur_subprog + 1].start;
+		}
+	}
+	return 0;
+#+end_src
+**** check btf_info and attach btf
+we skip this step for now. TODO: maybe BTF will be important for us.
+**** resolve_pseudo_ldimm64
+we also skip this, QUESTION: Will this be important?
+**** Device bound
+some device bound checks that we dont want to mess with.
+**** check_cfg
+This step checks for loops in code - can be omitted if we get a proof of variants.
+**** all subprograms are checked: do_check_sub_progs
+Im getting tired of including everything so we limit ourself to only the important parts?
+a check for a subprogram is checked via ~do_check_common~:
+setup a state. All subprograms must follow same rules with newly unset registers etc.
+If our program is a subprogram or the main program is of the ~BPF_PROG_TYPE_EXT~ then we
+(TODO: LOOK MORE INTO BTF)
+firstly try to convert btf into ~bpf_reg_state~ if result is 0 then we successfully converted. EFAULT if verifier bug (somehow) or EINVAL if it cannot convert. This will abort verification.
+Then we update the lower registers approriately.
+#+begin_src c
+	if (subprog || env->prog->type == BPF_PROG_TYPE_EXT) {
+		ret = btf_prepare_func_args(env, subprog, regs);
+		if (ret)
+			goto out;
+		for (i = BPF_REG_1; i <= BPF_REG_5; i++) {
+			if (regs[i].type == PTR_TO_CTX)
+				mark_reg_known_zero(env, regs, i);
+			else if (regs[i].type == SCALAR_VALUE)
+				mark_reg_unknown(env, regs, i);
+			else if (base_type(regs[i].type) == PTR_TO_MEM) {
+				const u32 mem_size = regs[i].mem_size;
+
+				mark_reg_known_zero(env, regs, i);
+				regs[i].mem_size = mem_size;
+				regs[i].id = ++env->id_gen;
+			}
+		}
+#+end_src
+Then We get to the actual check, we dont really need what goes on i think. We should be able to skip this entire step with a proof.
+It looks like some of the sanitization happens in ~do_check~.
+Then main is checked similarly to subprograms.
+**** offloading:
+I dont really understand what this means.
+**** Checking max depth of stack
+TODO
+*** Rewrites are gonna happen
+We should be able to remove this.
+**** OPTIMIZE LOOP
+This is related to inlining loops from the loop helper.
+**** hard wire dead code branches
+This code will go over all instructions.
+We skip if the instruction is not a conditional jump.
+if the next instruction is dead code, that is it has not been seen by the verifier,
+then we can convert the conditional jump into jump with same offset as the current one.
+similarly if the code if the jump is taken is dead, then dont take it.
+**** remove dead code
+as the name suggest, remove dead code.
+**** remove nops
+in the form of jmp 0.
+**** Sanitize dead code
+This only happens if ~bpf_capable()~ is false, i actualle dont really understand this. TODO???
+
+**** convert_ctx_accesses
+convert loads and writes from ctx accessed, to actual code?
+I dont think we want to mess with this.
+TODO?
+**** misc fixups
+- divide by 0 patching.
+- ~LD_ABS~ and ~LD_IND~ with rewrite of supported by program type.
+- Rewrite pointer arithmetic (speculation attacks)
+- kfunc patching (immediate is the BTF value but should be descriptor, and some more, we cannot really remove this? or maybe kfuncs should not be allowed)
+- some builts ins?
+- tail calls are modified, probably still need this. dont know what it does.
+- something else... im getting very tired.
+**** fixup call args
+YES YES

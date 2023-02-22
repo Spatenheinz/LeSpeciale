@@ -1,0 +1,11 @@
+#+title: Checker
+
+* Aletha
+- natural deduction style calculus. (driven by resolution)
+- Skolemization (prenex with universal first order quant)
+- command structure close to SMT-LIB (in many cases uses existing features)
+- very short article?
+
+* LFSC
+ - also lisp like syntax.
+ -
