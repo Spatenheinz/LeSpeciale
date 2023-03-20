@@ -1,0 +1,49 @@
+#+LATEX_CLASS: report-noparts
+#+LATEX_CLASS_OPTIONS: [a4paper, openany]
+#+LATEX_COMPILER: pdflatex
+
+#+LATEX_HEADER: \usepackage{lmodern} % Ensures we have the right font
+
+#+LATEX_HEADER: \usepackage[T1]{fontenc}
+#+LATEX_HEADER: \usepackage[AUTO]{inputenc}
+#+LATEX_HEADER: \usepackage{graphicx}
+#+LATEX_HEADER: \usepackage{amsmath, amsthm, amssymb}
+#+LATEX_HEADER: \usepackage[table, xcdraw]{xcolor}
+#+LATEX_HEADER: \usepackage{titlesec}
+
+% Setup for the official front page from KU
+#+LATEX_HEADER: \usepackage[english, science, titlepage]{Preamble/ku-frontpage}
+
+#+LATEX_HEADER: \usepackage{url}
+
+% we dont want indentation
+#+LATEX_HEADER: \setlength{\parindent}{0pt}
+% maybe we want more or less space between paragraphs
+#+LATEX_HEADER: \setlength{\parskip}{1em}
+
+%nicer fonts
+#+LATEX_HEADER: \usepackage[stretch=10]{microtype}
+
+
+% TODO: this is not needed?
+#+LATEX_HEADER: \usepackage{hyphenat}
+
+% TODO: Should make better raggedright have never used
+#+LATEX_HEADER: \usepackage{ragged2e}
+
+% Code highlighting is done by src setup but we keep it for good measure
+#+LATEX_HEADER: \usepackage{minted}
+
+% Disables flush alighment on the right side. Personal preference.
+# #+LATEX_HEADER: \RaggedRight
+
+% Page geometry
+#+LATEX_HEADER: \usepackage[top=1in, bottom=1.25in, left=1.55in, right=1.55in]{geometry}
+
+% Line spacing
+#+LATEX_HEADER: \renewcommand{\baselinestretch}{1.15}
+
+% bib-latex
+#+LATEX_HEADER: \usepackage[backend=biber,dateabbrev=false]{biblatex}
+#+LATEX_HEADER: \usepackage{csquotes} % package to biblatex
+#+LATEX_HEADER: \addbibresource{references.bib}

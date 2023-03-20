@@ -1,0 +1,16 @@
+#+SETUPFILE: Preamble/latex-setup.org
+
+#+TITLE: *In-kernel Linux Proof Checker*
+#+AUTHOR: Jacob Herbst (mwr148)
+#+DATE: 2023-05-31
+#+LATEX_HEADER_EXTRA: \assignment{Msc. Thesis}
+#+LATEX_HEADER_EXTRA: \subtitle{For PCC'ifying the eBPF syscall}
+#+LATEX_HEADER_EXTRA: \repo{github.com}
+#+LATEX_HEADER_EXTRA: \advisor{Advisor: Ken Friis Larsen}
+#+LATEX_HEADER_EXTRA: \frontpageimage{croissant.png}
+
+* Background
+In this report we will write my thesis wtf
+#+begin_src rust
+main {}
+#+end_src

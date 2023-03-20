@@ -13,6 +13,7 @@ qemu-system-x86_64 \
 	-nographic \
 	-pidfile vm.pid \
 	-enable-kvm \
+	-virtfs local,path=$1,security_model=passthrough,mount_tag=hostshare \
 	2>&1 | tee vm.log
 
 # qemu-system-x86_64 \
