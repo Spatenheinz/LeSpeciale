@@ -9,8 +9,20 @@
 #+LATEX_HEADER_EXTRA: \advisor{Advisor: Ken Friis Larsen}
 #+LATEX_HEADER_EXTRA: \frontpageimage{croissant.png}
 
-* Background
-In this report we will write my thesis wtf
-#+begin_src rust
-main {}
-#+end_src
+#+BEGIN_abstract
+  TODO: this is an abstract
+#+END_abstract
+
+#+include: introduction.org
+
+#+include: Proofs/pcc.org
+
+#+include: Linux/linux.org
+
+#+include: Proofs/proofs.org
+
+#+include: Implementation/implementation.org
+
+#+include: Results/results.org
+
+#+include: conclusion.org

@@ -1,0 +1,7 @@
+* TODO [0/2] Formal logic and Computers
+
+
+** TODO Satisfiability modulo theories
+#+INCLUDE: smt.org
+
+** TODO CVC5, Logical Framework with Side Conditions and Alethe

@@ -1,0 +1,12 @@
+* TODO Experiments
+  - Take some examples, (for instance from Mads Thesis and check the proofs and see if the new format will let the updated ebpf syscall allow programs to load)
+  - obviously also check that it will reject programs that either does not match the program (if this can even happen by design), or if the proof is unsatisfiable.
+  - We really want the functionality to be non-blocking. Is this easy or difficult in Rust and in the Kernel?
+
+* TODO Evaluation
+  - Videnskabsteori: Hypothesis etc.
+    - Correctness
+    - Expressiveness
+    - Performance
+    - Ease of use?
+    - maybe more???

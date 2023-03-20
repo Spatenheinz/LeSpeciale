@@ -1,0 +1,11 @@
+* TODO [0/5] The in-kernel proof checker
+
+** TODO Overall design
+
+** IDEA The Linux build system?
+
+** TODO Reading proofs
+
+** TODO Typechecking LFSC
+
+** TODO Plugging into the eBPF syscall
