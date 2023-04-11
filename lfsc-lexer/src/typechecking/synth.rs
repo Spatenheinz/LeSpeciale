@@ -1,8 +1,7 @@
-use lfsc_syntax::ast::{AlphaTerm, FromLit, TermLiteral, Num};
+use lfsc_syntax::ast::{AlphaTerm, FromLit};
 use lfsc_syntax::ast::AlphaTerm::*;
 use super::nbe::{eval, eval_closure};
 use super::values::{TResult, Type, as_pi};
-use super::values::Value::*;
 use super::context::{Context, Key, RLCTX};
 use super::check::check;
 
@@ -32,11 +31,7 @@ where   T: PartialEq + Clone + FromLit + std::fmt::Debug,
         App(t1, t2) => {
             use std::borrow::Borrow;
             let f_ty = synth(t1, ctx.clone())?;
-            let (a,b) = // f_ty.borrow().as_pi()?;
-                match f_ty.borrow() {
-                Type::Pi(a,b) => (a,b),
-                _ => return Err(crate::typechecking::values::TypecheckingErrors::NotPi),
-            };
+            let (a,b) = as_pi(f_ty.borrow())?;
             check(t2, a.clone(), ctx.clone())?;
             let res_clo = eval_closure(b.clone(), eval(t2, ctx.clone())?)?;
             Ok(res_clo)

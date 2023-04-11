@@ -6,7 +6,7 @@ use super::values::{Value, TResult, RT, as_pi, Neutral, as_Z, as_Q};
 use super::context::RLCTX;
 
 use std::rc::Rc;
-use std::borrow::BorrowMut;
+use std::borrow::{BorrowMut, Borrow};
 
 
 pub fn check<'a, T>(term: &'a AlphaTerm<T>, tau: RT<'a, T>,
@@ -15,19 +15,19 @@ where
     T: PartialEq + Clone + FromLit + std::fmt::Debug,
 {
     match term {
-        Literal(TermLiteral::Number(Num::Z(_))) => as_Z(tau),
-        Literal(TermLiteral::Number(Num::Q(_,_))) => as_Q(tau),
+        Literal(TermLiteral::Number(Num::Z(_))) => as_Z(tau.borrow()),
+        Literal(TermLiteral::Number(Num::Q(_,_))) => as_Q(tau.borrow()),
         Var(x) => todo!(),
         DBI(i) => todo!(),
         AlphaTerm::Pi(t1, t2) => {
             todo!()
         },
         AlphaTerm::Lam(body) => {
-            let (a,b) = as_pi(tau)?;
+            let (a,b) = as_pi(tau.borrow())?;
             let val = eval_closure(b,
                 Rc::new(Value::Neutral(a.clone(),
                                        Rc::new(Neutral::DBI(0)))))?;
-            ctx.as_ptr().insert(a);
+            super::context::LocalContext::insert(ctx.borrow_mut(), a);
             check(body, val, ctx)
         },
         AnnLam(..) => todo!(),

@@ -1,15 +1,13 @@
 use std::rc::Rc;
-use std::cell::RefCell;
 
 use lfsc_syntax::ast::AlphaTerm;
 
 use super::context::LResult;
-use std::borrow::Borrow;
 
 #[derive(Debug)]
 pub struct Closure<'a, T> {
     // pub env: &'a mut super::context::LocalContext<'a, T>,
-    pub env: Rc<RefCell<super::context::LocalContext<'a, T>>>,
+    pub env: super::context::RLCTX<'a, T>,
     pub body: &'a AlphaTerm<T>,
 }
 //
@@ -29,24 +27,24 @@ pub enum Value<'a, T> {
 }
 
 #[allow(non_snake_case)]
-pub fn as_Z<'a,T>(v: RT<'a, T>) -> TResult<()> {
-    match v.borrow() {
+pub fn as_Z<'a,T>(v: &Value<'a, T>) -> TResult<()> {
+    match v {
         Value::ZT => Ok(()),
         _ => Err(TypecheckingErrors::NotZ),
     }
 }
 
 #[allow(non_snake_case)]
-pub fn as_Q<'a,T>(v: RT<'a, T>) -> TResult<()> {
-    match v.borrow() {
+pub fn as_Q<'a,T>(v: & Value<'a, T>) -> TResult<()> {
+    match v {
         Value::QT => Ok(()),
         _ => Err(TypecheckingErrors::NotZ),
     }
 }
 
-pub fn as_pi<'a, T>(v: RT<'a, T>)
+pub fn as_pi<'a, T>(v: &Value<'a, T>)
                     -> TResult<(RT<'a,T>, Rc<Closure<'a, T>>)> {
-    match v.borrow() {
+    match v {
         Value::Pi(a, b) => Ok((a.clone(), b.clone())),
         _ => Err(TypecheckingErrors::NotPi),
     }
