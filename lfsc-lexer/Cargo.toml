@@ -1,0 +1,15 @@
+[package]
+name = "lfsc-lexer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lfsc_syntax = { path = "lfsc_syntax" }
+# num-bigint = { version = "0.4", default-features = false }
+nom = "7.1.3"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

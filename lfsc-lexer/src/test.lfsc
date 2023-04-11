@@ -1,0 +1,15 @@
+; WARNING: adding trust step for THEORY_REWRITE
+(let x 10 x)
+; (define cvc.c (var 0 Bool))
+; (define cvc.b (var 1 Bool))
+; (define cvc.d (var 2 Bool))
+; (check
+; (@ __t1 (= cvc.b cvc.d)
+; (@ __t2 (or cvc.b (or cvc.d false))
+; (@ __t3 (= __t2 __t1)
+; (@ __t4 (and __t3 true)
+; (@ __t5 (ite cvc.d cvc.c false)
+; (@ __t6 (= cvc.c cvc.d)
+; (@ __t7 (or cvc.d (or cvc.b false))
+; (@ __t8 (and (not cvc.d) __t4)
+; (% __a0 (holds (and __t7 (and __t6 (and (not __t5) __t4))))

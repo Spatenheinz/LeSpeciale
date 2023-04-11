@@ -1,0 +1,71 @@
+; WARNING: adding trust step for THEORY_REWRITE
+(define cvc.r0_1 (var 0 (BitVec 64)))
+(define cvc.r1_2 (var 1 (BitVec 64)))
+(check
+(@ t1 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 bvn))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+(@ t2 (bvc b0 (bvc b0 t1))
+(@ t3 (bv (bvc b0 (bvc b0 t2)))
+(@ t4 (= cvc.r1_2 t3)
+(@ t5 (bv (bvc b0 (bvc b1 t2)))
+(@ t6 (= cvc.r1_2 t5)
+(@ t7 (bv (bvc b0 (bvc b1 (bvc b0 (bvc b1 t1)))))
+(@ t8 (= cvc.r0_1 t7)
+(@ t9 (= t5 cvc.r1_2)
+(@ t10 (= t3 cvc.r1_2)
+(@ t11 (not t10)
+(@ t12 (= t3 t5)
+(@ t13 (= t12 false)
+(# a0 (holds (not (=> t8 (=> t6 (not t4)))))
+(: (holds false)
+
+(plet _  _
+
+(not_implies_elim2 _  _
+(eq_resolve _  _  a0
+(cong _  _  _  _
+(refl f_not)
+(cong _  _  _  _
+(cong _  _  _  _
+(refl f_=>)
+(trust (= t8 (= t7 cvc.r0_1))) ; from THEORY_REWRITE
+)
+(cong _  _  _  _
+(cong _  _  _  _
+(refl f_=>)
+(trust (= t6 t9)) ; from THEORY_REWRITE
+)
+(cong _  _  _  _
+(refl f_not)
+(trust (= t4 t10)) ; from THEORY_REWRITE
+))))))
+(\ p1
+
+
+(resolution _  _  _
+(resolution _  _  _
+(reordering _  (or t11 (or (not t9) false))
+(implies_elim _  _
+(process_scope _  _  t11
+(scope _  t9
+(\ a1
+(false_elim _
+(trans _  _  _
+(cong _  _  _  _
+(cong _  _  _  _
+(refl f_=)
+(refl t3))
+(symm _  _  a1))
+(true_elim _
+(trans _  _  _
+(trust (= t13 (not t12))) ; from THEORY_REWRITE
+
+(trans _  _  _
+(cong _  _  _  _
+(refl f_not)
+(trust t13) ; from THEORY_REWRITE
+)
+(trust (= (not false) true)) ; from THEORY_REWRITE
+))))))))))
+(not_not_elim _
+(not_implies_elim2 _  _  p1)) ff t10)
+(not_implies_elim1 _  _  p1) ff t9)))))))))))))))))))

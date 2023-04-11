@@ -1,0 +1,141 @@
+; WARNING: adding trust step for THEORY_REWRITE
+(define cvc.c (var 0 Bool))
+(define cvc.b (var 1 Bool))
+(define cvc.d (var 2 Bool))
+(check
+(@ __t1 (= cvc.b cvc.d)
+(@ __t2 (or cvc.b (or cvc.d false))
+(@ __t3 (= __t2 __t1)
+(@ __t4 (and __t3 true)
+(@ __t5 (ite cvc.d cvc.c false)
+(@ __t6 (= cvc.c cvc.d)
+(@ __t7 (or cvc.d (or cvc.b false))
+(@ __t8 (and (not cvc.d) __t4)
+(% __a0 (holds (and __t7 (and __t6 (and (not __t5) __t4))))
+(: (holds false)
+
+(plet _  _
+
+(refl __t3)
+(\ __p1
+
+(plet _  _
+
+(refl f_and)
+(\ __p2
+
+(plet _  _
+
+(refl __t7)
+(\ __p3
+
+(plet _  _
+
+(refl f_and)
+(\ __p4
+
+(plet _  _
+
+(refl f_and)
+(\ __p5
+
+(plet _  _
+
+(cong _  _  _  _
+(cong _  _  _  _  __p5 __p3)
+(cong _  _  _  _
+(cong _  _  _  _  __p5
+(refl __t6))
+(cong _  _  _  _
+(cong _  _  _  _  __p5
+(cong _  _  _  _
+(refl f_not)
+(trust (= __t5 (and cvc.d (and cvc.c true)))) ; from THEORY_REWRITE
+))
+(cong _  _  _  _
+(cong _  _  _  _  __p5 __p1)
+(refl true)))))
+(\ __p6
+
+(plet _  _
+
+(and_elim _  _  1
+(eq_resolve _  _  __a0 __p6))
+(\ __p7
+
+(plet _  _
+
+(refl f_and)
+(\ __p8
+
+(plet _  _
+
+(refl cvc.d)
+(\ __p9
+
+(plet _  _
+
+(eq_resolve _  _  __a0
+(trans _  _  _  __p6
+(trans _  _  _
+(cong _  _  _  _
+(cong _  _  _  _  __p4
+(refl __t7))
+(cong _  _  _  _
+(cong _  _  _  _  __p4
+(cong _  _  _  _
+(cong _  _  _  _
+(refl f_=) __p7) __p9))
+(cong _  _  _  _
+(cong _  _  _  _  __p4
+(cong _  _  _  _
+(refl f_not)
+(cong _  _  _  _
+(cong _  _  _  _  __p8 __p9)
+(cong _  _  _  _
+(cong _  _  _  _  __p8 __p7)
+(refl true)))))
+(cong _  _  _  _
+(cong _  _  _  _  __p4
+(refl __t3))
+(refl true)))))
+(trans _  _  _
+(cong _  _  _  _
+(cong _  _  _  _  __p2 __p3)
+(cong _  _  _  _
+(cong _  _  _  _  __p2
+(trust (= (= cvc.d cvc.d) true)) ; from THEORY_REWRITE
+)
+(cong _  _  _  _
+(cong _  _  _  _  __p2
+(cong _  _  _  _
+(refl f_not)
+(trust (= (and cvc.d (and cvc.d true)) cvc.d)) ; from THEORY_REWRITE
+))
+(cong _  _  _  _
+(cong _  _  _  _  __p2 __p1)
+(refl true)))))
+(trust (= (and __t7 (and true __t8)) (and __t7 __t8))) ; from THEORY_REWRITE
+))))
+(\ __p10
+
+(plet _  _
+
+(and_elim _  _  0 __p10)
+(\ __p11
+
+
+(resolution _  _  _
+(resolution _  _  _
+(reordering _  (or __t1 (or (not __t2) false))
+(equiv_elim1 _  _
+(and_elim _  _  2 __p10)))
+(resolution _  _  _
+(resolution _  _  _
+(reordering _  (or cvc.d (or (not cvc.b) (or (not __t1) false)))
+(cnf_equiv_pos1 cvc.b cvc.d))
+(and_elim _  _  1 __p10) tt cvc.d)
+(resolution _  _  _
+(reordering _  __t2 __p11)
+(and_elim _  _  1 __p10) tt cvc.d) ff cvc.b) tt __t1)
+(reordering _  __t2 __p11) ff __t2))))))))))))))))))))))))))))))))))
