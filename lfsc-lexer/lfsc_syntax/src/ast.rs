@@ -4,32 +4,11 @@ pub enum Num {
     Q(u32, u32)
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum TermLiteral {
-    Number(Num),
-    Mpq,
-    Mpz,
-    Type,
-    Hole,
+pub trait BuiltIn {
+    fn _mpz() -> Self;
+    fn _mpq() -> Self;
+    fn _type() -> Self;
 }
-
-pub trait FromLit {
-    fn from_lit(lit: TermLiteral) -> Self;
-}
-
-impl FromLit for &str {
-    fn from_lit(lit: TermLiteral) -> Self {
-        match lit {
-            TermLiteral::Number(Num::Z(_)) => "mpz",
-            TermLiteral::Number(Num::Q(_, _)) => "mpq",
-            TermLiteral::Mpq => "mpq",
-            TermLiteral::Mpz => "mpz",
-            TermLiteral::Type => "type",
-            _ => panic!("HOLE SHOULD NOT BE A LITERAL")
-        }
-    }
-}
-
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum BinderKind {
@@ -43,8 +22,8 @@ pub enum BinderKind {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Term<T> {
-    // A literal
-    Literal(TermLiteral),
+    Number(Num),
+    Hole,
     // Variables can be both explicit and by a De Bruijn Index, Notice this will first occur
     // after alpha normalization. And only bound variables will be DBI.
     Var(T),
@@ -66,8 +45,10 @@ pub enum Term<T> {
 
 
 #[derive(Debug, PartialEq)]
+#[repr(C)]
 pub enum AlphaTerm<T> {
-    Literal(TermLiteral),
+    Number(Num),
+    Hole,
     Var(T),
     DBI(u32),
     // a Pi binder consists of a type and a body
@@ -93,11 +74,11 @@ pub enum Decl {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum NumericSC<T> {
-    Sum{ lhs: Num, rhs: Num },
-    Prod{ lhs: Num, rhs: Num },
-    Div{ lhs: Num, rhs: Num },
-    Negation{ num: Num },
-    ItoR{ num: Num },
+    Sum(Num, Num),
+    Prod(Num, Num),
+    Div(Num, Num),
+    Negation(Num),
+    ItoR(Num),
     ZBranch { num: Num, tbranch: Term<T>, fbranch: Term<T> },
     NegBranch { num: Num, tbranch: Term<T>, fbranch: Term<T> },
 }
@@ -121,29 +102,32 @@ pub enum CompoundSC<T> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum SideEffectSC<T> {
-    IfMarked { n: u32, c: Term<T>, tbranch: Term<T>, fbranch: Term<T> },
-    MarkVar { n: u32, c: Term<T> },
-    Do { a: Term<T>, b: Term<T> },
+    IfMarked { n: u32, c: TermSC<T>, tbranch: TermSC<T>, fbranch: TermSC<T> },
+    MarkVar(u32, T),
+    Do(TermSC<T>, TermSC<T>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TermSC<T> {
+    Number(Num),
+    Var(T),
+    Let(T, Term<T>, Term<T>),
     Numeric(NumericSC<T>),
     Compound(CompoundSC<T>),
-    SideEffect(SideEffectSC<T>)
+    SideEffect(Box<SideEffectSC<T>>)
 }
 
 
 #[derive(Debug, PartialEq)]
-pub enum Command<T> {
-    Declare{var: String, ty: Type<T>},
-    Define{var: String, term: Term<T>},
-    Opaque{var: String, term: Term<T>},
+pub enum Command<Id> {
+    Declare(Id, Term<Id>),
+    Define(Id, Term<Id>),
+    // Opaque{var: Id, term: T},
 //  Declare Rule: (declare-rule VAR DECLS TYPE): equivalent to (declare VAR (-> DECLS TYPE))
 // Declare Type: (declare-type VAR DECLS): equivalent to (declare VAR (-> DECLS type))
-    DefConst{var: String, decls: Decls, term: Term<T>},
-    Check(Term<T>),
-    AssCheck{decls: Decls, ty: Term<T>, term: Term<T>},
-    ProgDef{args: Vec<(String, Term<T>)>, ty: Term<T>, body: Term<T>},
-    Run(TermSC<T>),
+    // DefConst{var: Id, decls: Decls, term: T},
+    Check(Term<Id>),
+    // AssCheck{decls: Decls, ty: T, term: T},
+    // ProgDef{args: Vec<(Id, T)>, ty: T, body: T},
+    // Run(TermSC<T>),
 }

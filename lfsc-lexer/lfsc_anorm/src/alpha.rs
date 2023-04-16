@@ -9,7 +9,8 @@ pub fn alpha_normalize<'a, T>(term: Term<T>) -> AlphaTerm<T>
 where T: Clone + PartialEq
 {
     match term {
-        Term::Literal(l) => Literal(l),
+        Term::Number(l) => Number(l),
+        Term::Hole => Hole,
         Term::Var(v) => Var(v),
         Term::DBI(d) => DBI(d),
         Term::Binder {kind, var, ty, mut body } => {

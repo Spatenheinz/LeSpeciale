@@ -6,7 +6,7 @@ use super::shift::shift;
 pub fn subst<'a, T>(term: &'a mut Term<T>, target: &'a Option<T>, mut sub_term: Term<T>)
 where T: PartialEq + Clone {
     match term {
-        Literal(_) | DBI(_) => (),
+        Hole | Number(_) | DBI(_) => (),
         Var(x) => {
             if target.is_some() && target.as_ref().unwrap() == x {
                 *term = sub_term

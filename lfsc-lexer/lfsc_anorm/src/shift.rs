@@ -9,7 +9,7 @@ use lfsc_syntax::ast::Term;
 pub fn shift<'a, T>(term: &'a mut Term<T>, d: u32, target: &'a Option<T>, minimum: u32)
 where T: PartialEq + Clone {
     match term {
-        Literal(_) => (),
+        Number(_) | Hole => (),
         DBI(n) => {
             if target.is_none() && minimum <= *n {
                 *term = DBI(*n + d)

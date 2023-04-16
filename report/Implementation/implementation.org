@@ -1,11 +1,38 @@
 * TODO [0/5] The in-kernel proof checker
+In this Section we provide a highlevel overview of the in-kernel proof checker.
+Followed by an indepth description of implementation for each subpart of the design.
 
 ** TODO Overall design
+We can split the actual design into multiple levels.
+Firstly we must consider the overall interaction between the code producer and the code consumer.
+In this interaction we will strive for doing as little work as possible inside the kernel.
+Specifically we want the following properties for an implementation:
+
+1. The implementation should be correct and follow soundness of the LFSC typesystem.
+2. The implementation must be both memory and runtime efficient (comparative to the verifier).
+3. The implementation should be safe.
+4. The implementation should be simple in nature, to minimize the risk of bugs (WELL, NICE NOT NEED?)
+
+Moving as much computation to user-space as possible will give the best chance of an implementation that
+will be competitive with the verifier whilst being less code heavy and proovably correct.
+Unsurprisingly, most of the work still needs to reside in the kernel,
+
+however if we require that the input must be using De Bruijn indices for bound variables we can
+eliminate a fraction of both memory from variable names when looking up variables.
+Furthermore we get equality for free, as it simply amounts to syntactical equality.
+
+By using Rust as implementation language, we can get a lot of the requirements for free.
+Although it does not guarantee the implementation to be safe in terms of malicious inputs,
+it will greatly decrease the risk of any memory leak.
+
+ALL OF THIS IS GARBAGE!!!
+
 
 ** IDEA The Linux build system?
 
 ** TODO Reading proofs
 
 ** TODO Typechecking LFSC
+
 
 ** TODO Plugging into the eBPF syscall

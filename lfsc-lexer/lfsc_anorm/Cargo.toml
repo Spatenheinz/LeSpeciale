@@ -1,8 +1,9 @@
 [package]
-name = "tagless"
+name = "lfsc_anorm"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+lfsc_syntax = { path = "../lfsc_syntax" }

@@ -1,6 +1,12 @@
 #+title: Syntax
 
 
+toplevel:
+  Define
+  Declare
+  function
+  check
+
 ! is ᴨ
 
 constants can be not enclosed,
@@ -60,3 +66,16 @@ make a new symbol based on this
 
 if \x: A. M, gives that A is of type Type, then we save x := (x, A), we then check the range,
 M, we make ! x domain (classifier of range)
+
+
+
+* Sideconditions:
+
+<#+begin_src
+S ::=
+    num | var | '(' S'
+
+S' ::= 'let' .. ')' | S S ')'
+--  S ')'
+--  do .. ')'
+#+end_src

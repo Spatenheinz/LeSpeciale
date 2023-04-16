@@ -1,46 +1,53 @@
-use lfsc_syntax::ast::{AlphaTerm, FromLit};
+use lfsc_syntax::ast::{AlphaTerm, Num, BuiltIn};
 use lfsc_syntax::ast::AlphaTerm::*;
 use super::nbe::{eval, eval_closure};
-use super::values::{TResult, Type, as_pi};
-use super::context::{Context, Key, RLCTX};
+use super::values::{as_pi, TypecheckingErrors, ResRT};
+use super::context::{RLCTX, LocalContext, RGCTX};
 use super::check::check;
 
 use std::rc::Rc;
+use std::borrow::Borrow;
 
-pub fn synth<'a, T>(term: &'a AlphaTerm<T>, ctx: RLCTX<'a,T>) -> TResult<Rc<Type<'a, T>>>
-where   T: PartialEq + Clone + FromLit + std::fmt::Debug,
+pub fn synth<'a, T>(term: &'a AlphaTerm<T>,
+                    lctx: RLCTX<'a,T>,
+                    gctx: RGCTX<'a, T>) -> ResRT<'a,T>
+where   T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
 {
     match term {
-        Literal(l) =>
-            ctx.borrow().get_type(Key::Name(FromLit::from_lit(l.clone()))),
-        Var(x) =>
-            ctx.borrow().get_type(Key::Name(x.clone())),
-        DBI(i) =>
-            ctx.borrow().get_type(Key::DBI(*i)),
+        Number(Num::Z(_)) => gctx.get_value(&T::_mpz()),
+        Number(Num::Q(..)) => gctx.get_value(&T::_mpq()),
+        Var(x)            => gctx.get_type(x),
+        DBI(i)            => lctx.get_type(*i),
         AlphaTerm::Pi(t1, t2) => {
-            let tmp = Rc::new(Type::Kind);
-            check(t1, tmp.clone(), ctx.clone())?;
-            let val = eval(t1, ctx.clone())?;
-            ctx.borrow_mut().insert(val);
-            check(t2, tmp, ctx)?;
-            Ok(Rc::new(Type::Kind))
-        }
-        AlphaTerm::Lam(_) | AnnLam(..) => {
+            check(t1, gctx.kind.clone(), lctx.clone(), gctx)?;
+            let val = eval(t1, lctx.clone(), gctx)?;
+            check(t2, gctx.kind.clone(),
+                  LocalContext::insert(val.clone(), lctx.clone()), gctx)?;
+            Ok(gctx.kind.clone())
+        },
+        AnnLam(dom, range) => {
+            // to make a type for a lambda, we start by checking that the domain is type
+            // it cannot be Kind.
+            // then we check that the range is a function -- im not entirely sure this is correct.
+            // check(dom, Rc::new(Type::Type), lctx.clone(), gctx.clone())?;
+            // let range = synth(range, lctx.clone(), gctx.clone())?;
+            // Ok(Rc::new(Type::Pi(dom.clone(), range)));
             todo!("cannot synth a lambda");
         }
         App(t1, t2) => {
-            use std::borrow::Borrow;
-            let f_ty = synth(t1, ctx.clone())?;
+            let f_ty = synth(t1, lctx.clone(), gctx)?;
             let (a,b) = as_pi(f_ty.borrow())?;
-            check(t2, a.clone(), ctx.clone())?;
-            let res_clo = eval_closure(b.clone(), eval(t2, ctx.clone())?)?;
+            check(t2, a.clone(), lctx.clone(), gctx)?;
+            let res_clo = eval_closure(b, eval(t2, lctx.clone(), gctx)?, gctx)?;
             Ok(res_clo)
         }
         Asc(t1, t2) => {
-            let ty = synth(t1, ctx.clone())?;
-            check(t2, ty.clone(), ctx)?;
+            let ty = synth(t1, lctx.clone(), gctx)?;
+            check(t2, ty.clone(), lctx, gctx)?;
             Ok(ty)
         }
+        AlphaTerm::Lam(_) => Err(TypecheckingErrors::CannotInferLambda),
+        Hole => Err(TypecheckingErrors::CannotInferHole),
         SC(t1, t2) => {
             todo!()
         }

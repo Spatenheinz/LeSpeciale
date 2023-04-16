@@ -1,24 +1,32 @@
 use std::rc::Rc;
+use std::cell::RefCell;
+use std::borrow::Cow;
 
 use lfsc_syntax::ast::AlphaTerm;
 
-use super::context::LResult;
+use super::context::{LResult, LocalContext};
 
-#[derive(Debug)]
-pub struct Closure<'a, T> {
-    // pub env: &'a mut super::context::LocalContext<'a, T>,
+#[derive(Debug, Clone)]
+pub struct Closure<'a, T: Clone> {
+    #[cfg(feature = "conslist")]
     pub env: super::context::RLCTX<'a, T>,
+    // #[cfg(not(feature = "conslist"))]
+    // pub env: &'a LocalContext<'a, T>,
     pub body: &'a AlphaTerm<T>,
 }
 //
 pub type Type<'a, T> = Value<'a, T>;
 pub type RT<'a, T> = Rc<Type<'a, T>>;
+// pub type RT<'a, T> = &'a Type<'a, T>;
+// pub type Eval<'a, T> = TResult<(RT<'a, T>, LocalContext<'a, T>)>;
+pub type ResRT<'a, T> = TResult<RT<'a, T>, T>;
 
 #[derive(Debug, Clone)]
-pub enum Value<'a, T> {
-    Pi(RT<'a, T>, Rc<Closure<'a, T>>),
-    Lam(Rc<Closure<'a, T>>),
+pub enum Value<'a, T: Clone> {
+    Pi(RT<'a, T>, Closure<'a, T>),
+    Lam(Closure<'a, T>),
     Kind, // Universe
+    Type,
     ZT,
     Z(u32),
     QT,
@@ -27,7 +35,9 @@ pub enum Value<'a, T> {
 }
 
 #[allow(non_snake_case)]
-pub fn as_Z<'a,T>(v: &Value<'a, T>) -> TResult<()> {
+pub fn as_Z<'a,T>(v: &Value<'a, T>) -> TResult<(), T>
+where T: Clone
+{
     match v {
         Value::ZT => Ok(()),
         _ => Err(TypecheckingErrors::NotZ),
@@ -35,22 +45,28 @@ pub fn as_Z<'a,T>(v: &Value<'a, T>) -> TResult<()> {
 }
 
 #[allow(non_snake_case)]
-pub fn as_Q<'a,T>(v: & Value<'a, T>) -> TResult<()> {
+pub fn as_Q<'a,T>(v: & Value<'a, T>) -> TResult<(), T>
+where T: Clone
+{
     match v {
         Value::QT => Ok(()),
         _ => Err(TypecheckingErrors::NotZ),
     }
 }
 
-pub fn as_pi<'a, T>(v: &Value<'a, T>)
-                    -> TResult<(RT<'a,T>, Rc<Closure<'a, T>>)> {
+pub fn as_pi<'a, T>(v: & Value<'a, T>)
+                    -> TResult<(RT<'a,T>, Closure<'a, T>), T>
+where T: Clone
+{
     match v {
         Value::Pi(a, b) => Ok((a.clone(), b.clone())),
         _ => Err(TypecheckingErrors::NotPi),
     }
 }
 
-pub fn is_neutral<'a, T>(v: &Value<'a, T>) -> bool {
+pub fn is_neutral<'a, T>(v: &Value<'a, T>) -> bool
+where T: Clone
+{
     match v {
         Value::Neutral(_, _) => true,
         _ => false,
@@ -58,7 +74,7 @@ pub fn is_neutral<'a, T>(v: &Value<'a, T>) -> bool {
 }
 
 #[derive(Debug)]
-pub enum TypecheckingErrors {
+pub enum TypecheckingErrors<T> {
     TypeInReadBack,
     ValueInReadBack,
     LamUsedAsType,
@@ -69,17 +85,22 @@ pub enum TypecheckingErrors {
     NotZ,
     NotQ,
     LookupFailed(super::context::LookupErr),
+    CannotInferLambda,
+    CannotInferHole,
+    Mismatch(AlphaTerm<T>, AlphaTerm<T>),
 }
 
-pub type TResult<T> = Result<T, TypecheckingErrors>;
+pub type TResult<T, K> = Result<T, TypecheckingErrors<K>>;
 
 #[derive(Debug, Clone)]
-pub enum Neutral<'a, T> {
+pub enum Neutral<'a, T>
+where T: Clone
+{
     Var(T),
     DBI(u32),
-    Hole(Option<RT<'a, T>>),
+    Hole(RefCell<Option<RT<'a, T>>>),
     App(Rc<Neutral<'a, T>>, Normal<'a, T>),
 }
 
 #[derive(Debug, Clone)]
-pub struct Normal<'a, T>(pub Rc<Type<'a, T>>, pub Rc<Value<'a, T>>);
+pub struct Normal<'a, T: Clone>(pub Rc<Type<'a, T>>, pub Rc<Value<'a, T>>);
