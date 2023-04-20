@@ -34,11 +34,11 @@ where T: PartialEq + Clone {
             subst(ty, target, sub_term.clone());
             subst(val, target, sub_term);
         }
-        App { fun, arg } => {
+        App(fun, arg) => {
             subst(fun, target, sub_term.clone());
             subst(arg, target, sub_term);
         }
-        SideCondition { x, y, var } => todo!(),
+        SC(x, y) => todo!(),
         Arrow { decls, result } => todo!(),
     }
 }

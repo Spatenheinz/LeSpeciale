@@ -37,12 +37,12 @@ where T: Clone + PartialEq
             let val = alpha_normalize(*val);
             Asc(Box::new(ty), Box::new(val))
         },
-        Term::App { fun, arg } => {
+        Term::App(fun, arg) => {
             let f = alpha_normalize(*fun);
             let a = alpha_normalize(*arg);
             App(Box::new(f), Box::new(a))
         }
-        Term::SideCondition { x, y, var } => todo!(),
+        Term::SC(x, y) => todo!(),
         Term::Arrow { decls, result } => todo!(),
     }
 }

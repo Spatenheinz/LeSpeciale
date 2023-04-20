@@ -21,9 +21,16 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 fn main() {
-    // let src = include_str!("overflow.plf");
-    let src = include_str!("smol.plf");
+    let src = include_str!("overflow.plf");
+    // let src = include_str!("smol.plf");
     println!("{:?}", parse_term(src));
+    // let path = std::fs::read_dir("./signatures").unwrap();
+    // for i in path {
+    //     let i = i.unwrap();
+    //     println!("{:?}", i.file_name());
+    //     let str = &std::fs::read_to_string(i.path()).unwrap();
+    //     let (rest, prog) = parse_file(str).unwrap();
+    // }
     // let term =
     //         App { fun: Binder { kind: Lam,
     //                             var: None,

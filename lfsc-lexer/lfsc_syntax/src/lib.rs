@@ -4,10 +4,10 @@ pub mod sexp;
 #[macro_export]
 macro_rules! binder {
     (let $v:ident, $e:expr, $body:expr) => {
-        $crate::ast::Term::App {
-            fun: Box::new(binder!(lam, $v, $body)),
-            arg: Box::new($e),
-        }
+        $crate::ast::Term::App(
+            Box::new(binder!(lam, $v, $body)),
+            Box::new($e),
+        )
     };
     (pi, $v:ident : $ty:expr, $body:expr) => {
         $crate::ast::Term::Binder {
@@ -90,15 +90,15 @@ macro_rules! term_ {
         binder!(lam, $v, term!($b))
     };
     (let $e:tt $b:tt) => {
-        $crate::ast::Term::App {
-            fun: binder!(lam, term!($b)).into(),
-            arg: term!($e).into(),
-        }
+        $crate::ast::Term::App(
+            binder!(lam, term!($b)).into(),
+            term!($e).into(),
+        )
     };
     (let $v:ident $e:tt $b:tt) => {
         $crate::ast::Term::App {
-            fun: binder!(lam, $v, term!($b)).into(),
-            arg: term!($e).into(),
+            binder!(lam, $v, term!($b)).into(),
+            term!($e).into(),
         }
     };
     ($($x:tt)+) => {

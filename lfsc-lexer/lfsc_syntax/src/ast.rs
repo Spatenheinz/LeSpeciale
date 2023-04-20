@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq, Clone)]
 pub enum Num {
-    Z(u32),
-    Q(u32, u32)
+    Z(i32),
+    Q(i32, i32)
 }
 
 pub trait BuiltIn {
@@ -37,10 +37,10 @@ pub enum Term<T> {
     // : ascription
     Ascription { ty: Box<Type<T>>, val: Box<Term<T>> },
     // ^ and provided
-    SideCondition { x: Box<TermSC<T>>, y: Box<TermSC<T>>, var: T },
+    SC(TermSC<T>, TermSC<T>),
     // => alias for nested !-terms.
     Arrow { decls: Decls, result: Box<Term<T>>},
-    App {fun: Box<Term<T>>, arg: Box<Term<T>>}
+    App(Box<Term<T>>, Box<Term<T>>)
 }
 
 
@@ -59,7 +59,7 @@ pub enum AlphaTerm<T> {
     AnnLam(Box<AlphaTerm<T>>, Box<AlphaTerm<T>>),
     // i dont know about the big lambda
     Asc(Box<AlphaTerm<T>>, Box<AlphaTerm<T>>),
-    SC(Box<AlphaTerm<T>>, Box<AlphaTerm<T>>),
+    SC(AlphaTermSC<T>, AlphaTermSC<T>),
     App(Box<AlphaTerm<T>>, Box<AlphaTerm<T>>),
 }
 
@@ -74,49 +74,61 @@ pub enum Decl {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum NumericSC<T> {
-    Sum(Num, Num),
-    Prod(Num, Num),
-    Div(Num, Num),
-    Negation(Num),
-    ItoR(Num),
-    ZBranch { num: Num, tbranch: Term<T>, fbranch: Term<T> },
-    NegBranch { num: Num, tbranch: Term<T>, fbranch: Term<T> },
+    Sum(T, T),
+    Prod(T, T),
+    Div(T, T),
+    Neg(T),
+    ZtoQ(T),
+    ZBranch { n: T, tbranch: T, fbranch: T },
+    NegBranch { n: T, tbranch: T, fbranch: T },
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Pattern {
+pub enum Pattern<T> {
     Default,
-    Symbol(String),
-    App { sym: String, args: Vec<String> }
+    Symbol(T),
+    App(T, Vec<T>)
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum CompoundSC<T> {
-    Match { disc: Term<T>, cases: Vec<(Pattern, Term<T>)> },
+pub enum CompoundSC<AT, T> {
+    Match(AT, Vec<(Pattern<T>, AT)>),
     // < order
-    Compare { a: Term<T>, b: Term<T>, tbranch: Term<T>, fbranch: Term<T> },
+    Compare { a: AT, b: AT, tbranch: AT, fbranch: AT },
     // =
-    IfEq { a: Term<T>, b: Term<T>, tbranch: Term<T>, fbranch: Term<T> },
-    Fail,
+    IfEq { a: AT, b: AT, tbranch: AT, fbranch: AT },
+    Fail(TermSC<T>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum SideEffectSC<T> {
-    IfMarked { n: u32, c: TermSC<T>, tbranch: TermSC<T>, fbranch: TermSC<T> },
-    MarkVar(u32, T),
-    Do(TermSC<T>, TermSC<T>),
+pub enum SideEffectSC<AT> {
+    IfMarked { n: u32, c: AT, tbranch: AT, fbranch: AT },
+    MarkVar(u32, AT), // can only be a variable however, can be both explicit and DBI
+    Do(AT, AT),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TermSC<T> {
     Number(Num),
     Var(T),
-    Let(T, Term<T>, Term<T>),
-    Numeric(NumericSC<T>),
-    Compound(CompoundSC<T>),
-    SideEffect(Box<SideEffectSC<T>>)
+    Let(T, Box<TermSC<T>>, Box<TermSC<T>>),
+    App(Box<TermSC<T>>, Box<TermSC<T>>),
+    Numeric(Box<NumericSC<TermSC<T>>>),
+    Compound(Box<CompoundSC<TermSC<T>, T>>),
+    SideEffect(Box<SideEffectSC<TermSC<T>>>)
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum AlphaTermSC<T> {
+    Number(Num),
+    Var(T),
+    DBI(u32),
+    Let(Box<AlphaTermSC<T>>, Box<AlphaTermSC<T>>),
+    App(Box<AlphaTermSC<T>>, Box<AlphaTermSC<T>>),
+    Numeric(Box<NumericSC<AlphaTermSC<T>>>),
+    Compound(Box<CompoundSC<AlphaTermSC<T>, T>>),
+    SideEffect(Box<SideEffectSC<AlphaTermSC<T>>>)
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Command<Id> {
@@ -128,6 +140,6 @@ pub enum Command<Id> {
     // DefConst{var: Id, decls: Decls, term: T},
     Check(Term<Id>),
     // AssCheck{decls: Decls, ty: T, term: T},
-    // ProgDef{args: Vec<(Id, T)>, ty: T, body: T},
-    // Run(TermSC<T>),
+    Prog{cache: bool, id: Id, args: Vec<(Id, Term<Id>)>, ty: Term<Id>, body: TermSC<Id>},
+    Run(TermSC<Id>),
 }

@@ -1,21 +1,24 @@
-use std::ops::RangeFrom;
-
-use lfsc_syntax::{ast::{Num, Term, Command, TermSC, SideEffectSC}, binder, var};
+use lfsc_syntax::{ast::{Num, Term, Command, TermSC, SideEffectSC,
+                        NumericSC, CompoundSC, Pattern}, binder, var};
 
 extern crate nom;
 
 use nom::{
     branch::alt,
-    bytes::complete::{is_not, tag},
-    character::{complete::{
+    bytes::complete::{is_not, tag, take_until},
+    character::complete::{
         alpha1, alphanumeric1, char, digit1, satisfy,
-    }, is_digit},
-    combinator::{map, recognize, value, opt},
+    },
+    combinator::{map, recognize, value, opt, eof},
     error::{ParseError, VerboseError, Error},
-    multi::{many0, many1, fold_many_m_n, many_m_n},
+    multi::{many0, many1, fold_many_m_n, many_till, fold_many0},
     sequence::{delimited, pair, preceded, terminated, tuple},
-    AsChar,IResult, InputIter, Slice, Parser,
+    IResult, Parser,
 };
+
+pub fn parse_file(it: &str) -> IResult<&str, Vec<Command<&str>>> {
+    delimited(ws, many0(parse_command), eof)(it)
+}
 
 pub fn parse_command(it: &str) -> IResult<&str, Command<&str>> {
     parens(alt((
@@ -24,43 +27,58 @@ pub fn parse_command(it: &str) -> IResult<&str, Command<&str>> {
         map(preceded(reserved("define"), pair(parse_ident, parse_term)),
              |(x, term)| Command::Define(x, term)),
         map(preceded(reserved("declare"), pair(parse_ident, parse_term)),
-             |(x, term)| Command::Declare(x, term))
+             |(x, term)| Command::Declare(x, term)),
+        map(preceded(reserved("program"),
+                     tuple((parse_ident,
+                            parens(many1(parens(pair(parse_ident, parse_term)))),
+                            parse_term,
+                            parse_sc))),
+             |(id, args, ty, body)| Command::Prog{cache: false, id, args, ty, body}),
+        map(preceded(reserved("function"),
+                     tuple((parse_ident,
+                            parens(many1(parens(pair(parse_ident, parse_term)))),
+                            parse_term,
+                            parse_sc))),
+             |(id, args, ty, body)| Command::Prog{cache: true, id, args, ty, body}),
+        map(preceded(reserved("run"), parse_sc),
+             |x| Command::Run(x)),
     )))(it)
 }
 
 pub fn parse_term(it: &str) -> IResult<&str, Term<&str>> {
-    alt((
+    let f = alt((
        parse_hole,
        map(parse_ident, |x| Term::Var(x)),
        map(parse_num, |x| Term::Number(x)),
        open_followed(parse_term_),
-    ))(it)
+    ))(it);
+    f
 }
 
 fn parse_term_(it: &str) -> IResult<&str, Term<&str>> {
     if let res @ Ok(..) = terminated(parse_binder, closed)(it) {
         return res;
     }
-    let (rest, opt) = parse_term(it)?;
-    if let Ok((rest, x)) = terminated(parse_term, closed)(rest) {
-        return Ok((rest,Term::App { fun: Box::new(opt), arg: Box::new(x) }));
-    }
+    let (rest, head) = parse_term(it)?;
+    let (rest, tail) =
+        fold_many0(parse_term, || head.clone(),
+            |acc, x| Term::App(Box::new(acc), Box::new(x)))(rest)?;
     let (rest, _) = closed(rest)?;
-    Ok((rest, opt))
+    Ok((rest, tail))
 }
 
 pub fn parse_hole(it : &str) -> IResult<&str, Term<&str>> {
     map(reserved("_"), |_| Term::Hole)(it)
 }
 
-const KEYWORDS: [&str; 4] = ["let", "pi", "lam", "forall"];
+const KEYWORDS: [&str; 20] = ["let", "pi", "lam", "do", "match",
+                             "mpz_add", "mpz_mul", "mpz_div", "mpz_neg",
+                             "mpz_to_mpq", "mp_ifzero", "mp_ifneg",
+                             "markvar", "ifmarked", "default", "fail",
+                             "run", "define", "declare", "check"];
 
 pub fn reserved<'a>(expected: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str> {
     terminated(tag(expected),ws1)
-}
-
-pub fn parse_var(it : &str) -> IResult<&str, Term<&str>> {
-    map(parse_ident, |x| Term::Var(x))(it)
 }
 
 //TODO: Might overflow
@@ -81,43 +99,117 @@ fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
             |(ty, val)| Term::Ascription { ty: Box::new(ty), val: Box::new(val)},
         ),
         map(
-            preceded(alt((reserved("lam"),tag("!"))), tuple((parse_ident, parse_term))),
+            preceded(alt((reserved("lam"),reserved("\\"))), tuple((parse_ident, parse_term))),
             |(var, body)| binder!(lam, var, body),
         ),
         // map(
         //     preceded((tag("#"), tuple((parse_ident, parse_term, parse_term))),
         //     |(var, ty, body)| binder!(biglam, var : ty, body),
         // ),
-        // preceded(alt((reserved("provided"), reserved("^"))), parse_sc)
+        map(preceded(alt((reserved("provided"), reserved("^"))),
+                     pair(parse_sc, parse_sc)),
+            |(x,y)| Term::SC(x, y)),
     ))(it)
 }
 
 fn parse_sc(it: &str) -> IResult<&str, TermSC<&str>> {
     alt((
+        // nums, identifier
         map(parse_num, |x| TermSC::Number(x)),
         map(parse_ident, |x| TermSC::Var(x)),
-        open_followed(parse_sc_)
+        // rest needs to be in a list
+        open_followed(parse_sc_opt)
     ))(it)
 }
+
+fn parse_sc_opt(it: &str) -> IResult<&str, TermSC<&str>> {
+    if let res @ Ok(..) = terminated(parse_sc_, closed)(it) {
+        return res;
+    }
+    let (rest, head) = parse_sc(it)?;
+    let (rest, tail) =
+        fold_many0(parse_sc, || head.clone(),
+            |acc, x| TermSC::App(Box::new(acc), Box::new(x)))(rest)?;
+    let (rest, _) = closed(rest)?;
+    Ok((rest, tail))
+}
+
 fn parse_sc_(it: &str) -> IResult<&str, TermSC<&str>> {
     alt((
         map(
             preceded(alt((reserved("let"),reserved("@"))),
-                          tuple((parse_ident, parse_term, parse_term))),
-            |(var, val, body)|  TermSC::Let(var, val, body)),
+                          tuple((parse_ident, parse_sc, parse_sc))),
+            |(var, val, body)|  TermSC::Let(var, Box::new(val), Box::new(body))),
         // side effects
-        // map(preceded(reserved("do")),
-        //              tuple((parse_ident, parse_term, parse_term))),
-        //     |(var, ty, body)| TermSC::Pi(var, ty, body)),
+        map(parse_effect, |x| TermSC::SideEffect(Box::new(x))),
+        // numerics
+        map(parse_numeric, |x| TermSC::Numeric(Box::new(x))),
+        // compounds
+        map(parse_compound, |x| TermSC::Compound(Box::new(x))),
         ))(it)
 
 }
 
-fn parse_effect(it: &str) -> IResult<&str, SideEffectSC<&str>> {
+fn parse_compound(it : &str) -> IResult<&str, CompoundSC<TermSC<&str>, &str>> {
+    alt((
+        map(preceded(reserved("fail"),
+                     parse_sc), |x| CompoundSC::Fail(x)),
+        map(preceded(reserved("compare"),
+                      tuple((parse_sc, parse_sc, parse_sc, parse_sc))),
+            |(a,b,tbranch,fbranch)|
+            CompoundSC::Compare{a,b,tbranch, fbranch}),
+        map(preceded(reserved("if_equal"),
+                     tuple((parse_sc, parse_sc, parse_sc, parse_sc))),
+            |(a,b,tbranch,fbranch)|
+            CompoundSC::IfEq{a,b,tbranch, fbranch}),
+        map(preceded(reserved("match"),
+                     pair(parse_sc,
+                          many1(parens(pair(parse_pat, parse_sc))))),
+            |(x,branches)| CompoundSC::Match(x,branches)),
+    ))(it)
+}
+
+fn parse_pat(it : &str) -> IResult<&str, Pattern<&str>> {
+    let f = alt((
+        map(reserved("default"), |_| Pattern::Default),
+        map(parse_ident, |x| Pattern::Symbol(x)),
+        map(parens(pair(parse_ident, many1(parse_ident))),
+            |(x,ys)| Pattern::App(x,ys)),
+    ))(it);
+    f
+}
+
+fn parse_numeric(it : &str) -> IResult<&str, NumericSC<TermSC<&str>>> {
+    let f = alt((
+        map(preceded(reserved("mpz_add"),
+                 bin_op), |(x,y)| NumericSC::Sum(x,y)),
+        map(preceded(reserved("mpz_mul"),
+                 bin_op), |(x,y)| NumericSC::Prod(x,y)),
+        map(preceded(reserved("mpz_div"),
+                 bin_op), |(x,y)| NumericSC::Div(x,y)),
+        map(preceded(alt((reserved("mpz_neg"),reserved("~"))),
+                 parse_sc), |x| NumericSC::Neg(x)),
+        map(preceded(reserved("mpz_to_mpq"),
+                 parse_sc), |x| NumericSC::ZtoQ(x)),
+        map(preceded(reserved("mp_ifzero"),
+                     tuple((parse_sc, parse_sc, parse_sc))),
+            |(n, tbranch, fbranch)| NumericSC::ZBranch { n, tbranch, fbranch }),
+        map(preceded(reserved("mp_ifneg"),
+                     tuple((parse_sc, parse_sc, parse_sc))),
+            |(n, tbranch, fbranch)| NumericSC::NegBranch { n, tbranch, fbranch }),
+    ))(it);
+    f
+}
+
+fn bin_op(it : &str) -> IResult<&str, (TermSC<&str>, TermSC<&str>)> {
+    pair(parse_sc, parse_sc)(it)
+}
+
+fn parse_effect(it: &str) -> IResult<&str, SideEffectSC<TermSC<&str>>> {
     alt((
         map(preceded(reserved("do"), pair(parse_sc, parse_sc)),
             |(a, b)| SideEffectSC::Do(a, b)),
-        map(pair(marks("markvar"), parse_ident),
+        map(pair(marks("markvar"), parse_sc),
             |(n, v)| SideEffectSC::MarkVar(n,v)),
         map(tuple((marks("ifmarked"), parse_sc, parse_sc, parse_sc)),
             |(n, c, tbranch, fbranch)|
@@ -139,7 +231,6 @@ fn marks<'a>(p: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, u32> {
 }
 
 
-    // nums, identifier
     // Following needs be parenthesized
     //
     // SIDEEFFECTS-SC
@@ -172,19 +263,18 @@ pub fn parse_num(it: &str) -> IResult<&str, Num> {
     match lexeme(preceded(tag("/"), digit1::<&str, VerboseError<&str>>))(rest) {
         Ok((rest, q)) => Ok((
             rest,
-            Num::Q(u32::from_str_radix(p, 10).unwrap(),
-                                       u32::from_str_radix(q, 10).unwrap()))),
+            Num::Q(i32::from_str_radix(p, 10).unwrap(),
+                   i32::from_str_radix(q, 10).unwrap()))),
         Err(_) => {
             Ok((rest,
-                Num::Z(p.parse::<u32>().unwrap())))
+                Num::Z(p.parse::<i32>().unwrap())))
         }
     }
 }
 
 
 fn closed(it: &str) -> IResult<&str, ()> {
-    let (rest,_) = lexeme(char(')'))(it)?;
-    Ok((rest,()))
+    value((), lexeme(char(')')))(it)
 }
 
 fn open_followed<'a, P, O, E: ParseError<&'a str>>(p: P)
@@ -205,7 +295,7 @@ where
 
 pub fn comment<'a, E: ParseError<&'a str>>(i: &'a str)
                                            -> IResult<&'a str, (), E> {
-    value((), pair(char(';'), is_not("\n")))(i)
+    value((), preceded(char(';'), take_until("\n")))(i)
 }
 
 pub fn ws1<'a, E: ParseError<&'a str>>(i: &'a str)
@@ -218,7 +308,8 @@ pub fn ws1<'a, E: ParseError<&'a str>>(i: &'a str)
 pub fn ws<'a, E: ParseError<&'a str>>(i: &'a str) -> IResult<&'a str, (), E> {
     value(
         (),
-        many0(alt((comment, value((), satisfy(|c| c.is_whitespace()))))),
+        many0(alt((comment,
+                   value((), satisfy(|c| c.is_whitespace()))))),
     )(i)
 }
 
@@ -230,11 +321,18 @@ where
     terminated(p, ws)
 }
 
+fn chars(c: char) -> bool {
+    (c >= '\"' && c <= '$') || (c >= '&' && c <= '\'') || (c >= '*' && c <= '/')
+    || (c >= '<' && c <= '?') || (c >= 'A' && c <= '[') || c >= ']' || (c >= '_' && c <= 'z')
+}
+fn follow(c: char) -> bool {
+    (c >= '!' && c <= '\'') || c >= '*'
+}
+
 pub fn parse_ident(it: &str) -> IResult<&str, &str> {
     let (rest, x) = lexeme(recognize(pair(
-                            alt((alpha1, tag("_"))),
-                            many0(alt((alphanumeric1, tag("_")))),
-                          )))(it)?;
+                            satisfy(chars),
+                            many0(satisfy(follow)))))(it)?;
     if KEYWORDS.contains(&x) {
         return Err(nom::Err::Error(Error::new(rest, nom::error::ErrorKind::Tag)))
     }

@@ -2,7 +2,7 @@ use lfsc_syntax::ast::{AlphaTerm, Num, BuiltIn};
 use lfsc_syntax::ast::AlphaTerm::*;
 use super::nbe::eval_closure;
 use super::readback::readback;
-use super::synth::synth;
+use super::infer::infer;
 use super::values::{Value, TResult, RT, as_pi, Neutral, as_Z, as_Q, TypecheckingErrors};
 use super::context::{RLCTX, LocalContext, RGCTX};
 
@@ -17,24 +17,22 @@ where
     T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
 {
     match term {
-        Number(Num::Z(_)) => as_Z(tau.borrow()),
-        Number(Num::Q(_,_)) => as_Q(tau.borrow()),
+        // will be checked in convert?
+        // Number(Num::Z(_)) => as_Z(tau.borrow()),
+        // Number(Num::Q(_,_)) => as_Q(tau.borrow()),
         AlphaTerm::Lam(body) => {
             let (a,b) = as_pi(tau.as_ref())?;
-            let val = eval_closure(b.clone(),
-                Rc::new(Value::Neutral(a.clone(),
-                                       Rc::new(Neutral::DBI(0)))),
-                gctx)?;
+            let val = b(Rc::new(Value::Neutral(a.clone(),
+                                       Rc::new(Neutral::DBI(0)))))?;
             let ctx1 = LocalContext::insert(a, lctx.clone());
             check(body, val, ctx1, gctx)
         },
-        AnnLam(..) => todo!(),
         SC(t1, t2) => {
             todo!()
         },
-        // Fv, Bv, Ascription, PI,
+        // Fv, Bv, Ascription, PI, Annotated, etc.
         _ => {
-            let t = synth(term, lctx.clone(), gctx)?;
+            let t = infer(term, lctx.clone(), gctx)?;
             convert(t, tau, gctx.kind.clone(),  lctx, gctx)
         }
     }

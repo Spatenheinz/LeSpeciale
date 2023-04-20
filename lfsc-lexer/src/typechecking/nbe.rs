@@ -41,19 +41,18 @@ pub fn eval<'a, T>(term: &'a AlphaTerm<T>,
                 Ok(Rc::new(Value::Lam(closure)))
             },
             Asc(_, val) => eval(val, lctx, gctx),
-                // unreachable!("should be removed by typechecker, RIGHT?"),
             SC(..) => todo!("eval SC"),
         }
 }
 
-#[cfg(feature = "conslist")]
-pub fn eval_closure<'a, T>(closure: Closure<'a, T>,
-                            arg: RT<'a, T>,
-                            gctx: RGCTX<'a, T>) -> ResRT<'a, T>
-where T: Clone + PartialEq + std::fmt::Debug
-{
-       eval(closure.body, LocalContext::insert(arg, closure.env.clone()), gctx)
-}
+// #[cfg(feature = "conslist")]
+// pub fn eval_closure<'a, T>(closure: Closure<'a, T>,
+//                             arg: RT<'a, T>,
+//                             gctx: RGCTX<'a, T>) -> ResRT<'a, T>
+// where T: Clone + PartialEq + std::fmt::Debug
+// {
+//        eval(closure.body, LocalContext::insert(arg, closure.env), gctx)
+// }
 
     // // Eliminators
 

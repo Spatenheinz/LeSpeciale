@@ -41,7 +41,7 @@ where
             let app = do_app(val, tmp, gctx)?;
             Ok(abinder!(lam, readback(ran_, app, lctx, gctx)?))
         }
-        Type::Kind => {
+        Type::Box => {
             match val.borrow() {
                 Value::Pi(at, bt) => {
                     let dom = readback(ty.clone(), at.clone(), lctx.clone(), gctx)?;
@@ -57,16 +57,17 @@ where
                 Value::ZT => Ok(Var(T::_mpz())),
                 Value::QT => Ok(Var(T::_mpq())),
 
-                Value::Type => todo!(),
+                Value::Star => todo!(),
                 Value::Z(_) => todo!("readback z"),
 
                 Value::Q(..) => todo!("readback q"),
-                Value::Kind => todo!("readback kind"),
+                Value::Box => todo!("readback kind"),
                 Value::Lam(_) => todo!("readback lam"),
                 Value::Neutral(_, _) => unreachable!("neutral should have been handled above"),
+                Value::Run(..) => todo!()
             }
         }
-        Type::Type => todo!(),
+        Type::Star => todo!(),
         Type::ZT => {
             todo!("readback zt")
         },
@@ -77,6 +78,7 @@ where
         Value::Neutral(..) => Err(TypecheckingErrors::NeutralUsedAsType),
         Value::Z(_) | Value::Q(..) => Err(TypecheckingErrors::NumberUsedAsType),
         Value::Lam(_) => Err(TypecheckingErrors::LamUsedAsType),
+        Value::Run(..) => todo!()
     }
 }
 

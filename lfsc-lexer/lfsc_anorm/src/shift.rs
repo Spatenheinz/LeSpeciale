@@ -33,11 +33,11 @@ where T: PartialEq + Clone {
             shift(ty, d, target, minimum);
             shift(val, d, target, minimum);
         }
-        App { fun, arg } => {
+        App(fun, arg) => {
             shift(fun, d, target, minimum);
             shift(arg, d, target, minimum);
         }
-        SideCondition { x, y, var } => todo!(),
+        SC(x, y) => todo!(),
         Arrow { decls, result } => todo!(),
     }
 }

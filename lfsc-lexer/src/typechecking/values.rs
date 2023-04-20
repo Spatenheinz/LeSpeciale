@@ -1,19 +1,33 @@
+use core::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::borrow::Cow;
 
 use lfsc_syntax::ast::AlphaTerm;
 
-use super::context::{LResult, LocalContext};
+use super::context::{LocalContext, RGCTX};
 
-#[derive(Debug, Clone)]
-pub struct Closure<'a, T: Clone> {
-    #[cfg(feature = "conslist")]
-    pub env: super::context::RLCTX<'a, T>,
-    // #[cfg(not(feature = "conslist"))]
-    // pub env: &'a LocalContext<'a, T>,
-    pub body: &'a AlphaTerm<T>,
+pub type Closure<'a,T> = Box<dyn FnOnce(RT<'a, T>) -> ResRT<'a, T>>;
+
+pub fn mkClosure<'a, T>(body: &'a AlphaTerm<T>,
+                        env: super::context::RLCTX<'a, T>,
+                        gctx: RGCTX<'a, T>)
+                       -> Closure<'a, T>
+where T: Clone + PartialEq + fmt::Debug
+{
+    Box::new(|v|
+             super::nbe::eval(body,
+                              LocalContext::insert(v, env),
+                              gctx))
 }
+
+// #[derive(Debug, Clone)]
+// pub struct Closure<'a, T: Clone> {
+//     #[cfg(feature = "conslist")]
+//     pub env: super::context::RLCTX<'a, T>,
+//     // #[cfg(not(feature = "conslist"))]
+//     // pub env: &'a LocalContext<'a, T>,
+//     pub body: &'a AlphaTerm<T>,
+// }
 //
 pub type Type<'a, T> = Value<'a, T>;
 pub type RT<'a, T> = Rc<Type<'a, T>>;
@@ -21,17 +35,66 @@ pub type RT<'a, T> = Rc<Type<'a, T>>;
 // pub type Eval<'a, T> = TResult<(RT<'a, T>, LocalContext<'a, T>)>;
 pub type ResRT<'a, T> = TResult<RT<'a, T>, T>;
 
-#[derive(Debug, Clone)]
 pub enum Value<'a, T: Clone> {
     Pi(RT<'a, T>, Closure<'a, T>),
     Lam(Closure<'a, T>),
-    Kind, // Universe
-    Type,
+    Box, // Universe
+    Star,
     ZT,
-    Z(u32),
+    Z(i32), // TODO: should in fact be unbounded
     QT,
-    Q(u32, u32),
+    Q(i32, i32), // TODO: should in fact be unbounded
     Neutral(RT<'a, T>, Rc<Neutral<'a, T>>),
+    Run(&'a AlphaTerm<T>, RT<'a, T>),
+}
+impl<'a, T: Clone> fmt::Debug for Value<'a, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Value::Pi(a, _) => write!(f, "Pi: {:?}", a),
+            Value::Lam(_) => write!(f, "Lam"),
+            Value::Box => write!(f, "Box"),
+            Value::Star => write!(f, "Star"),
+            Value::ZT => write!(f, "ZT"),
+            Value::Z(i) => write!(f, "Z: {}", i),
+            Value::QT => write!(f, "QT"),
+            Value::Q(i, j) => write!(f, "Q: {}/{}", i, j),
+            Value::Neutral(_, n) => write!(f, "Neutral: "),
+            Value::Run(_, t) => write!(f, "Run: {:?}", t),
+        }
+    }
+}
+
+impl<'a, T: Clone> PartialEq for Value<'a, T> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            // TODO incomplete
+            // (Value::Pi(a, _), Value::Pi(b, _)) => a == b,
+            // (Value::Lam(_), Value::Lam(_)) => true,
+            (Value::Box, Value::Box) => true,
+            (Value::Star, Value::Star) => true,
+            (Value::ZT, Value::ZT) => true,
+            (Value::Z(i), Value::Z(j)) => i == j,
+            (Value::QT, Value::QT) => true,
+            (Value::Q(i, j), Value::Q(k, l)) => i == k && j == l,
+            // (Value::Neutral(_, n), Value::Neutral(_, m)) => n == m,
+            // (Value::Run(_, t), Value::Run(_, u)) => t == u,
+            _ => false,
+        }
+    }
+}
+pub fn as_symbolic<'a, T>(v: &Value<'a, T>)
+                          -> TResult<super::context::Key<T>, T>
+where T: Clone
+{
+    match v {
+        Value::Neutral(_, n) => match &**n {
+            Neutral::Var(x) => Ok(super::context::Key::Name(x.clone())),
+            Neutral::DBI(x) => Ok(super::context::Key::DBI(*x)),
+            _ => Err(TypecheckingErrors::NotSymbolic),
+        },
+        _ => Err(TypecheckingErrors::NotSymbolic),
+    }
 }
 
 #[allow(non_snake_case)]
@@ -55,11 +118,11 @@ where T: Clone
 }
 
 pub fn as_pi<'a, T>(v: & Value<'a, T>)
-                    -> TResult<(RT<'a,T>, Closure<'a, T>), T>
+                    -> TResult<(RT<'a,T>, &'a Closure<'a, T>), T>
 where T: Clone
 {
     match v {
-        Value::Pi(a, b) => Ok((a.clone(), b.clone())),
+        Value::Pi(a, b) => Ok((a.clone(), b)),
         _ => Err(TypecheckingErrors::NotPi),
     }
 }
@@ -87,12 +150,23 @@ pub enum TypecheckingErrors<T> {
     LookupFailed(super::context::LookupErr),
     CannotInferLambda,
     CannotInferHole,
+    ExpectedSort,
+    // ExpectedSort(Value<T>),
+    // we have these errors in Side-conditions.
+    ExpectedNum,
+    ExpectedSameNum,
+    ExpectedSameInBranch,
     Mismatch(AlphaTerm<T>, AlphaTerm<T>),
+    DivByZero,
+    NaN,
+    ReachedFail,
+    NotSymbolic,
+    Mark // tried to get mark for non-symbolic variable.
 }
 
 pub type TResult<T, K> = Result<T, TypecheckingErrors<K>>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, PartialEq)]
 pub enum Neutral<'a, T>
 where T: Clone
 {
@@ -102,5 +176,5 @@ where T: Clone
     App(Rc<Neutral<'a, T>>, Normal<'a, T>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Normal<'a, T: Clone>(pub Rc<Type<'a, T>>, pub Rc<Value<'a, T>>);

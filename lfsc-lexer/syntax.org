@@ -68,6 +68,10 @@ if \x: A. M, gives that A is of type Type, then we save x := (x, A), we then che
 M, we make ! x domain (classifier of range)
 
 
+S ::= num | var | '('
+
+S ::= let .. ')' | S ')' | S S ')'
+
 
 * Sideconditions:
 

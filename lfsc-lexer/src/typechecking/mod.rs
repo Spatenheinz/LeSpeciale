@@ -3,11 +3,12 @@ pub mod context;
 pub mod values;
 pub mod nbe;
 pub mod readback;
-pub mod synth;
+pub mod infer;
+mod sc;
 // mod occurs;
 
 use lfsc_syntax::ast::{Command, AlphaTerm, BuiltIn};
-use synth::synth;
+use infer::infer;
 use check::check;
 use nbe::eval;
 
