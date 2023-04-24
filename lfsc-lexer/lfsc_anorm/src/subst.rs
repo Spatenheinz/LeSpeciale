@@ -1,13 +1,14 @@
 use lfsc_syntax::ast::Term;
 use lfsc_syntax::ast::Term::*;
+use lfsc_syntax::ast::Ident::*;
 
 use super::shift::shift;
 
 pub fn subst<'a, T>(term: &'a mut Term<T>, target: &'a Option<T>, mut sub_term: Term<T>)
 where T: PartialEq + Clone {
     match term {
-        Hole | Number(_) | DBI(_) => (),
-        Var(x) => {
+        Hole | Number(_) | Ident(DBI(_)) => (),
+        Ident(Symbol(x)) => {
             if target.is_some() && target.as_ref().unwrap() == x {
                 *term = sub_term
             }

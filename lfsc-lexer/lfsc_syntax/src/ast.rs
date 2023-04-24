@@ -11,6 +11,12 @@ pub trait BuiltIn {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum Ident<Id> {
+    Symbol(Id),
+    DBI(u32)
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum BinderKind {
     // ! and forall (pi)
     Pi,
@@ -21,50 +27,48 @@ pub enum BinderKind {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Term<T> {
+pub enum Term<Id> {
     Number(Num),
     Hole,
     // Variables can be both explicit and by a De Bruijn Index, Notice this will first occur
     // after alpha normalization. And only bound variables will be DBI.
-    Var(T),
-    DBI(u32),
+    Ident(Ident<Id>),
     // a binder may be either a dependent binder (pi), a lambda or a big lambda
     // \ and lam : also called unascription is a lambda binder with None typing
     // # this is the ascription function
     // // % this is the big lambda case
-    Binder{ kind: BinderKind, var: Option<T>, ty: Option<Box<Type<T>>>, body: Box<Term<T>> },
+    Binder{ kind: BinderKind, var: Option<Id>, ty: Option<Box<Type<Id>>>, body: Box<Term<Id>> },
     // @ and let (this is syntactical sugar) let x = e in b ~ (lambda x . b) e
     // : ascription
-    Ascription { ty: Box<Type<T>>, val: Box<Term<T>> },
+    Ascription { ty: Box<Type<Id>>, val: Box<Term<Id>> },
     // ^ and provided
-    SC(TermSC<T>, TermSC<T>),
+    SC(TermSC<Id>, TermSC<Id>),
     // => alias for nested !-terms.
-    Arrow { decls: Decls, result: Box<Term<T>>},
-    App(Box<Term<T>>, Box<Term<T>>)
+    Arrow { decls: Decls, result: Box<Term<Id>>},
+    App(Box<Term<Id>>, Box<Term<Id>>)
 }
 
 
 #[derive(Debug, PartialEq)]
 #[repr(C)]
-pub enum AlphaTerm<T> {
+pub enum AlphaTerm<Id> {
     Number(Num),
     Hole,
-    Var(T),
-    DBI(u32),
+    Ident(Ident<Id>),
     // a Pi binder consists of a type and a body
-    Pi(Box<AlphaTerm<T>>, Box<AlphaTerm<T>>),
+    Pi(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
     // a lambda binder consists of a body
-    Lam(Box<AlphaTerm<T>>),
+    Lam(Box<AlphaTerm<Id>>),
     // an annotated lambda  consists of a type and a body
-    AnnLam(Box<AlphaTerm<T>>, Box<AlphaTerm<T>>),
+    AnnLam(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
     // i dont know about the big lambda
-    Asc(Box<AlphaTerm<T>>, Box<AlphaTerm<T>>),
-    SC(AlphaTermSC<T>, AlphaTermSC<T>),
-    App(Box<AlphaTerm<T>>, Box<AlphaTerm<T>>),
+    Asc(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
+    SC(AlphaTermSC<Id>, AlphaTermSC<Id>),
+    App(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
 }
 
 
-type Type<T> = Term<T>;
+type Type<Id> = Term<Id>;
 
 type Decls = Vec<Decl>;
 #[derive(Debug, PartialEq, Clone)]
@@ -73,61 +77,61 @@ pub enum Decl {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum NumericSC<T> {
-    Sum(T, T),
-    Prod(T, T),
-    Div(T, T),
-    Neg(T),
-    ZtoQ(T),
-    ZBranch { n: T, tbranch: T, fbranch: T },
-    NegBranch { n: T, tbranch: T, fbranch: T },
+pub enum NumericSC<SC> {
+    Sum(SC, SC),
+    Prod(SC, SC),
+    Div(SC, SC),
+    Neg(SC),
+    ZtoQ(SC),
+    ZBranch { n: SC, tbranch: SC, fbranch: SC },
+    NegBranch { n: SC, tbranch: SC, fbranch: SC },
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Pattern<T> {
+pub enum Pattern<Id> {
     Default,
-    Symbol(T),
-    App(T, Vec<T>)
+    Symbol(Ident<Id>),
+    App(Ident<Id>, Vec<Id>)
 }
 
+
 #[derive(Debug, PartialEq, Clone)]
-pub enum CompoundSC<AT, T> {
-    Match(AT, Vec<(Pattern<T>, AT)>),
+pub enum CompoundSC<SC, Id> {
+    Match(SC, Vec<(Pattern<Id>, SC)>),
     // < order
-    Compare { a: AT, b: AT, tbranch: AT, fbranch: AT },
+    // Compare { a: SC, b: SC, tbranch: SC, fbranch: SC },
     // =
-    IfEq { a: AT, b: AT, tbranch: AT, fbranch: AT },
-    Fail(TermSC<T>),
+    IfEq { a: SC, b: SC, tbranch: SC, fbranch: SC },
+    Fail(SC),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum SideEffectSC<AT> {
-    IfMarked { n: u32, c: AT, tbranch: AT, fbranch: AT },
-    MarkVar(u32, AT), // can only be a variable however, can be both explicit and DBI
-    Do(AT, AT),
+pub enum SideEffectSC<SC> {
+    IfMarked { n: u32, c: SC, tbranch: SC, fbranch: SC },
+    MarkVar(u32, SC), // can only be a variable however, can be both explicit and DBI
+    Do(SC, SC),
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum TermSC<T> {
+pub enum TermSC<Id> {
     Number(Num),
-    Var(T),
-    Let(T, Box<TermSC<T>>, Box<TermSC<T>>),
-    App(Box<TermSC<T>>, Box<TermSC<T>>),
-    Numeric(Box<NumericSC<TermSC<T>>>),
-    Compound(Box<CompoundSC<TermSC<T>, T>>),
-    SideEffect(Box<SideEffectSC<TermSC<T>>>)
+    Var(Id),
+    Let(Id, Box<TermSC<Id>>, Box<TermSC<Id>>),
+    App(Box<TermSC<Id>>, Box<TermSC<Id>>),
+    Numeric(Box<NumericSC<TermSC<Id>>>),
+    Compound(Box<CompoundSC<TermSC<Id>, Id>>),
+    SideEffect(Box<SideEffectSC<TermSC<Id>>>)
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum AlphaTermSC<T> {
+pub enum AlphaTermSC<Id> {
     Number(Num),
-    Var(T),
-    DBI(u32),
-    Let(Box<AlphaTermSC<T>>, Box<AlphaTermSC<T>>),
-    App(Box<AlphaTermSC<T>>, Box<AlphaTermSC<T>>),
-    Numeric(Box<NumericSC<AlphaTermSC<T>>>),
-    Compound(Box<CompoundSC<AlphaTermSC<T>, T>>),
-    SideEffect(Box<SideEffectSC<AlphaTermSC<T>>>)
+    Ident(Ident<Id>),
+    Let(Box<AlphaTermSC<Id>>, Box<AlphaTermSC<Id>>),
+    App(Box<AlphaTermSC<Id>>, Box<AlphaTermSC<Id>>),
+    Numeric(Box<NumericSC<AlphaTermSC<Id>>>),
+    Compound(Box<CompoundSC<AlphaTermSC<Id>, Id>>),
+    SideEffect(Box<SideEffectSC<AlphaTermSC<Id>>>)
 }
 
 #[derive(Debug, PartialEq)]

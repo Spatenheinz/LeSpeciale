@@ -118,6 +118,7 @@ use std::borrow::Borrow;
 use std::rc::Rc;
 
 use lfsc_syntax::ast::{AlphaTermSC, Num, NumericSC, CompoundSC, SideEffectSC};
+use lfsc_syntax::ast::Ident::*;
 use lfsc_syntax::ast::AlphaTermSC::*;
 use lfsc_syntax::ast::NumericSC::*;
 use lfsc_syntax::ast::CompoundSC::*;
@@ -136,8 +137,8 @@ pub fn run_sc<'a, T>(sc: &'a AlphaTermSC<T>,
         Number(Num::Z(p)) => Ok(Rc::new(Value::Z(*p))),
         Number(Num::Q(p,q)) => Ok(Rc::new(Value::Q(*p, *q))),
         // Little unsure about value vs type.
-        DBI(i) => lctx.get_value(*i),
-        Var(x) => gctx.get_value(x),
+        Ident(DBI(i)) => lctx.get_value(*i),
+        Ident(Symbol(x)) => gctx.get_value(x),
         Let(m, n) => {
             let m = run_sc(m, lctx.clone(), gctx.clone())?;
             let lctx = LocalContext::insert(m, lctx);
@@ -163,6 +164,7 @@ fn run_sideeffect<'a, T>(sc: &'a SideEffectSC<AlphaTermSC<T>>,
         run_sc(b, lctx, gctx)
     },
     MarkVar(n, var) => {
+        // by construction Markvar will be a variable.
         let var = run_sc(var, lctx.clone(), gctx)?;
         let v = as_symbolic(&var)?;
         set_mark(v, *n, lctx, gctx);
@@ -200,9 +202,9 @@ fn run_compound<'a, T>(sc: &'a CompoundSC<AlphaTermSC<T>, T>,
         //     (Value::ZT,_) => unreachable!() // only to dominate the typechecker
         // }
     }
-    Compare { a, b, tbranch, fbranch } => {
-        todo!() // somehow a little tricky
-    }
+    // Compare { a, b, tbranch, fbranch } => {
+    //     todo!() // somehow a little tricky
+    // }
     Match(scrut, cases) => {
         todo!("maybe easier after apply..")
     }

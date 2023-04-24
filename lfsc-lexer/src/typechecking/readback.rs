@@ -1,12 +1,13 @@
 use std::{rc::Rc, borrow::Borrow};
 
 use lfsc_syntax::{ast::AlphaTerm,  abinder, ast::BuiltIn};
+use lfsc_syntax::ast::Ident::*;
 use lfsc_syntax::ast::AlphaTerm::*;
 
 use super::context::{LocalContext, RGCTX};
 use super::{values::{RT, Normal, Value, Type, Neutral, TypecheckingErrors, TResult},
             context::RLCTX,
-            nbe::{eval_closure, do_app}
+            nbe::do_app
 };
 
 
@@ -37,8 +38,8 @@ where
         Type::Pi(dom, ran) => {
             let ctx1 = LocalContext::insert(dom.clone(), lctx.clone());
             let tmp = Rc::new(Value::Neutral(dom.clone(), Rc::new(Neutral::DBI(0))));
-            let ran_ = eval_closure(ran.clone(), tmp.clone(), gctx)?;
-            let app = do_app(val, tmp, gctx)?;
+            let ran_ = ran(tmp.clone())?;
+            let app = do_app(val, tmp)?;
             Ok(abinder!(lam, readback(ran_, app, lctx, gctx)?))
         }
         Type::Box => {
@@ -47,15 +48,13 @@ where
                     let dom = readback(ty.clone(), at.clone(), lctx.clone(), gctx)?;
                     let ctx1 = LocalContext::insert(at.clone(), lctx.clone());
                     let cls_res =
-                        eval_closure(bt.clone(),
-                                    Rc::new(Value::Neutral(at.clone(),
-                                                           Rc::new(Neutral::DBI(0)))),
-                                    gctx)?;
+                        bt(Rc::new(Value::Neutral(at.clone(),
+                                                 Rc::new(Neutral::DBI(0)))))?;
                     let ran = readback(ty.clone(), cls_res, lctx.clone(), gctx)?;
                     Ok(abinder!(pi, dom, ran))
                 }
-                Value::ZT => Ok(Var(T::_mpz())),
-                Value::QT => Ok(Var(T::_mpq())),
+                Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
+                Value::QT => Ok(Ident(Symbol(T::_mpq()))),
 
                 Value::Star => todo!(),
                 Value::Z(_) => todo!("readback z"),
@@ -90,8 +89,8 @@ where
     T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
 {
     match neu.borrow() {
-        Neutral::DBI(i) => Ok(DBI(*i)),
-        Neutral::Var(name) => Ok(Var(name.clone())),
+        Neutral::DBI(i) => Ok(Ident(DBI(*i))),
+        Neutral::Var(name) => Ok(Ident(Symbol(name.clone()))),
         Neutral::App(f, a) => {
             let f = readback_neutral(ty, f.clone(), lctx.clone(), gctx)?;
             let a = readback_normal(a.clone(), lctx.clone(), gctx)?;

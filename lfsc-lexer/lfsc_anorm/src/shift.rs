@@ -1,4 +1,5 @@
 use lfsc_syntax::ast::Term::*;
+use lfsc_syntax::ast::Ident::*;
 use lfsc_syntax::ast::Term;
 
 /// Shift is supposed to shift the debruijn indicies of terms.
@@ -10,14 +11,14 @@ pub fn shift<'a, T>(term: &'a mut Term<T>, d: u32, target: &'a Option<T>, minimu
 where T: PartialEq + Clone {
     match term {
         Number(_) | Hole => (),
-        DBI(n) => {
+        Ident(DBI(n)) => {
             if target.is_none() && minimum <= *n {
-                *term = DBI(*n + d)
+                *term = Ident(DBI(*n + d))
             }
         }
-        Var(x) => {
+        Ident(Symbol(x)) => {
             if target.is_some() && target.as_ref().unwrap() == x {
-                *term = DBI(0);
+                *term = Ident(DBI(0));
             }
         },
         Binder {kind, var, ty, body } => {

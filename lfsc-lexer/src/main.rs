@@ -9,7 +9,7 @@ mod typechecking;
 // use parser::parser::*;
 // use parser::sexp_parser::*;
 use lfsc_anorm::alpha::*;
-use parser::parser2::*;
+use parser::parser::*;
 use typechecking::nbe::*;
 use typechecking::context::*;
 

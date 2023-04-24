@@ -1,3 +1,5 @@
+use lfsc_syntax::ast::Ident;
+
 use super::values::{Neutral, Type, Value, RT, TResult, TypecheckingErrors};
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -11,9 +13,7 @@ pub type LResult<T, K> = TResult<T, K>;
 
 #[cfg(feature = "conslist")]
 pub type RLCTX<'a, T> = Rc<LocalContext<'a, T>>;
-#[cfg(not(feature = "conslist"))]
-pub type RLCTX<'a, T> = &'a LocalContext<'a, T>;
-// pub type RLCTX<'a, T> = Cow<'a, LocalContext<'a, T>>;
+
 pub type RGCTX<'a, T> = &'a GlobalContext<'a, T>;
 
 #[derive(Debug)]
@@ -30,18 +30,6 @@ pub enum LocalContext<'a, K: Clone> {
     Cons(TypeEntry<'a, K>, RLCTX<'a, K>),
 }
 
-#[derive(Debug, Clone)]
-#[cfg(not(feature = "conslist"))]
-pub struct LocalContext<'a, K: Clone> {
-    values: Vec<TypeEntry<'a, K>>,
-}
-
-#[derive(Debug)]
-pub enum Key<K> {
-    Name(K),
-    DBI(u32),
-}
-
 // pub fn init_with_str<'a>() -> Rc<GlobalContext<'a, &'a str>> {
 pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
     let mut ctx = GlobalContext::new();
@@ -52,15 +40,26 @@ pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
     // Rc::new(ctx)
 }
 
-fn from_entry_to_value<'a, K: Clone>(entry: &TypeEntry<'a, K>, key: Key<K>)
+pub fn get_type<'a, K: Clone> (key: &Ident<K>,
+                               lctx: RLCTX<'a, K>,
+                               rctx: RGCTX<'a, K>) -> LResult<RT<'a, K>, K>
+where K: std::fmt::Debug + Clone + PartialEq
+{
+    match key {
+        Ident::DBI(i) => lctx.get(*i).map(|v| from_entry_to_type(v)),
+        Ident::Symbol(name) => rctx.get(&name).map(|v| from_entry_to_type(v)),
+    }
+}
+
+fn from_entry_to_value<'a, K: Clone>(entry: &TypeEntry<'a, K>, key: Ident<K>)
                                      -> RT<'a, K> {
        match entry {
          TypeEntry::Def { val, .. } => val.clone(),
          TypeEntry::IsA { ty, .. } =>
                Rc::new(Value::Neutral(ty.clone(),
                           Rc::new( match key {
-                                     Key::Name(key) => Neutral::Var(key),
-                                     Key::DBI(dbi) => Neutral::DBI(dbi)
+                                     Ident::Symbol(key) => Neutral::Var(key),
+                                     Ident::DBI(dbi) => Neutral::DBI(dbi)
                                    }))),
          }
 }
@@ -73,30 +72,30 @@ fn from_entry_to_type<'a, K: Clone>(entry: &TypeEntry<'a, K>)
        }
 }
 
-pub fn get_mark<'a, K>(key: Key<K>,
+pub fn get_mark<'a, K>(key: Ident<K>,
                        n: u32,
                        lctx: RLCTX<'a, K>,
                        rctx: RGCTX<'a, K>) -> LResult<u32, K>
 where K: std::fmt::Debug + Clone + PartialEq
     {
     let val = match key {
-                Key::DBI(i) => lctx.get(i),
-                Key::Name(name) => rctx.get(&name)
+                Ident::DBI(i) => lctx.get(i),
+                Ident::Symbol(name) => rctx.get(&name)
              }?;
      match val {
             TypeEntry::IsA { marks, .. } => Ok((*marks.borrow() >> n) & 1),
             TypeEntry::Def { .. } => return Err(TypecheckingErrors::Mark),
         }
     }
-pub fn set_mark<'a, K>(key: Key<K>,
+pub fn set_mark<'a, K>(key: Ident<K>,
                        n: u32,
                        lctx: RLCTX<'a, K>,
                        rctx: RGCTX<'a, K>)
 where K: PartialEq + Clone + std::fmt::Debug
 {
     let val = match key {
-                Key::DBI(i) => lctx.get(i),
-                Key::Name(name) => rctx.get(&name)
+                Ident::DBI(i) => lctx.get(i),
+                Ident::Symbol(name) => rctx.get(&name)
              };
     if let Ok(TypeEntry::IsA { marks, .. }) = val {
        let mut marks = marks.borrow_mut();
@@ -138,13 +137,13 @@ where K: PartialEq + Clone
               .zip(self.values.iter().rev())
               .find(|(&ref n, _)| n == key)
               .map(|(_, v)| v)
-              .ok_or(lookup_err(Key::Name(key)))
+              .ok_or(lookup_err(Ident::Symbol(key)))
     }
 
 
     pub fn get_value(&self, key: &K) -> LResult<RT<'a, K>, K>
     where K: std::fmt::Debug {
-        self.get(key).map(|v| from_entry_to_value(v, Key::Name(key.clone())))
+        self.get(key).map(|v| from_entry_to_value(v, Ident::Symbol(key.clone())))
     }
 
     pub fn get_type(&self, key: &K) -> LResult<RT<'a, K>, K>
@@ -153,7 +152,7 @@ where K: PartialEq + Clone
     }
 }
 
-fn lookup_err<K, T>(key: Key<K>) -> TypecheckingErrors<T>
+fn lookup_err<K, T>(key: Ident<K>) -> TypecheckingErrors<T>
 where K: std::fmt::Debug {
     TypecheckingErrors::LookupFailed(LookupErr { err: format!("{:?} not found", key) })
 }
@@ -181,7 +180,7 @@ impl<'a, K> LocalContext<'a, K>
     #[cfg(feature = "conslist")]
     pub fn get(&self, key: u32) -> LResult<&TypeEntry<'a, K>, K> {
         match self {
-            LocalContext::Nil => Err(lookup_err(Key::<K>::DBI(key))),
+            LocalContext::Nil => Err(lookup_err(Ident::<K>::DBI(key))),
             LocalContext::Cons(ty, ctx) => {
                 if key == 0 {
                     Ok(ty)
@@ -194,7 +193,7 @@ impl<'a, K> LocalContext<'a, K>
 
     #[cfg(feature = "conslist")]
     pub fn get_value(&self, key: u32) -> LResult<RT<'a, K>, K> {
-        self.get(key).map(|v| from_entry_to_value(v, Key::<K>::DBI(key)))
+        self.get(key).map(|v| from_entry_to_value(v, Ident::<K>::DBI(key)))
     }
 
     #[cfg(feature = "conslist")]

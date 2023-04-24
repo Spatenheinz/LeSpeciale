@@ -10,7 +10,11 @@
 #+LATEX_HEADER_EXTRA: \frontpageimage{croissant.png}
 
 #+BEGIN_abstract
-  TODO: this is an abstract
+This project investigates the possibility of using Proof Carrying Code (PCC) for the EBPF Linux subsystem.
+More specifically I focus on the validation of proofs in the context of PCC. I do so by considering the dependently typed language Logical Framework with Side Conditions (LFSC), how it can be used for proof-checking
+and an implementation in Rust.
+In doing so this project investigates both how suitable Rust is for implementing a PCC architecture that can run in the Linux kernel,
+aswell as considering if LFSC is at all useful when under the constraint of the Linux kernel.
 #+END_abstract
 
 #+include: introduction.org

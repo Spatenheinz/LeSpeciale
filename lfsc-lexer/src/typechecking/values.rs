@@ -2,11 +2,11 @@ use core::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use lfsc_syntax::ast::AlphaTerm;
+use lfsc_syntax::ast::{AlphaTerm, AlphaTermSC, Ident};
 
 use super::context::{LocalContext, RGCTX};
 
-pub type Closure<'a,T> = Box<dyn FnOnce(RT<'a, T>) -> ResRT<'a, T>>;
+pub type Closure<'a,T> = Box<dyn Fn(RT<'a, T>) -> ResRT<'a, T> + 'a>;
 
 pub fn mkClosure<'a, T>(body: &'a AlphaTerm<T>,
                         env: super::context::RLCTX<'a, T>,
@@ -14,21 +14,13 @@ pub fn mkClosure<'a, T>(body: &'a AlphaTerm<T>,
                        -> Closure<'a, T>
 where T: Clone + PartialEq + fmt::Debug
 {
-    Box::new(|v|
+    Box::new(move |v|
              super::nbe::eval(body,
-                              LocalContext::insert(v, env),
+                              LocalContext::insert(v, env.clone()),
                               gctx))
 }
 
-// #[derive(Debug, Clone)]
-// pub struct Closure<'a, T: Clone> {
-//     #[cfg(feature = "conslist")]
-//     pub env: super::context::RLCTX<'a, T>,
-//     // #[cfg(not(feature = "conslist"))]
-//     // pub env: &'a LocalContext<'a, T>,
-//     pub body: &'a AlphaTerm<T>,
-// }
-//
+pub type TResult<T, K> = Result<T, TypecheckingErrors<K>>;
 pub type Type<'a, T> = Value<'a, T>;
 pub type RT<'a, T> = Rc<Type<'a, T>>;
 // pub type RT<'a, T> = &'a Type<'a, T>;
@@ -45,8 +37,9 @@ pub enum Value<'a, T: Clone> {
     QT,
     Q(i32, i32), // TODO: should in fact be unbounded
     Neutral(RT<'a, T>, Rc<Neutral<'a, T>>),
-    Run(&'a AlphaTerm<T>, RT<'a, T>),
+    Run(&'a AlphaTermSC<T>, RT<'a, T>),
 }
+
 impl<'a, T: Clone> fmt::Debug for Value<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -84,13 +77,13 @@ impl<'a, T: Clone> PartialEq for Value<'a, T> {
     }
 }
 pub fn as_symbolic<'a, T>(v: &Value<'a, T>)
-                          -> TResult<super::context::Key<T>, T>
+                          -> TResult<Ident<T>, T>
 where T: Clone
 {
     match v {
         Value::Neutral(_, n) => match &**n {
-            Neutral::Var(x) => Ok(super::context::Key::Name(x.clone())),
-            Neutral::DBI(x) => Ok(super::context::Key::DBI(*x)),
+            Neutral::Var(x) => Ok(Ident::Symbol(x.clone())),
+            Neutral::DBI(x) => Ok(Ident::DBI(*x)),
             _ => Err(TypecheckingErrors::NotSymbolic),
         },
         _ => Err(TypecheckingErrors::NotSymbolic),
@@ -117,16 +110,6 @@ where T: Clone
     }
 }
 
-pub fn as_pi<'a, T>(v: & Value<'a, T>)
-                    -> TResult<(RT<'a,T>, &'a Closure<'a, T>), T>
-where T: Clone
-{
-    match v {
-        Value::Pi(a, b) => Ok((a.clone(), b)),
-        _ => Err(TypecheckingErrors::NotPi),
-    }
-}
-
 pub fn is_neutral<'a, T>(v: &Value<'a, T>) -> bool
 where T: Clone
 {
@@ -150,6 +133,10 @@ pub enum TypecheckingErrors<T> {
     LookupFailed(super::context::LookupErr),
     CannotInferLambda,
     CannotInferHole,
+
+    NotFullyApplied,
+    DependentTypeNotAllowed,
+
     ExpectedSort,
     // ExpectedSort(Value<T>),
     // we have these errors in Side-conditions.
@@ -161,10 +148,9 @@ pub enum TypecheckingErrors<T> {
     NaN,
     ReachedFail,
     NotSymbolic,
-    Mark // tried to get mark for non-symbolic variable.
+    Mark, // tried to get mark for non-symbolic variable.
 }
 
-pub type TResult<T, K> = Result<T, TypecheckingErrors<K>>;
 
 #[derive(Debug, PartialEq)]
 pub enum Neutral<'a, T>

@@ -1,5 +1,6 @@
 use lfsc_syntax::ast::{Term, AlphaTerm, BinderKind};
 use lfsc_syntax::ast::AlphaTerm::*;
+use lfsc_syntax::ast::Ident::*;
 
 use super::shift::shift;
 use super::subst::subst;
@@ -11,13 +12,13 @@ where T: Clone + PartialEq
     match term {
         Term::Number(l) => Number(l),
         Term::Hole => Hole,
-        Term::Var(v) => Var(v),
-        Term::DBI(d) => DBI(d),
+        Term::Ident(Symbol(v)) => Ident(Symbol(v)),
+        Term::Ident(DBI(d)) => Ident(DBI(d)),
         Term::Binder {kind, var, ty, mut body } => {
             let ty = ty.map(|x| alpha_normalize(*x));
             if !var.is_none() {
                 shift(&mut body, 1, &None, 0);
-                subst(&mut body, &var, Term::DBI(0));
+                subst(&mut body, &var, Term::Ident(DBI(0)));
             }
             let body = alpha_normalize(*body);
             match kind {

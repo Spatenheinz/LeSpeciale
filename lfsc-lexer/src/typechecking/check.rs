@@ -1,14 +1,12 @@
-use lfsc_syntax::ast::{AlphaTerm, Num, BuiltIn};
+use lfsc_syntax::ast::{AlphaTerm, BuiltIn};
 use lfsc_syntax::ast::AlphaTerm::*;
-use super::nbe::eval_closure;
 use super::readback::readback;
 use super::infer::infer;
-use super::values::{Value, TResult, RT, as_pi, Neutral, as_Z, as_Q, TypecheckingErrors};
+use super::values::{Value, TResult, RT, Neutral, TypecheckingErrors};
 use super::context::{RLCTX, LocalContext, RGCTX};
 
 use std::rc::Rc;
-use std::borrow::{BorrowMut, Borrow};
-
+use std::borrow::Borrow;
 
 pub fn check<'a, T>(term: &'a AlphaTerm<T>, tau: RT<'a, T>,
                     lctx: RLCTX<'a, T>,
@@ -17,15 +15,14 @@ where
     T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
 {
     match term {
-        // will be checked in convert?
-        // Number(Num::Z(_)) => as_Z(tau.borrow()),
-        // Number(Num::Q(_,_)) => as_Q(tau.borrow()),
         AlphaTerm::Lam(body) => {
-            let (a,b) = as_pi(tau.as_ref())?;
-            let val = b(Rc::new(Value::Neutral(a.clone(),
-                                       Rc::new(Neutral::DBI(0)))))?;
-            let ctx1 = LocalContext::insert(a, lctx.clone());
-            check(body, val, ctx1, gctx)
+            if let Value::Pi(a,b) = tau.borrow() {
+                let val = b(Rc::new(Value::Neutral(a.clone(),
+                                        Rc::new(Neutral::DBI(0)))))?;
+                let ctx1 = LocalContext::insert(a.clone(), lctx.clone());
+                return check(body, val, ctx1, gctx)
+            }
+            Err(TypecheckingErrors::NotPi)
         },
         SC(t1, t2) => {
             todo!()
@@ -45,7 +42,7 @@ where
     T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
 {
     let e1 = readback(tau.clone(), t1, lctx.clone(), gctx)?;
-    let e2 = readback(tau.clone(), t2, lctx.clone(), gctx)?;
+    let e2 = readback(tau.clone(), t2, lctx, gctx)?;
     if e1 == e2 {
         Ok(())
     } else {
