@@ -4,20 +4,23 @@ use std::cell::RefCell;
 
 use lfsc_syntax::ast::{AlphaTerm, AlphaTermSC, Ident};
 
-use super::context::{LocalContext, RGCTX};
+use super::context::{LocalContext, RGCTX, GlobalContext};
 
-pub type Closure<'a,T> = Box<dyn Fn(RT<'a, T>) -> ResRT<'a, T> + 'a>;
+pub type Closure<'a,T> = Box<dyn Fn(RT<'a, T>, RGCTX<'a, T>) -> ResRT<'a, T> + 'a>;
+// pub type Closure<'a,T> = Box<dyn Fn(RT<'a, T>) -> ResRT<'a, T> + 'a>;
 
-pub fn mkClosure<'a, T>(body: &'a AlphaTerm<T>,
+pub fn mk_closure<'a, T>(body: &'a AlphaTerm<T>,
                         env: super::context::RLCTX<'a, T>,
-                        gctx: RGCTX<'a, T>)
+                        )
                        -> Closure<'a, T>
 where T: Clone + PartialEq + fmt::Debug
 {
-    Box::new(move |v|
+    Box::new(move |v, gctx|
+        // let ref_ = Weak::new()
+    // }
              super::nbe::eval(body,
                               LocalContext::insert(v, env.clone()),
-                              gctx))
+                              gctx.clone()))
 }
 
 pub type TResult<T, K> = Result<T, TypecheckingErrors<K>>;
@@ -40,10 +43,27 @@ pub enum Value<'a, T: Clone> {
     Run(&'a AlphaTermSC<T>, RT<'a, T>),
 }
 
+// fn level_print(val: &Value, f: &mut fmt::Formatter, lvl: u32) {
+//     match self {
+//         Value::Pi(a, b) => write!(f, "(∏ x{} : {:?}. {})", lvl, a, level_print(b, f, lvl + 1)),
+//           Value::Lam(m) => write!(f, "Lam"),
+//           Value::Box => write!(f, "Box"),
+//           Value::Star => write!(f, "Star"),
+//           Value::ZT => write!(f, "ZT"),
+//           Value::Z(i) => write!(f, "Z: {}", i),
+//           Value::QT => write!(f, "QT"),
+//           Value::Q(i, j) => write!(f, "Q: {}/{}", i, j),
+//           Value::Neutral(_, n) => write!(f, "Neutral: "),
+//           Value::Run(_, t) => write!(f, "Run: {:?}", t),
+//     }
+// }
+
+
+
 impl<'a, T: Clone> fmt::Debug for Value<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Value::Pi(a, _) => write!(f, "Pi: {:?}", a),
+            Value::Pi(a, _) => write!(f, "∏ {:?}", a),
             Value::Lam(_) => write!(f, "Lam"),
             Value::Box => write!(f, "Box"),
             Value::Star => write!(f, "Star"),

@@ -38,18 +38,18 @@ where
         Type::Pi(dom, ran) => {
             let ctx1 = LocalContext::insert(dom.clone(), lctx.clone());
             let tmp = Rc::new(Value::Neutral(dom.clone(), Rc::new(Neutral::DBI(0))));
-            let ran_ = ran(tmp.clone())?;
-            let app = do_app(val, tmp)?;
+            let ran_ = ran(tmp.clone(), gctx.clone())?;
+            let app = do_app(val, tmp, gctx.clone())?;
             Ok(abinder!(lam, readback(ran_, app, lctx, gctx)?))
         }
         Type::Box => {
             match val.borrow() {
                 Value::Pi(at, bt) => {
-                    let dom = readback(ty.clone(), at.clone(), lctx.clone(), gctx)?;
+                    let dom = readback(ty.clone(), at.clone(), lctx.clone(), gctx.clone())?;
                     let ctx1 = LocalContext::insert(at.clone(), lctx.clone());
                     let cls_res =
                         bt(Rc::new(Value::Neutral(at.clone(),
-                                                 Rc::new(Neutral::DBI(0)))))?;
+                                                 Rc::new(Neutral::DBI(0)))), gctx.clone())?;
                     let ran = readback(ty.clone(), cls_res, lctx.clone(), gctx)?;
                     Ok(abinder!(pi, dom, ran))
                 }
@@ -60,7 +60,7 @@ where
                 Value::Z(_) => todo!("readback z"),
 
                 Value::Q(..) => todo!("readback q"),
-                Value::Box => todo!("readback kind"),
+                Value::Box => {dbg!(gctx); todo!()},
                 Value::Lam(_) => todo!("readback lam"),
                 Value::Neutral(_, _) => unreachable!("neutral should have been handled above"),
                 Value::Run(..) => todo!()
@@ -92,7 +92,7 @@ where
         Neutral::DBI(i) => Ok(Ident(DBI(*i))),
         Neutral::Var(name) => Ok(Ident(Symbol(name.clone()))),
         Neutral::App(f, a) => {
-            let f = readback_neutral(ty, f.clone(), lctx.clone(), gctx)?;
+            let f = readback_neutral(ty, f.clone(), lctx.clone(), gctx.clone())?;
             let a = readback_normal(a.clone(), lctx.clone(), gctx)?;
             Ok(App(Box::new(f),Box::new(a)))
         },

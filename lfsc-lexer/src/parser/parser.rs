@@ -1,5 +1,5 @@
 use lfsc_syntax::{ast::{Num, Term, Command, TermSC, SideEffectSC,
-                        NumericSC, CompoundSC, Pattern, Ident}, binder, var};
+                        NumericSC, CompoundSC, Pattern, Ident, StrCommand}, binder, var};
 
 extern crate nom;
 
@@ -16,11 +16,11 @@ use nom::{
     IResult, Parser,
 };
 
-pub fn parse_file(it: &str) -> IResult<&str, Vec<Command<&str>>> {
+pub fn parse_file(it: &str) -> IResult<&str, Vec<StrCommand>> {
     delimited(ws, many0(parse_command), eof)(it)
 }
 
-pub fn parse_command(it: &str) -> IResult<&str, Command<&str>> {
+pub fn parse_command(it: &str) -> IResult<&str, StrCommand> {
     parens(alt((
         map(preceded(reserved("check"), parse_term),
              |x| Command::Check(x)),

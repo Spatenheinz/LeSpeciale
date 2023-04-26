@@ -10,6 +10,18 @@ pub trait BuiltIn {
     fn _type() -> Self;
 }
 
+impl BuiltIn for &str {
+    fn _mpz() -> Self {
+        "mpz"
+    }
+    fn _mpq() -> Self {
+        "mpq"
+    }
+    fn _type() -> Self {
+        "type"
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Ident<Id> {
     Symbol(Id),
@@ -37,7 +49,7 @@ pub enum Term<Id> {
     // \ and lam : also called unascription is a lambda binder with None typing
     // # this is the ascription function
     // // % this is the big lambda case
-    Binder{ kind: BinderKind, var: Option<Id>, ty: Option<Box<Type<Id>>>, body: Box<Term<Id>> },
+    Binder{ kind: BinderKind, var: Id, ty: Option<Box<Type<Id>>>, body: Box<Term<Id>> },
     // @ and let (this is syntactical sugar) let x = e in b ~ (lambda x . b) e
     // : ascription
     Ascription { ty: Box<Type<Id>>, val: Box<Term<Id>> },
@@ -47,6 +59,7 @@ pub enum Term<Id> {
     Arrow { decls: Decls, result: Box<Term<Id>>},
     App(Box<Term<Id>>, Box<Term<Id>>)
 }
+pub type StrTerm<'a> = Term<&'a str>;
 
 
 #[derive(Debug, PartialEq)]
@@ -66,6 +79,8 @@ pub enum AlphaTerm<Id> {
     SC(AlphaTermSC<Id>, AlphaTermSC<Id>),
     App(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
 }
+
+pub type StrAlphaTerm<'a> = AlphaTerm<&'a str>;
 
 
 type Type<Id> = Term<Id>;
@@ -93,11 +108,17 @@ pub enum Pattern<Id> {
     Symbol(Ident<Id>),
     App(Ident<Id>, Vec<Id>)
 }
+#[derive(Debug, PartialEq, Clone)]
+pub enum AlphaPattern<Id> {
+    Default,
+    Symbol(Ident<Id>),
+    App(Ident<Id>, u32)
+}
 
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum CompoundSC<SC, Id> {
-    Match(SC, Vec<(Pattern<Id>, SC)>),
+pub enum CompoundSC<SC, Pattern> {
+    Match(SC, Vec<(Pattern, SC)>),
     // < order
     // Compare { a: SC, b: SC, tbranch: SC, fbranch: SC },
     // =
@@ -119,9 +140,10 @@ pub enum TermSC<Id> {
     Let(Id, Box<TermSC<Id>>, Box<TermSC<Id>>),
     App(Box<TermSC<Id>>, Box<TermSC<Id>>),
     Numeric(Box<NumericSC<TermSC<Id>>>),
-    Compound(Box<CompoundSC<TermSC<Id>, Id>>),
+    Compound(Box<CompoundSC<TermSC<Id>, Pattern<Id>>>),
     SideEffect(Box<SideEffectSC<TermSC<Id>>>)
 }
+pub type StrSC<'a> = TermSC<&'a str>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum AlphaTermSC<Id> {
@@ -130,20 +152,32 @@ pub enum AlphaTermSC<Id> {
     Let(Box<AlphaTermSC<Id>>, Box<AlphaTermSC<Id>>),
     App(Box<AlphaTermSC<Id>>, Box<AlphaTermSC<Id>>),
     Numeric(Box<NumericSC<AlphaTermSC<Id>>>),
-    Compound(Box<CompoundSC<AlphaTermSC<Id>, Id>>),
+    Compound(Box<CompoundSC<AlphaTermSC<Id>, AlphaPattern<Id>>>),
     SideEffect(Box<SideEffectSC<AlphaTermSC<Id>>>)
 }
 
+pub type StrAlphaSC<'a> = AlphaTermSC<&'a str>;
+
+pub type StrCommand<'a> = Command<&'a str, // Identifier
+                                  Term<&'a str>, // Term
+                                  TermSC<&'a str>, // SideCondition
+                                  Vec<(&'a str, Term<&'a str>)>>;
+pub type StrAlphaCommand<'a> = Command<&'a str, // Identifier
+                                       StrAlphaTerm<'a>, // Alpha normalized term
+                                       AlphaTermSC<&'a str>, // Alpha normalized side condition
+                                       Vec<StrAlphaTerm<'a>>>;
+pub type Program<'a> = Vec<StrCommand<'a>>;
+
 #[derive(Debug, PartialEq)]
-pub enum Command<Id> {
-    Declare(Id, Term<Id>),
-    Define(Id, Term<Id>),
+pub enum Command<Id, Term, SC, Args> {
+    Declare(Id, Term),
+    Define(Id, Term),
     // Opaque{var: Id, term: T},
 //  Declare Rule: (declare-rule VAR DECLS TYPE): equivalent to (declare VAR (-> DECLS TYPE))
 // Declare Type: (declare-type VAR DECLS): equivalent to (declare VAR (-> DECLS type))
     // DefConst{var: Id, decls: Decls, term: T},
-    Check(Term<Id>),
+    Check(Term),
     // AssCheck{decls: Decls, ty: T, term: T},
-    Prog{cache: bool, id: Id, args: Vec<(Id, Term<Id>)>, ty: Term<Id>, body: TermSC<Id>},
-    Run(TermSC<Id>),
+    Prog{cache: bool, id: Id, args: Args, ty: Term, body: SC},
+    Run(SC),
 }

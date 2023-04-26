@@ -12,15 +12,7 @@ macro_rules! binder {
     (pi, $v:ident : $ty:expr, $body:expr) => {
         $crate::ast::Term::Binder {
             kind: $crate::ast::BinderKind::Pi,
-            var: Some(var!($v)),
-            ty: Some(Box::new($ty)),
-            body: Box::new($body),
-        }
-    };
-    (pi, $ty:expr, $body:expr) => {
-        $crate::ast::Term::Binder {
-            kind: $crate::ast::BinderKind::Pi,
-            var: None,
+            var: var!($v),
             ty: Some(Box::new($ty)),
             body: Box::new($body),
         }
@@ -28,15 +20,7 @@ macro_rules! binder {
     (lam, $v:ident, $body:expr) => {
         $crate::ast::Term::Binder {
             kind: $crate::ast::BinderKind::Lam,
-            var: Some(var!($v)),
-            ty: None,
-            body: Box::new($body),
-        }
-    };
-    (lam, $body:expr) => {
-        $crate::ast::Term::Binder {
-            kind: $crate::ast::BinderKind::Lam,
-            var: None,
+            var: var!($v),
             ty: None,
             body: Box::new($body),
         }
@@ -44,7 +28,7 @@ macro_rules! binder {
     (lam, $v:ident : $ty:expr, $body:expr) => {
         $crate::ast::Term::Binder {
             kind: $crate::ast::BinderKind::Lam,
-            var: Some(var!($v)),
+            var: var!($v),
             ty: Some(Box::new($ty)),
             body: Box::new($body),
         }
@@ -52,7 +36,7 @@ macro_rules! binder {
     (biglam, $v:ident : $ty:expr, $body:expr) => {
         $crate::ast::Term::Binder {
             kind: $crate::ast::BinderKind::BigLam,
-            var: Some(var!($v)),
+            var: var!($v),
             ty: Some(Box::new($ty)),
             body: Box::new($body),
         }
@@ -72,34 +56,34 @@ macro_rules! abinder {
 #[macro_export]
 macro_rules! var {
     ($name:ident) => {
-        $name
+        stringify!($name)
         // stringify!($name).to_owned()
     };
 }
 
 #[macro_export]
 macro_rules! term {
-    ($v:ident) => { $crate::ast::Term::Var(var!($v)) };
+    ($v:ident) => { $crate::ast::Term::Ident(Symbol(var!($v))) };
     (($($inner:tt)+)) => { term_!($($inner)+) };
 }
 
 #[macro_export]
 macro_rules! term_ {
-    ($v:ident) => {$crate::ast::Term::Var(var!($v))};
+    ($v:ident) => {$crate::ast::Term::Ident(Symbol(var!($v)))};
     (λ $v:ident $b:tt) => {
         binder!(lam, $v, term!($b))
     };
-    (let $e:tt $b:tt) => {
-        $crate::ast::Term::App(
-            binder!(lam, term!($b)).into(),
-            term!($e).into(),
-        )
-    };
+    // (let $e:tt $b:tt) => {
+    //     $crate::ast::Term::App(
+    //         binder!(lam, term!($b)).into(),
+    //         term!($e).into(),
+    //     )
+    // };
     (let $v:ident $e:tt $b:tt) => {
-        $crate::ast::Term::App {
+        $crate::ast::Term::App(
             binder!(lam, $v, term!($b)).into(),
             term!($e).into(),
-        }
+        )
     };
     ($($x:tt)+) => {
             rec!($($x)+)
@@ -119,10 +103,10 @@ macro_rules! rec {
 #[macro_export]
 macro_rules! app {
     ($f:expr, $x:expr) => {
-        $crate::ast::Term::App {
-            fun: $f.into(),
-            arg: $x.into(),
-        }
+        $crate::ast::Term::App (
+            $f.into(),
+            $x.into(),
+        )
     };
 }
 
@@ -133,22 +117,22 @@ mod tests {
     #[test]
     fn var_test() {
         let term = term!(x);
-        assert_eq!(term, Var("x".to_owned()));
+        assert_eq!(term, Ident(Symbol("x")));
     }
     #[test]
     fn var_keyword_test() {
         let term = term!(let);
-        assert_eq!(term, Var("let".to_owned()));
+        assert_eq!(term, Ident(Symbol("let")));
     }
     #[test]
     fn apply_test() {
         let term = term!((f x));
         assert_eq!(
             term,
-            App {
-                fun: Var("f".to_owned()).into(),
-                arg: Box::new(Var("x".to_owned())),
-            }
+            App (
+                Var("f".to_owned()).into(),
+                Box::new(Var("x".to_owned())),
+            )
         );
     }
     #[test]
@@ -156,13 +140,13 @@ mod tests {
         let term = term!((f g x));
         assert_eq!(
             term,
-            App {
-                fun: Box::new(Var("f".to_owned())),
-                arg: Box::new(App {
-                    fun: Box::new(Var("g".to_owned())),
-                    arg: Box::new(Var("x".to_owned())),
-                }),
-            }
+            App (
+                Box::new(Var("f".to_owned())),
+                Box::new(App (
+                    Box::new(Var("g".to_owned())),
+                    Box::new(Var("x".to_owned())),
+                )),
+            )
         );
     }
     #[test]
@@ -170,10 +154,10 @@ mod tests {
         let term = term!((let x y x));
         assert_eq!(
             term,
-            App {
-                fun: binder!(lam, x, term!(x)).into(),
-                arg: Box::new(Var("y".to_owned()))
-            }
+            App (
+                binder!(lam, x, term!(x)).into(),
+                Box::new(Var("y".to_owned()))
+            )
         );
     }
     #[test]
@@ -181,10 +165,10 @@ mod tests {
         let term = term!((let y x));
         assert_eq!(
             term,
-            App {
-                fun: binder!(lam, term!(x)).into(),
-                arg: Box::new(Var("y".to_owned()))
-            }
+            App (
+                binder!(lam, term!(x)).into(),
+                Box::new(Var("y".to_owned()))
+            )
         );
     }
     #[test]
@@ -192,14 +176,13 @@ mod tests {
         let term = term!((let x (f y) x));
         assert_eq!(
             term,
-            App {
-                fun: binder!(lam, x, term!(x)).into(),
-                arg: App {
-                    fun: Box::new(Var("f".to_owned())),
-                    arg: Box::new(Var("y".to_owned()))
-                }
-                .into()
-            }
+            App (
+                binder!(lam, x, term!(x)).into(),
+                App (
+                    Box::new(Var("f".to_owned())),
+                    Box::new(Var("y".to_owned()))
+                ).into()
+            )
         );
     }
     #[test]
@@ -207,14 +190,12 @@ mod tests {
         let term = term!(((let x y x) z));
         assert_eq!(
             term,
-            App {
-                fun: App {
-                    fun: binder!(lam, x, term!(x)).into(),
-                    arg: term!(y).into()
-                }
-                .into(),
-                arg: Box::new(Var("z".to_owned())),
-            }
+            App (
+                App (
+                    binder!(lam, x, term!(x)).into(),
+                    term!(y).into()).into(),
+                Box::new(Var("z".to_owned())),
+            )
         );
     }
     #[test]
@@ -222,16 +203,16 @@ mod tests {
         let term = term!(((f x) (g y)));
         assert_eq!(
             term,
-            App {
-                fun: Box::new(App {
-                    fun: Box::new(Var("f".to_owned())),
-                    arg: Box::new(Var("x".to_owned())),
-                }),
-                arg: Box::new(App {
-                    fun: Box::new(Var("g".to_owned())),
-                    arg: Box::new(Var("y".to_owned())),
-                }),
-            }
+            App (
+                Box::new(App (
+                    Box::new(Var("f".to_owned())),
+                    Box::new(Var("x".to_owned())),
+                )),
+                Box::new(App (
+                    Box::new(Var("g".to_owned())),
+                    Box::new(Var("y".to_owned())),
+                )),
+            )
         );
     }
 }

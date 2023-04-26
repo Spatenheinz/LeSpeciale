@@ -18,7 +18,7 @@ where
         AlphaTerm::Lam(body) => {
             if let Value::Pi(a,b) = tau.borrow() {
                 let val = b(Rc::new(Value::Neutral(a.clone(),
-                                        Rc::new(Neutral::DBI(0)))))?;
+                                        Rc::new(Neutral::DBI(0)))), gctx.clone())?;
                 let ctx1 = LocalContext::insert(a.clone(), lctx.clone());
                 return check(body, val, ctx1, gctx)
             }
@@ -29,7 +29,7 @@ where
         },
         // Fv, Bv, Ascription, PI, Annotated, etc.
         _ => {
-            let t = infer(term, lctx.clone(), gctx)?;
+            let t = infer(term, lctx.clone(), gctx.clone())?;
             convert(t, tau, gctx.kind.clone(),  lctx, gctx)
         }
     }
@@ -41,7 +41,7 @@ fn convert<'a, T>(t1: RT<'a, T>, t2: RT<'a, T>, tau: RT<'a, T>,
 where
     T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
 {
-    let e1 = readback(tau.clone(), t1, lctx.clone(), gctx)?;
+    let e1 = readback(tau.clone(), t1, lctx.clone(), gctx.clone())?;
     let e2 = readback(tau.clone(), t2, lctx, gctx)?;
     if e1 == e2 {
         Ok(())
