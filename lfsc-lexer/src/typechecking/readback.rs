@@ -4,17 +4,16 @@ use lfsc_syntax::{ast::AlphaTerm,  abinder, ast::BuiltIn};
 use lfsc_syntax::ast::Ident::*;
 use lfsc_syntax::ast::AlphaTerm::*;
 
-use super::context::{LocalContext, RGCTX};
+use super::context::{LocalContext, Rgctx, Rlctx};
 use super::{values::{RT, Normal, Value, Type, Neutral, TypecheckingErrors, TResult},
-            context::RLCTX,
             nbe::do_app
 };
 
 
 
 pub fn readback_normal<'a, T>(normal: Normal<'a, T>,
-                              lctx: RLCTX<'a, T>,
-                              gctx: RGCTX<'a, T>) -> TResult<AlphaTerm<T>, T>
+                              lctx: Rlctx<'a, T>,
+                              gctx: Rgctx<'a, T>) -> TResult<AlphaTerm<T>, T>
 where
     T: PartialEq + Clone + BuiltIn + std::fmt::Debug
 {
@@ -24,8 +23,8 @@ where
 
 pub fn readback<'a, T>(ty: RT<'a, T>,
                        val: RT<'a, T>,
-                       lctx: RLCTX<'a, T>,
-                       gctx: RGCTX<'a, T>) -> TResult<AlphaTerm<T>, T>
+                       lctx: Rlctx<'a, T>,
+                       gctx: Rgctx<'a, T>) -> TResult<AlphaTerm<T>, T>
 where
     T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
 {
@@ -83,8 +82,8 @@ where
 
 fn readback_neutral<'a, T>(ty: RT<'a, T>,
                            neu: Rc<Neutral<'a, T>>,
-                           lctx: RLCTX<'a,T>,
-                           gctx: RGCTX<'a,T>) -> TResult<AlphaTerm<T>, T>
+                           lctx: Rlctx<'a,T>,
+                           gctx: Rgctx<'a,T>) -> TResult<AlphaTerm<T>, T>
 where
     T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
 {

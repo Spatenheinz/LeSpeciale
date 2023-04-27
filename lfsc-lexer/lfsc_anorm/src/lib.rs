@@ -1,3 +1,2 @@
-pub mod shift;
+mod lookup;
 pub mod alpha;
-pub mod subst;

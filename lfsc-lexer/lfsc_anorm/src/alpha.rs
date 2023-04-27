@@ -6,6 +6,8 @@ use lfsc_syntax::ast::Ident::*;
 
 use lfsc_syntax::ast::StrAlphaSC as ASC;
 
+use crate::lookup::Lookup;
+
 
 pub fn alpha_convert_command(command: StrCommand) -> StrAlphaCommand {
     let vars = &mut Vec::new();
@@ -49,30 +51,6 @@ fn local<'a, 'b, Input, Output>(fun: impl Fn(Input, &mut Vec<&'a str>)
     vars.truncate(len);
     aterm
     })
-}
-
-fn lookup_(vars: &[&str], var: &str) -> Option<u32> {
-    vars.iter().rev()
-               .position(|&x| x == var)
-               .map(|x| (x as u32))
-}
-
-trait Lookup<'a> {
-    fn lookup(vars: &[&'a str], var: &'a str) -> Self;
-}
-
-impl<'a> Lookup<'a> for StrAlphaTerm<'a> {
-    fn lookup(vars: &[&'a str], var: &'a str) -> Self {
-        lookup_(vars, var).map(|x| Ident(DBI(x)))
-                          .unwrap_or(Ident(Symbol(var)))
-    }
-}
-
-impl<'a> Lookup<'a> for ASC<'a> {
-    fn lookup(vars: &[&'a str], var: &'a str) -> Self {
-        lookup_(vars, var).map(|x| ASC::Ident(DBI(x)))
-                          .unwrap_or(ASC::Ident(Symbol(var)))
-    }
 }
 
 pub fn alpha_normalize<'a>(term: StrTerm<'a>,

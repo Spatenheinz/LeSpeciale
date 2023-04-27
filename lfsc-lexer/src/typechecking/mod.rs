@@ -6,30 +6,25 @@ pub mod readback;
 pub mod infer;
 mod sc;
 pub mod tester;
-// mod occurs;
-
 
 use std::rc::Rc;
 
-use lfsc_syntax::ast::{Command, AlphaTerm, BuiltIn, AlphaTermSC};
-use infer::infer;
-use check::check;
+use lfsc_syntax::ast::{Command, StrAlphaCommand};
 use nbe::eval;
 
-use self::{context::{GlobalContext, RLCTX, LocalContext, RGCTX}, values::TResult, infer::infer_sort};
+use self::{context::{LocalContext, Rgctx}, values::TResult, infer::infer_sort};
 
-pub fn handle_command<'a, T>(com: &'a Command<T, AlphaTerm<T>, AlphaTermSC<T>>,
+pub fn handle_command<'a, 'b>(com: &'b StrAlphaCommand<'a>,
                              // lctx: RLCTX<'a,T>,
-                             gctx: RGCTX<'a, T>) -> TResult<(), T>
-where T: Clone + BuiltIn + std::fmt::Debug + PartialEq,
+                             gctx: Rgctx<'b, &'a str>) -> TResult<(), &'a str>
 {
     let lctx = Rc::new(LocalContext::new());
     match com {
       Command::Declare(var, ty) => {
           // actually doing this for pi will check that it is a sort already,
-            infer_sort(&ty, lctx.clone(), gctx.clone())?;
-            let val = eval(&ty, lctx, gctx.clone())?;
-            gctx.insert(var.clone(), val);
+            infer_sort(ty, lctx.clone(), gctx.clone())?;
+            let val = eval(ty, lctx, gctx.clone())?;
+            gctx.insert(var, val);
             Ok(())
       },
         Command::Define(var, term) => {

@@ -3,14 +3,14 @@ use lfsc_syntax::ast::AlphaTerm::*;
 use super::readback::readback;
 use super::infer::infer;
 use super::values::{Value, TResult, RT, Neutral, TypecheckingErrors};
-use super::context::{RLCTX, LocalContext, RGCTX};
+use super::context::{Rlctx, LocalContext, Rgctx};
 
 use std::rc::Rc;
 use std::borrow::Borrow;
 
 pub fn check<'a, T>(term: &'a AlphaTerm<T>, tau: RT<'a, T>,
-                    lctx: RLCTX<'a, T>,
-                    gctx: RGCTX<'a, T>) -> TResult<(), T>
+                    lctx: Rlctx<'a, T>,
+                    gctx: Rgctx<'a, T>) -> TResult<(), T>
 where
     T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
 {
@@ -36,8 +36,8 @@ where
 }
 
 fn convert<'a, T>(t1: RT<'a, T>, t2: RT<'a, T>, tau: RT<'a, T>,
-                  lctx: RLCTX<'a, T>,
-                  gctx: RGCTX<'a, T>) -> TResult<(), T>
+                  lctx: Rlctx<'a, T>,
+                  gctx: Rgctx<'a, T>) -> TResult<(), T>
 where
     T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
 {

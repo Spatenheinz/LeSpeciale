@@ -1,29 +1,13 @@
-// #![no_std]
-// extern crate alloc;
-// use alloc::string::{String, ToString};
-//
 mod parser;
 mod typechecking;
-
-// use parser::lexer::*;
-// use parser::parser::*;
-// use parser::sexp_parser::*;
 use lfsc_anorm::alpha::*;
-use lfsc_syntax::ast::Command;
-use lfsc_syntax::ast::Program;
 use parser::parser::*;
-use typechecking::nbe::*;
 use typechecking::context::*;
 
-// use lfsc_syntax::{term, var, term_, binder, rec, app};
-use lfsc_syntax::ast::BinderKind::*;
-use lfsc_syntax::ast::Term::*;
 
 use std::rc::Rc;
-use std::cell::RefCell;
 
 use crate::typechecking::handle_command;
-use crate::typechecking::values::TResult;
 
 fn main() {
     let str = &std::fs::read_to_string("src/smol.plf").unwrap();

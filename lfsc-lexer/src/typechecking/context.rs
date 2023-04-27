@@ -1,9 +1,8 @@
 use lfsc_syntax::ast::Ident;
 
-use super::values::{Neutral, Type, Value, RT, TResult, TypecheckingErrors, self};
+use super::values::{Neutral, Type, Value, RT, TResult, TypecheckingErrors};
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::borrow::Cow;
 
 #[derive(Debug)]
 pub struct LookupErr {err: String}
@@ -12,10 +11,10 @@ pub type LResult<T, K> = TResult<T, K>;
 
 
 #[cfg(feature = "conslist")]
-pub type RLCTX<'a, T> = Rc<LocalContext<'a, T>>;
+pub type Rlctx<'a, T> = Rc<LocalContext<'a, T>>;
 
 // pub type RGCTX<'a, T> = Rc<GlobalContext<'a, T>>;
-pub type RGCTX<'a, T> = Rc<GlobalContext<'a, T>>;
+pub type Rgctx<'a, T> = Rc<GlobalContext<'a, T>>;
 
 #[derive(Debug, Clone)]
 pub struct GlobalContext<'a, K: Clone> {
@@ -28,7 +27,7 @@ pub struct GlobalContext<'a, K: Clone> {
 #[cfg(feature = "conslist")]
 pub enum LocalContext<'a, K: Clone> {
     Nil,
-    Cons(TypeEntry<'a, K>, RLCTX<'a, K>),
+    Cons(TypeEntry<'a, K>, Rlctx<'a, K>),
 }
 
 // pub fn init_with_str<'a>() -> Rc<GlobalContext<'a, &'a str>> {
@@ -41,9 +40,11 @@ pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
     // Rc::new(ctx)
 }
 
-pub fn get_type<'a, K: Clone> (key: &Ident<K>,
-                               lctx: RLCTX<'a, K>,
-                               rctx: RGCTX<'a, K>) -> LResult<RT<'a, K>, K>
+pub fn get_type<'ctx, K: Clone>
+    (key: &Ident<K>,
+     lctx: Rlctx<'ctx, K>,
+     rctx: Rgctx<'ctx, K>)
+     -> LResult<RT<'ctx, K>, K>
 where K: std::fmt::Debug + Clone + PartialEq
 {
     match key {
@@ -75,8 +76,8 @@ fn from_entry_to_type<'a, K: Clone>(entry: &TypeEntry<'a, K>)
 
 // pub fn get_mark<'a, K>(key: Ident<K>,
 //                        n: u32,
-//                        lctx: RLCTX<'a, K>,
-//                        gctx: RGCTX<'a, K>) -> LResult<u32, K>
+//                        lctx: Rlctx<'a, K>,
+//                        gctx: Rgctx<'a, K>) -> LResult<u32, K>
 // where K: std::fmt::Debug + Clone + PartialEq
 //     {
 //     match key {
@@ -92,8 +93,8 @@ fn from_entry_to_type<'a, K: Clone>(entry: &TypeEntry<'a, K>)
 //     }
 // pub fn set_mark<'a, K>(key: Ident<K>,
 //                        n: u32,
-//                        lctx: RLCTX<'a, K>,
-//                        gctx: RGCTX<'a, K>)
+//                        lctx: Rlctx<'a, K>,
+//                        gctx: Rgctx<'a, K>)
 // where K: PartialEq + Clone + std::fmt::Debug
 // {
 //     let val = match key {
@@ -190,7 +191,7 @@ impl<'a, K> LocalContext<'a, K>
     }
 
     #[cfg(feature = "conslist")]
-    pub fn insert(ty: RT<'a, K>, ctx: RLCTX<'a, K>) -> RLCTX<'a, K> {
+    pub fn insert(ty: RT<'a, K>, ctx: Rlctx<'a, K>) -> Rlctx<'a, K> {
         Rc::new(LocalContext::Cons(
             TypeEntry::IsA { ty, marks: RefCell::new(0)}, ctx))
     }

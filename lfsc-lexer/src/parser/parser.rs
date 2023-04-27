@@ -5,13 +5,11 @@ extern crate nom;
 
 use nom::{
     branch::alt,
-    bytes::complete::{is_not, tag, take_until},
-    character::complete::{
-        alpha1, alphanumeric1, char, digit1, satisfy,
-    },
+    bytes::complete::{tag, take_until},
+    character::complete::{ char, digit1, satisfy},
     combinator::{map, recognize, value, opt, eof},
     error::{ParseError, VerboseError, Error},
-    multi::{many0, many1, fold_many_m_n, many_till, fold_many0},
+    multi::{many0, many1, fold_many_m_n, fold_many0},
     sequence::{delimited, pair, preceded, terminated, tuple},
     IResult, Parser,
 };
@@ -23,7 +21,7 @@ pub fn parse_file(it: &str) -> IResult<&str, Vec<StrCommand>> {
 pub fn parse_command(it: &str) -> IResult<&str, StrCommand> {
     parens(alt((
         map(preceded(reserved("check"), parse_term),
-             |x| Command::Check(x)),
+             Command::Check),
         map(preceded(reserved("define"), pair(parse_ident, parse_term)),
              |(x, term)| Command::Define(x, term)),
         map(preceded(reserved("declare"), pair(parse_ident, parse_term)),
@@ -41,7 +39,7 @@ pub fn parse_command(it: &str) -> IResult<&str, StrCommand> {
                             parse_sc))),
              |(id, args, ty, body)| Command::Prog{cache: true, id, args, ty, body}),
         map(preceded(reserved("run"), parse_sc),
-             |x| Command::Run(x)),
+             Command::Run),
     )))(it)
 }
 
@@ -49,7 +47,7 @@ pub fn parse_term(it: &str) -> IResult<&str, Term<&str>> {
     let f = alt((
        parse_hole,
        map(parse_ident, |x| Term::Ident(Ident::Symbol(x))),
-       map(parse_num, |x| Term::Number(x)),
+       map(parse_num, Term::Number),
        open_followed(parse_term_),
     ))(it);
     f
@@ -77,7 +75,8 @@ const KEYWORDS: [&str; 20] = ["let", "pi", "lam", "do", "match",
                              "markvar", "ifmarked", "default", "fail",
                              "run", "define", "declare", "check"];
 
-pub fn reserved<'a>(expected: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str> {
+pub fn reserved<'a>(expected: &'a str)
+                    -> impl FnMut(&'a str) -> IResult<&'a str, &'a str> {
     terminated(tag(expected),ws1)
 }
 
@@ -149,10 +148,10 @@ fn parse_sc_(it: &str) -> IResult<&str, TermSC<&str>> {
 
 }
 
-fn parse_compound(it : &str) -> IResult<&str, CompoundSC<TermSC<&str>, &str>> {
+fn parse_compound(it : &str) -> IResult<&str, CompoundSC<TermSC<&str>, Pattern<&str>>> {
     alt((
         map(preceded(reserved("fail"),
-                     parse_sc), |x| CompoundSC::Fail(x)),
+                     parse_sc), CompoundSC::Fail),
         // map(preceded(reserved("compare"),
         //               tuple((parse_sc, parse_sc, parse_sc, parse_sc))),
         //     |(a,b,tbranch,fbranch)|

@@ -1,5 +1,5 @@
-use super::context::{RGCTX, RLCTX, LocalContext};
-use super::values::{Closure, Neutral, Normal, Value, RT, ResRT};
+use super::context::{Rgctx, Rlctx};
+use super::values::{Neutral, Normal, Value, RT, ResRT};
 use lfsc_syntax::ast::{AlphaTerm, Num};
 use lfsc_syntax::ast::Ident::*;
 use lfsc_syntax::ast::AlphaTerm::*;
@@ -7,12 +7,11 @@ use lfsc_syntax::ast::AlphaTerm::*;
 use std::rc::Rc;
 use std::borrow::Borrow;
 use std::cell::RefCell;
-use std::borrow::Cow;
 
 #[cfg(feature = "conslist")]
 pub fn eval<'a, T>(term: &'a AlphaTerm<T>,
-                    lctx: RLCTX<'a, T>,
-                    gctx: RGCTX<'a, T>) -> ResRT<'a, T>
+                    lctx: Rlctx<'a, T>,
+                    gctx: Rgctx<'a, T>) -> ResRT<'a, T>
     where T: Clone + PartialEq + std::fmt::Debug
 {
     use super::values::mk_closure;
@@ -47,18 +46,9 @@ pub fn eval<'a, T>(term: &'a AlphaTerm<T>,
             SC(..) => todo!("eval SC"),
         }
 }
-// #[cfg(feature = "conslist")]
-// pub fn eval_closure<'a, T>(closure: Closure<'a, T>,
-//                             arg: RT<'a, T>,
-//                             gctx: RGCTX<'a, T>) -> ResRT<'a, T>
-// where T: Clone + PartialEq + std::fmt::Debug
-// {
-//        eval(closure.body, LocalContext::insert(arg, closure.env.clone()), gctx)
-// }
 
-#[cfg(feature = "conslist")]
 pub fn do_app<'a, T>(func: RT<'a, T>, arg: RT<'a, T>,
-                     gctx: RGCTX<'a,T>) -> ResRT<'a, T>
+                     gctx: Rgctx<'a,T>) -> ResRT<'a, T>
 where T: Clone + PartialEq + std::fmt::Debug
 {
    match func.borrow() {

@@ -4,30 +4,23 @@ use std::cell::RefCell;
 
 use lfsc_syntax::ast::{AlphaTerm, AlphaTermSC, Ident};
 
-use super::context::{LocalContext, RGCTX, GlobalContext};
-
-pub type Closure<'a,T> = Box<dyn Fn(RT<'a, T>, RGCTX<'a, T>) -> ResRT<'a, T> + 'a>;
-// pub type Closure<'a,T> = Box<dyn Fn(RT<'a, T>) -> ResRT<'a, T> + 'a>;
+pub type Closure<'a,T> =
+    Box<dyn Fn(RT<'a, T>, super::context::Rgctx<'a, T>) -> ResRT<'a, T> + 'a>;
 
 pub fn mk_closure<'a, T>(body: &'a AlphaTerm<T>,
-                        env: super::context::RLCTX<'a, T>,
-                        )
-                       -> Closure<'a, T>
+                        env: super::context::Rlctx<'a, T>,
+                        ) -> Closure<'a, T>
 where T: Clone + PartialEq + fmt::Debug
 {
     Box::new(move |v, gctx|
-        // let ref_ = Weak::new()
-    // }
              super::nbe::eval(body,
-                              LocalContext::insert(v, env.clone()),
+                              super::context::LocalContext::insert(v, env.clone()),
                               gctx.clone()))
 }
 
 pub type TResult<T, K> = Result<T, TypecheckingErrors<K>>;
 pub type Type<'a, T> = Value<'a, T>;
 pub type RT<'a, T> = Rc<Type<'a, T>>;
-// pub type RT<'a, T> = &'a Type<'a, T>;
-// pub type Eval<'a, T> = TResult<(RT<'a, T>, LocalContext<'a, T>)>;
 pub type ResRT<'a, T> = TResult<RT<'a, T>, T>;
 
 pub enum Value<'a, T: Clone> {
