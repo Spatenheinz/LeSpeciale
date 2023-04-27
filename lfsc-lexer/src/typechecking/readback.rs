@@ -4,97 +4,91 @@ use lfsc_syntax::{ast::AlphaTerm,  abinder, ast::BuiltIn};
 use lfsc_syntax::ast::Ident::*;
 use lfsc_syntax::ast::AlphaTerm::*;
 
-use super::context::{LocalContext, Rgctx, Rlctx};
+use super::values::mk_neutral_var_with_type;
 use super::{values::{RT, Normal, Value, Type, Neutral, TypecheckingErrors, TResult},
-            nbe::do_app
 };
 
+use super::nbe::do_app;
 
+use super::EnvWrapper;
 
-pub fn readback_normal<'a, T>(normal: Normal<'a, T>,
-                              lctx: Rlctx<'a, T>,
-                              gctx: Rgctx<'a, T>) -> TResult<AlphaTerm<T>, T>
-where
-    T: PartialEq + Clone + BuiltIn + std::fmt::Debug
+impl<'ctx, T> EnvWrapper<'ctx, T>
+where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
 {
-    readback(normal.0 , normal.1 , lctx, gctx)
-}
-
-
-pub fn readback<'a, T>(ty: RT<'a, T>,
-                       val: RT<'a, T>,
-                       lctx: Rlctx<'a, T>,
-                       gctx: Rgctx<'a, T>) -> TResult<AlphaTerm<T>, T>
-where
-    T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
-{
-    // neutral values can be readback without a type
-    match val.borrow() {
-        Value::Neutral(_, a) => return readback_neutral(ty, a.clone(), lctx, gctx),
-        _ => (),
+    pub fn readback_normal(&self, normal: Normal<'ctx, T>)
+                           -> TResult<AlphaTerm<T>, T>
+    {
+        self.readback(normal.0 , normal.1)
     }
-    match ty.borrow() {
-        Type::Pi(dom, ran) => {
-            let ctx1 = LocalContext::insert(dom.clone(), lctx.clone());
-            let tmp = Rc::new(Value::Neutral(dom.clone(), Rc::new(Neutral::DBI(0))));
-            let ran_ = ran(tmp.clone(), gctx.clone())?;
-            let app = do_app(val, tmp, gctx.clone())?;
-            Ok(abinder!(lam, readback(ran_, app, lctx, gctx)?))
+
+    pub fn readback(&self,
+                    ty: RT<'ctx, T>,
+                    val: RT<'ctx, T>) -> TResult<AlphaTerm<T>, T>
+    {
+        // neutral values can be readback without a type
+        if let Value::Neutral(_, a) =  val.borrow() {
+            return self.readback_neutral(ty, a.clone())
         }
-        Type::Box => {
-            match val.borrow() {
-                Value::Pi(at, bt) => {
-                    let dom = readback(ty.clone(), at.clone(), lctx.clone(), gctx.clone())?;
-                    let ctx1 = LocalContext::insert(at.clone(), lctx.clone());
-                    let cls_res =
-                        bt(Rc::new(Value::Neutral(at.clone(),
-                                                 Rc::new(Neutral::DBI(0)))), gctx.clone())?;
-                    let ran = readback(ty.clone(), cls_res, lctx.clone(), gctx)?;
-                    Ok(abinder!(pi, dom, ran))
-                }
-                Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
-                Value::QT => Ok(Ident(Symbol(T::_mpq()))),
-
-                Value::Star => todo!(),
-                Value::Z(_) => todo!("readback z"),
-
-                Value::Q(..) => todo!("readback q"),
-                Value::Box => {dbg!(gctx); todo!()},
-                Value::Lam(_) => todo!("readback lam"),
-                Value::Neutral(_, _) => unreachable!("neutral should have been handled above"),
-                Value::Run(..) => todo!()
+        match ty.borrow() {
+            Type::Pi(dom, ran) => {
+                let env = self.update_local(dom.clone());
+                let var = mk_neutral_var_with_type(dom.clone());
+                let ran_ = ran(var.clone(), self)?;
+                let app = do_app(val, var, self)?;
+                Ok(abinder!(lam, env.readback(ran_, app)?))
             }
-        }
-        Type::Star => todo!(),
-        Type::ZT => {
-            todo!("readback zt")
-        },
-        Type::QT => {
-            todo!("readback qt")
-        },
-        // what to do about numbers?
-        Value::Neutral(..) => Err(TypecheckingErrors::NeutralUsedAsType),
-        Value::Z(_) | Value::Q(..) => Err(TypecheckingErrors::NumberUsedAsType),
-        Value::Lam(_) => Err(TypecheckingErrors::LamUsedAsType),
-        Value::Run(..) => todo!()
-    }
-}
+            Type::Box => {
+                match val.borrow() {
+                    Value::Pi(at, bt) => {
+                        let dom = self.readback(ty.clone(), at.clone())?;
+                        let env = self.update_local(at.clone());
+                        let cls_res = bt(mk_neutral_var_with_type(at.clone()),
+                                         self)?;
+                        let ran = env.readback(ty.clone(), cls_res)?;
+                        Ok(abinder!(pi, dom, ran))
+                    }
+                    Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
+                    Value::QT => Ok(Ident(Symbol(T::_mpq()))),
 
-fn readback_neutral<'a, T>(ty: RT<'a, T>,
-                           neu: Rc<Neutral<'a, T>>,
-                           lctx: Rlctx<'a,T>,
-                           gctx: Rgctx<'a,T>) -> TResult<AlphaTerm<T>, T>
-where
-    T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
-{
-    match neu.borrow() {
-        Neutral::DBI(i) => Ok(Ident(DBI(*i))),
-        Neutral::Var(name) => Ok(Ident(Symbol(name.clone()))),
-        Neutral::App(f, a) => {
-            let f = readback_neutral(ty, f.clone(), lctx.clone(), gctx.clone())?;
-            let a = readback_normal(a.clone(), lctx.clone(), gctx)?;
-            Ok(App(Box::new(f),Box::new(a)))
-        },
-        Neutral::Hole(_) => todo!("readback hole"),
+                    Value::Star => todo!(),
+                    Value::Z(_) => todo!("readback z"),
+
+                    Value::Q(..) => todo!("readback q"),
+                    Value::Box => {dbg!(&self.gctx); todo!()},
+                    Value::Lam(_) => todo!("readback lam"),
+                    Value::Neutral(_, _) => unreachable!("neutral should have been handled above"),
+                    Value::Run(..) => todo!()
+                }
+            }
+            Type::Star => todo!(),
+            Type::ZT => {
+                todo!("readback zt")
+            },
+            Type::QT => {
+                todo!("readback qt")
+            },
+            // what to do about numbers?
+            Value::Neutral(..) => Err(TypecheckingErrors::NeutralUsedAsType),
+            Value::Z(_) | Value::Q(..) => Err(TypecheckingErrors::NumberUsedAsType),
+            Value::Lam(_) => Err(TypecheckingErrors::LamUsedAsType),
+            Value::Run(..) => todo!()
+        }
+    }
+
+    fn readback_neutral(&self,
+                        _ty: RT<'ctx, T>,
+                        neu: Rc<Neutral<'ctx, T>>,
+                       ) -> TResult<AlphaTerm<T>, T>
+    {
+        match neu.borrow() {
+            Neutral::DBI(i) => Ok(Ident(DBI(*i))),
+            Neutral::Var(name) => Ok(Ident(Symbol(*name))),
+            Neutral::App(f, a) => {
+                let f = self.readback_neutral(_ty, f.clone())?;
+                let a = self.readback_normal(a.clone())?;
+                Ok(App(Box::new(f), Box::new(a)))
+            },
+            Neutral::Hole(_) => todo!("readback hole"),
+        }
     }
 }

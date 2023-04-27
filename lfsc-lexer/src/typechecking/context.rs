@@ -16,16 +16,16 @@ pub type Rlctx<'a, T> = Rc<LocalContext<'a, T>>;
 // pub type RGCTX<'a, T> = Rc<GlobalContext<'a, T>>;
 pub type Rgctx<'a, T> = Rc<GlobalContext<'a, T>>;
 
-#[derive(Debug, Clone)]
-pub struct GlobalContext<'a, K: Clone> {
+#[derive(Debug)]
+pub struct GlobalContext<'a, K: Copy> {
     pub kind: RT<'a, K>,
     keys: RefCell<Vec<K>>,
     values: RefCell<Vec<TypeEntry<'a, K>>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 #[cfg(feature = "conslist")]
-pub enum LocalContext<'a, K: Clone> {
+pub enum LocalContext<'a, K: Copy> {
     Nil,
     Cons(TypeEntry<'a, K>, Rlctx<'a, K>),
 }
@@ -40,20 +40,20 @@ pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
     // Rc::new(ctx)
 }
 
-pub fn get_type<'ctx, K: Clone>
+pub fn get_type<'ctx, K>
     (key: &Ident<K>,
      lctx: Rlctx<'ctx, K>,
      rctx: Rgctx<'ctx, K>)
      -> LResult<RT<'ctx, K>, K>
-where K: std::fmt::Debug + Clone + PartialEq
+where K: std::fmt::Debug + PartialEq + Copy
 {
     match key {
         Ident::DBI(i) => lctx.get_type(*i),
-        Ident::Symbol(name) => rctx.get_type(&name),
+        Ident::Symbol(name) => rctx.get_type(name),
     }
 }
 
-fn from_entry_to_value<'a, K: Clone>(entry: &TypeEntry<'a, K>, key: Ident<K>)
+fn from_entry_to_value<'a, K: Copy>(entry: &TypeEntry<'a, K>, key: Ident<K>)
                                      -> RT<'a, K> {
        match entry {
          TypeEntry::Def { val, .. } => val.clone(),
@@ -66,7 +66,7 @@ fn from_entry_to_value<'a, K: Clone>(entry: &TypeEntry<'a, K>, key: Ident<K>)
          }
 }
 
-fn from_entry_to_type<'a, K: Clone>(entry: &TypeEntry<'a, K>)
+fn from_entry_to_type<'a, K: Copy>(entry: &TypeEntry<'a, K>)
                                     -> RT<'a, K> {
        match entry {
          TypeEntry::Def { ty, .. } => ty.clone(),
@@ -112,7 +112,7 @@ fn from_entry_to_type<'a, K: Clone>(entry: &TypeEntry<'a, K>)
 // }
 
 impl<'a, K> GlobalContext<'a, K>
-where K: PartialEq + Clone + std::fmt::Debug
+where K: PartialEq + std::fmt::Debug + Copy
 {
     pub fn new() -> Self {
         Self {
@@ -152,8 +152,8 @@ where K: PartialEq + Clone + std::fmt::Debug
             .iter()
             .rev()
             .zip(self.values.borrow().iter().rev())
-            .find(|(&ref n, _)| n == key)
-            .map(|(_, v)| from_entry_to_value(v, Ident::Symbol(key.clone())))
+            .find(|(&n, _)| n == *key)
+            .map(|(_, v)| from_entry_to_value(v, Ident::Symbol(*key)))
             .ok_or(lookup_err(Ident::Symbol(key)))
     }
 
@@ -164,7 +164,7 @@ where K: PartialEq + Clone + std::fmt::Debug
             .iter()
             .rev()
             .zip(self.values.borrow().iter().rev())
-            .find(|(&ref n, _)| n == key)
+            .find(|(&n, _)| n == *key)
             .map(|(_, v)| from_entry_to_type(v))
             .ok_or(lookup_err(Ident::Symbol(key)))
     }
@@ -176,26 +176,16 @@ where K: std::fmt::Debug {
 }
 
 impl<'a, K> LocalContext<'a, K>
-    where K: PartialEq + Clone + std::fmt::Debug
+where K: PartialEq + std::fmt::Debug + Copy
 {
-    #[cfg(feature = "conslist")]
     pub fn new() -> Self {
         Self::Nil
     }
 
-    #[cfg(not(feature = "conslist"))]
-    pub fn new() -> Self {
-        Self {
-            values: Vec::new(),
-        }
-    }
-
-    #[cfg(feature = "conslist")]
     pub fn insert(ty: RT<'a, K>, ctx: Rlctx<'a, K>) -> Rlctx<'a, K> {
         Rc::new(LocalContext::Cons(
             TypeEntry::IsA { ty, marks: RefCell::new(0)}, ctx))
     }
-    #[cfg(feature = "conslist")]
     pub fn get(&self, key: u32) -> LResult<&TypeEntry<'a, K>, K> {
         match self {
             LocalContext::Nil => Err(lookup_err(Ident::<K>::DBI(key))),
@@ -209,19 +199,19 @@ impl<'a, K> LocalContext<'a, K>
         }
     }
 
-    #[cfg(feature = "conslist")]
     pub fn get_value(&self, key: u32) -> LResult<RT<'a, K>, K> {
         self.get(key).map(|v| from_entry_to_value(v, Ident::<K>::DBI(key)))
     }
 
-    #[cfg(feature = "conslist")]
     pub fn get_type(&self, key: u32) -> LResult<RT<'a, K>, K> {
         self.get(key).map(|v| from_entry_to_type(v))
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum TypeEntry<'a, Key> where Key: Clone {
+#[derive(Debug)]
+pub enum TypeEntry<'a, Key: Copy>
+// where Key: Clone
+{
     // Dec { ty: RT<'a, Key> },
     Def { ty: RT<'a, Key>, val: RT<'a, Key> },
     // the val of IsA is the neutral term Neutral t

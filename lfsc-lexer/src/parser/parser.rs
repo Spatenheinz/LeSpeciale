@@ -113,8 +113,8 @@ fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
 fn parse_sc(it: &str) -> IResult<&str, TermSC<&str>> {
     alt((
         // nums, identifier
-        map(parse_num, |x| TermSC::Number(x)),
-        map(parse_ident, |x| TermSC::Var(x)),
+        map(parse_num, TermSC::Number),
+        map(parse_ident, TermSC::Var),
         // rest needs to be in a list
         open_followed(parse_sc_opt)
     ))(it)
@@ -186,9 +186,9 @@ fn parse_numeric(it : &str) -> IResult<&str, NumericSC<TermSC<&str>>> {
         map(preceded(reserved("mpz_div"),
                  bin_op), |(x,y)| NumericSC::Div(x,y)),
         map(preceded(alt((reserved("mpz_neg"),reserved("~"))),
-                 parse_sc), |x| NumericSC::Neg(x)),
+                 parse_sc), NumericSC::Neg),
         map(preceded(reserved("mpz_to_mpq"),
-                 parse_sc), |x| NumericSC::ZtoQ(x)),
+                 parse_sc), NumericSC::ZtoQ),
         map(preceded(reserved("mp_ifzero"),
                      tuple((parse_sc, parse_sc, parse_sc))),
             |(n, tbranch, fbranch)| NumericSC::ZBranch { n, tbranch, fbranch }),
@@ -219,7 +219,7 @@ fn marks<'a>(p: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, u32> {
     move |it : &'a str| {
         let (rest, _) = tag(p)(it)?;
         let (rest, n) = lexeme(
-            opt(fold_many_m_n(1, 2, satisfy(|c: char| c.is_digit(10)),
+            opt(fold_many_m_n(1, 2, satisfy(|c: char| c.is_ascii_digit()),
                              || 0, |acc, x| acc * 10 + x as u32)))(rest)?;
         match n {
             Some(n) => Ok((rest, n)),
@@ -261,8 +261,8 @@ pub fn parse_num(it: &str) -> IResult<&str, Num> {
     match lexeme(preceded(tag("/"), digit1::<&str, VerboseError<&str>>))(rest) {
         Ok((rest, q)) => Ok((
             rest,
-            Num::Q(i32::from_str_radix(p, 10).unwrap(),
-                   i32::from_str_radix(q, 10).unwrap()))),
+            Num::Q(p.parse::<i32>().unwrap(),
+                   p.parse::<i32>().unwrap()))),
         Err(_) => {
             Ok((rest,
                 Num::Z(p.parse::<i32>().unwrap())))
@@ -320,11 +320,11 @@ where
 }
 
 fn chars(c: char) -> bool {
-    (c >= '\"' && c <= '$') || (c >= '&' && c <= '\'') || (c >= '*' && c <= '/')
-    || (c >= '<' && c <= '?') || (c >= 'A' && c <= '[') || c >= ']' || (c >= '_' && c <= 'z')
+    ('\"'..'$').contains(&c) || ('&'..'\'').contains(&c) || ('*'..'/').contains(&c)
+    || ('<'..'?').contains(&c) || ('A'..'[').contains(&c) || c >= ']' || ('_'..'z').contains(&c)
 }
 fn follow(c: char) -> bool {
-    (c >= '!' && c <= '\'') || c >= '*'
+    ('!'..'\'').contains(&c) || c >= '*'
 }
 
 pub fn parse_ident(it: &str) -> IResult<&str, &str> {

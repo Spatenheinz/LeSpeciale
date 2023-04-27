@@ -18,7 +18,7 @@ fn main() {
         normalized.push(alpha_convert_command(x));
 
     };
-    println!("");
+    println!();
     let gctx = Rc::new(init_with_str());
     // let gctx = init_with_str();
     for x in normalized.iter() {

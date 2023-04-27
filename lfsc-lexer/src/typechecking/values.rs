@@ -2,20 +2,22 @@ use core::fmt;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use lfsc_syntax::ast::{AlphaTerm, AlphaTermSC, Ident};
+use lfsc_syntax::ast::{AlphaTerm, AlphaTermSC, Ident, BuiltIn};
+
+use super::{EnvWrapper, context::LocalContext};
 
 pub type Closure<'a,T> =
-    Box<dyn Fn(RT<'a, T>, super::context::Rgctx<'a, T>) -> ResRT<'a, T> + 'a>;
+    Box<dyn Fn(RT<'a, T>, &EnvWrapper<'a, T>) -> ResRT<'a, T> + 'a>;
 
 pub fn mk_closure<'a, T>(body: &'a AlphaTerm<T>,
-                        env: super::context::Rlctx<'a, T>,
+                         lctx: super::context::Rlctx<'a, T>,
                         ) -> Closure<'a, T>
-where T: Clone + PartialEq + fmt::Debug
+where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 {
-    Box::new(move |v, gctx|
-             super::nbe::eval(body,
-                              super::context::LocalContext::insert(v, env.clone()),
-                              gctx.clone()))
+    Box::new(move |v, env|{
+             let lctx = LocalContext::insert(v, lctx.clone());
+             let env = EnvWrapper::new(lctx, env.gctx.clone(), env.allow_dependent);
+             env.eval(body)})
 }
 
 pub type TResult<T, K> = Result<T, TypecheckingErrors<K>>;
@@ -23,7 +25,8 @@ pub type Type<'a, T> = Value<'a, T>;
 pub type RT<'a, T> = Rc<Type<'a, T>>;
 pub type ResRT<'a, T> = TResult<RT<'a, T>, T>;
 
-pub enum Value<'a, T: Clone> {
+// #[derive(Clone)]
+pub enum Value<'a, T: Copy> {
     Pi(RT<'a, T>, Closure<'a, T>),
     Lam(Closure<'a, T>),
     Box, // Universe
@@ -53,7 +56,7 @@ pub enum Value<'a, T: Clone> {
 
 
 
-impl<'a, T: Clone> fmt::Debug for Value<'a, T> {
+impl<'a, T: Copy> fmt::Debug for Value<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Value::Pi(a, _) => write!(f, "∏ {:?}", a),
@@ -70,7 +73,7 @@ impl<'a, T: Clone> fmt::Debug for Value<'a, T> {
     }
 }
 
-impl<'a, T: Clone> PartialEq for Value<'a, T> {
+impl<'a, T: Copy> PartialEq for Value<'a, T> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -89,13 +92,21 @@ impl<'a, T: Clone> PartialEq for Value<'a, T> {
         }
     }
 }
-pub fn as_symbolic<'a, T>(v: &Value<'a, T>)
+
+#[inline(always)]
+pub fn mk_neutral_var_with_type<T>(typ: RT<T>) -> RT<T>
+where T: Copy
+{
+    Rc::new(Value::Neutral(typ, Rc::new(Neutral::DBI(0))))
+}
+
+pub fn as_symbolic<T>(v: &Value<T>)
                           -> TResult<Ident<T>, T>
-where T: Clone
+where T: Copy
 {
     match v {
         Value::Neutral(_, n) => match &**n {
-            Neutral::Var(x) => Ok(Ident::Symbol(x.clone())),
+            Neutral::Var(x) => Ok(Ident::Symbol(*x)),
             Neutral::DBI(x) => Ok(Ident::DBI(*x)),
             _ => Err(TypecheckingErrors::NotSymbolic),
         },
@@ -104,8 +115,8 @@ where T: Clone
 }
 
 #[allow(non_snake_case)]
-pub fn as_Z<'a,T>(v: &Value<'a, T>) -> TResult<(), T>
-where T: Clone
+pub fn as_Z<T>(v: &Value<T>) -> TResult<(), T>
+where T: Copy
 {
     match v {
         Value::ZT => Ok(()),
@@ -114,8 +125,8 @@ where T: Clone
 }
 
 #[allow(non_snake_case)]
-pub fn as_Q<'a,T>(v: & Value<'a, T>) -> TResult<(), T>
-where T: Clone
+pub fn as_Q<T>(v: & Value<T>) -> TResult<(), T>
+where T: Copy
 {
     match v {
         Value::QT => Ok(()),
@@ -123,13 +134,14 @@ where T: Clone
     }
 }
 
-pub fn is_neutral<'a, T>(v: &Value<'a, T>) -> bool
-where T: Clone
+pub fn is_neutral<T>(v: &Value<T>) -> bool
+where T: Copy
 {
-    match v {
-        Value::Neutral(_, _) => true,
-        _ => false,
-    }
+    matches!(v, Value::Neutral(_, _))
+    // matches! v {
+    //     Value::Neutral(_, _) => true,
+    //     _ => false,
+    // }
 }
 
 #[derive(Debug)]
@@ -165,9 +177,8 @@ pub enum TypecheckingErrors<T> {
 }
 
 
-#[derive(Debug, PartialEq)]
-pub enum Neutral<'a, T>
-where T: Clone
+#[derive(Debug, Clone)]
+pub enum Neutral<'a, T: Copy>
 {
     Var(T),
     DBI(u32),
@@ -175,5 +186,5 @@ where T: Clone
     App(Rc<Neutral<'a, T>>, Normal<'a, T>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Normal<'a, T: Clone>(pub Rc<Type<'a, T>>, pub Rc<Value<'a, T>>);
+#[derive(Debug, Clone)]
+pub struct Normal<'a, T: Copy>(pub Rc<Type<'a, T>>, pub Rc<Value<'a, T>>);
