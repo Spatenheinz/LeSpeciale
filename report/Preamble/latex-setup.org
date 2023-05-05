@@ -47,3 +47,17 @@
 #+LATEX_HEADER: \usepackage[backend=biber,dateabbrev=false]{biblatex}
 #+LATEX_HEADER: \usepackage{csquotes} % package to biblatex
 #+LATEX_HEADER: \addbibresource{references.bib}
+% semantics
+#+LATEX_HEADER: \usepackage{semantic}
+% checkmark
+#+LATEX_HEADER: \usepackage{ wasysym }
+
+% macros
+#+LATEX_HEADER: \newcommand{\lra}[1]{\langle #1 \rangle}
+#+LATEX_HEADER: \newcommand{\check}[2]{#1 \Leftarrow #2}
+#+LATEX_HEADER: \newcommand{\synth}[2]{#1 \Rightarrow #2}
+#+LATEX_HEADER: \newcommand{\contextcons}[1]{\Gamma,#1\vdash}
+#+LATEX_HEADER: \newcommand{\context}{\Gamma\vdash}
+#+LATEX_HEADER: \newcommand{\vdashs}{\vdash_\Sigma}
+#+LATEX_HEADER: \newcommand{\nilsig}{\langle\rangle}
+#+LATEX_HEADER: \newcommand{\subst}[3]{[#1/#2]#3}

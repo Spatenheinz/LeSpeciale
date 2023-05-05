@@ -9,6 +9,12 @@ use super::{EnvWrapper, context::LocalContext};
 pub type Closure<'a,T> =
     Box<dyn Fn(RT<'a, T>, &EnvWrapper<'a, T>) -> ResRT<'a, T> + 'a>;
 
+pub fn const_closure<T>(cons: RT<T>) -> Closure<T>
+where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
+{
+    Box::new(move |_, _| { Ok(cons.clone()) })
+}
+
 pub fn mk_closure<'a, T>(body: &'a AlphaTerm<T>,
                          lctx: super::context::Rlctx<'a, T>,
                         ) -> Closure<'a, T>
@@ -16,7 +22,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 {
     Box::new(move |v, env|{
              let lctx = LocalContext::insert(v, lctx.clone());
-             let env = EnvWrapper::new(lctx, env.gctx.clone(), env.allow_dependent);
+             let env = EnvWrapper::new(lctx, env.gctx.clone(), env.allow_dbi);
              env.eval(body)})
 }
 
@@ -37,11 +43,24 @@ pub enum Value<'a, T: Copy> {
     Q(i32, i32), // TODO: should in fact be unbounded
     Neutral(RT<'a, T>, Rc<Neutral<'a, T>>),
     Run(&'a AlphaTermSC<T>, RT<'a, T>),
+    Prog(Vec<RT<'a, T>>, &'a AlphaTermSC<T>),
 }
 
-// fn level_print(val: &Value, f: &mut fmt::Formatter, lvl: u32) {
-//     match self {
-//         Value::Pi(a, b) => write!(f, "(∏ x{} : {:?}. {})", lvl, a, level_print(b, f, lvl + 1)),
+// fn unfold<'a, T>(f: &Closure<'a, T>) -> RT<'a, T>
+// where T: Copy + fmt::Debug + BuiltIn + PartialEq
+// {
+//     let v = mk_neutral_var_with_type(Type::Box.into());
+//     f(v, &EnvWrapper::empty()).unwrap()
+// }
+
+// fn level_print<T>(val: &Value<T>, f: &mut fmt::Formatter, lvl: u32) -> fmt::Result
+// where T: Copy + fmt::Debug + BuiltIn + PartialEq
+// {
+//     let plunge = |fun| {
+//            level_print(&unfold(fun), f.clone(), lvl+1)
+//         };
+//     match val {
+//         Value::Pi(a, b) => { write!(f, "(∏ x{} : {:?}. )", lvl, a); plunge(&b); Ok(()) },
 //           Value::Lam(m) => write!(f, "Lam"),
 //           Value::Box => write!(f, "Box"),
 //           Value::Star => write!(f, "Star"),
@@ -56,7 +75,7 @@ pub enum Value<'a, T: Copy> {
 
 
 
-impl<'a, T: Copy> fmt::Debug for Value<'a, T> {
+impl<'a, T: Copy + fmt::Debug> fmt::Debug for Value<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Value::Pi(a, _) => write!(f, "∏ {:?}", a),
@@ -67,8 +86,9 @@ impl<'a, T: Copy> fmt::Debug for Value<'a, T> {
             Value::Z(i) => write!(f, "Z: {}", i),
             Value::QT => write!(f, "QT"),
             Value::Q(i, j) => write!(f, "Q: {}/{}", i, j),
-            Value::Neutral(_, n) => write!(f, "Neutral: "),
+            Value::Neutral(ty, n) => write!(f, "Neutral:\n\tty:  {:?}\n\tvar: {:?}", ty, n),
             Value::Run(_, t) => write!(f, "Run: {:?}", t),
+            Value::Prog(vars, t) => write!(f, "Prog: {:?}\n\t{:?}\n\t", vars, t),
         }
     }
 }
@@ -86,7 +106,7 @@ impl<'a, T: Copy> PartialEq for Value<'a, T> {
             (Value::Z(i), Value::Z(j)) => i == j,
             (Value::QT, Value::QT) => true,
             (Value::Q(i, j), Value::Q(k, l)) => i == k && j == l,
-            // (Value::Neutral(_, n), Value::Neutral(_, m)) => n == m,
+            // (Value::Neutral(a, n), Value::Neutral(b, m)) => a == b && n == m,
             // (Value::Run(_, t), Value::Run(_, u)) => t == u,
             _ => false,
         }
@@ -98,6 +118,30 @@ pub fn mk_neutral_var_with_type<T>(typ: RT<T>) -> RT<T>
 where T: Copy
 {
     Rc::new(Value::Neutral(typ, Rc::new(Neutral::DBI(0))))
+}
+
+pub fn is_type_or_datatype<T>(v: &Value<T>) -> TResult<(),T>
+where T: Copy
+{
+    if Type::Star == *v {
+        return Ok(());
+    }
+    is_datatype(v)
+}
+
+pub fn is_datatype<T>(v: &Value<T>) -> TResult<(), T>
+where T: Copy
+{
+    if let Ok(..) = as_Z(v) {
+        return Ok(());
+    }
+    if let Ok(..) = as_Q(v) {
+        return Ok(());
+    }
+    if let Ok(..) = as_symbolic(v) {
+        return Ok(());
+    }
+    Err(TypecheckingErrors::NotDatatype)
 }
 
 pub fn as_symbolic<T>(v: &Value<T>)
@@ -145,13 +189,17 @@ where T: Copy
 }
 
 #[derive(Debug)]
-pub enum TypecheckingErrors<T> {
-    TypeInReadBack,
-    ValueInReadBack,
-    LamUsedAsType,
-    HoleUsedAsType,
-    NumberUsedAsType,
-    NeutralUsedAsType,
+pub enum TypecheckingErrors<T>
+where T: Copy
+{
+    //Readback errors
+    ValueUsedAsType,
+    ReadBackMismatch,
+    // ReadBackMismatch(RT<'ctx, T>, RT<'ctx, T>),
+    WrongNumberOfArguments,
+
+    SymbolAlreadyDefined(T),
+
     NotPi,
     NotZ,
     NotQ,
@@ -159,9 +207,13 @@ pub enum TypecheckingErrors<T> {
     CannotInferLambda,
     CannotInferHole,
 
+    UnexpectedSC,
+    KindLevelDefinition,
+
     NotFullyApplied,
     DependentTypeNotAllowed,
 
+    NotDatatype,
     ExpectedSort,
     // ExpectedSort(Value<T>),
     // we have these errors in Side-conditions.
@@ -184,6 +236,7 @@ pub enum Neutral<'a, T: Copy>
     DBI(u32),
     Hole(RefCell<Option<RT<'a, T>>>),
     App(Rc<Neutral<'a, T>>, Normal<'a, T>),
+    // SC
 }
 
 #[derive(Debug, Clone)]

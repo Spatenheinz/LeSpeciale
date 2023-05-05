@@ -18,15 +18,16 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                 Number(Num::Z(p)) => Ok(Rc::new(Value::Z(*p))),
                 Number(Num::Q(p,q)) => Ok(Rc::new(Value::Q(*p, *q))),
                 Hole => {
-                    // Notice that hole does not have type kind, however
-                    // we will never get to use the type of a hole anyways.
-                    // let refcell = RefCell::new(None);
-                    // let neu = Rc::new(Neutral::Hole(refcell.clone()));
                     todo!()
-                    // Ok(Rc::new(Value::Neutral(gctx.kind.clone(), neu)))
                 },
                 Ident(Symbol(name)) => self.gctx.get_value(name),
-                Ident(DBI(i)) => self.lctx.get_value(*i),
+                Ident(DBI(i)) => {
+                    if self.allow_dbi <= *i {
+                        return self.lctx.get_value(*i);
+                    }
+                    // TODO fix panic
+                    panic!("dbi: {} is not allowed", i)
+                }
                 App(fun, arg) => {
                     let e1 = self.eval(fun)?;
                     let e2 = self.eval(arg)?;
@@ -42,7 +43,7 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                     Ok(Rc::new(Value::Lam(closure)))
                 },
                 Asc(_, val) => self.eval(val),
-                SC(..) => todo!("eval SC"),
+                SC(..) => panic!("eval SC"),
             }
     }
 }

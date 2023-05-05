@@ -54,7 +54,7 @@ pub enum Term<Id> {
     // : ascription
     Ascription { ty: Box<Type<Id>>, val: Box<Term<Id>> },
     // ^ and provided
-    SC(TermSC<Id>, TermSC<Id>),
+    SC(TermSC<Id>, Box<Term<Id>>),
     // => alias for nested !-terms.
     Arrow { decls: Decls, result: Box<Term<Id>>},
     App(Box<Term<Id>>, Box<Term<Id>>)
@@ -62,7 +62,7 @@ pub enum Term<Id> {
 pub type StrTerm<'a> = Term<&'a str>;
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 #[repr(C)]
 pub enum AlphaTerm<Id> {
     Number(Num),
@@ -76,7 +76,7 @@ pub enum AlphaTerm<Id> {
     AnnLam(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
     // i dont know about the big lambda
     Asc(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
-    SC(AlphaTermSC<Id>, AlphaTermSC<Id>),
+    SC(AlphaTermSC<Id>, Box<AlphaTerm<Id>>),
     App(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
 }
 
@@ -117,13 +117,13 @@ pub enum AlphaPattern<Id> {
 
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum CompoundSC<SC, Pattern> {
+pub enum CompoundSC<Term, SC, Pattern> {
     Match(SC, Vec<(Pattern, SC)>),
     // < order
     // Compare { a: SC, b: SC, tbranch: SC, fbranch: SC },
     // =
     IfEq { a: SC, b: SC, tbranch: SC, fbranch: SC },
-    Fail(SC),
+    Fail(Term),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -138,9 +138,9 @@ pub enum TermSC<Id> {
     Number(Num),
     Var(Id),
     Let(Id, Box<TermSC<Id>>, Box<TermSC<Id>>),
-    App(Box<TermSC<Id>>, Box<TermSC<Id>>),
+    App(Id, Vec<TermSC<Id>>),
     Numeric(Box<NumericSC<TermSC<Id>>>),
-    Compound(Box<CompoundSC<TermSC<Id>, Pattern<Id>>>),
+    Compound(Box<CompoundSC<Term<Id>, TermSC<Id>, Pattern<Id>>>),
     SideEffect(Box<SideEffectSC<TermSC<Id>>>)
 }
 pub type StrSC<'a> = TermSC<&'a str>;
@@ -150,9 +150,9 @@ pub enum AlphaTermSC<Id> {
     Number(Num),
     Ident(Ident<Id>),
     Let(Box<AlphaTermSC<Id>>, Box<AlphaTermSC<Id>>),
-    App(Box<AlphaTermSC<Id>>, Box<AlphaTermSC<Id>>),
+    App(Ident<Id>, Vec<AlphaTermSC<Id>>),
     Numeric(Box<NumericSC<AlphaTermSC<Id>>>),
-    Compound(Box<CompoundSC<AlphaTermSC<Id>, AlphaPattern<Id>>>),
+    Compound(Box<CompoundSC<AlphaTerm<Id>, AlphaTermSC<Id>, AlphaPattern<Id>>>),
     SideEffect(Box<SideEffectSC<AlphaTermSC<Id>>>)
 }
 

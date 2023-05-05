@@ -92,8 +92,9 @@ pub fn alpha_normalize<'a>(term: StrTerm<'a>,
         Term::SC(x, y) => {
             let mut alpha_local = local(alpha_normalize_sc, vars);
             let x = alpha_local(x);
-            let y = alpha_local(y);
-            SC(x, y)
+            drop(alpha_local);
+            let y = local(alpha_normalize, vars)(*y);
+            SC(x, Box::new(y))
         },
         Term::Arrow { decls: _decls, result: _result } => todo!("Currently unsupported"),
     }
@@ -112,11 +113,16 @@ fn alpha_normalize_sc<'a>(term: StrSC<'a>, vars: &mut Vec<&'a str>) -> ASC<'a> {
             let body = alpha_normalize_sc(*body, vars);
             ASC::Let(Box::new(val), Box::new(body))
         },
-        StrSC::App(fun, arg) => {
-            let mut alpha_local = local(alpha_normalize_sc, vars);
-            let f = alpha_local(*fun);
-            let a = alpha_local(*arg);
-            ASC::App(Box::new(f), Box::new(a))
+        StrSC::App(fun, args) => {
+            if let ASC::Ident(x) = Lookup::lookup(vars, fun) {
+                let mut alpha_local = local(alpha_normalize_sc, vars);
+                let mut args_ = Vec::new();
+                for arg in args.into_iter() {
+                    args_.push(alpha_local(arg));
+                }
+                return ASC::App(x, args_)
+            };
+            unreachable!("Cannot be reached because parser only allows identifiers in function position")
         },
         StrSC::Numeric(nsc) =>
             ASC::Numeric(Box::new(alpha_numeric(*nsc, vars))),
@@ -151,11 +157,11 @@ fn alpha_numeric<'a>(term: NumericSC<StrSC<'a>>, vars: &mut Vec<&'a str>)
     }
 }
 
-fn alpha_compound<'a>(term: CompoundSC<StrSC<'a>, Pattern<&'a str>>,
+fn alpha_compound<'a>(term: CompoundSC<StrTerm<'a>, StrSC<'a>, Pattern<&'a str>>,
                       vars: &mut Vec<&'a str>)
-                     -> CompoundSC<ASC<'a>, AlphaPattern<&'a str>> {
+                     -> CompoundSC<StrAlphaTerm<'a>, ASC<'a>, AlphaPattern<&'a str>> {
     match term {
-        CompoundSC::Fail(x) => CompoundSC::Fail(alpha_normalize_sc(x, vars)),
+        CompoundSC::Fail(x) => CompoundSC::Fail(alpha_normalize(x, vars)),
         CompoundSC::IfEq { a, b, tbranch, fbranch } => {
             let mut alpha_local = local(alpha_normalize_sc, vars);
             let a = alpha_local(a);

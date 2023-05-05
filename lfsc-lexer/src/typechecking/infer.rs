@@ -1,12 +1,13 @@
 use lfsc_syntax::ast::{AlphaTerm, Num, BuiltIn, AlphaTermSC, NumericSC,
-                       CompoundSC, SideEffectSC, AlphaPattern, StrAlphaTerm};
+                       CompoundSC, SideEffectSC, AlphaPattern};
 use lfsc_syntax::ast::AlphaTerm::*;
 use lfsc_syntax::ast::NumericSC::*;
 use lfsc_syntax::ast::CompoundSC::*;
 use lfsc_syntax::ast::SideEffectSC::*;
+use crate::typechecking::values::const_closure;
+
 use super::EnvWrapper;
-use super::values::{TypecheckingErrors, ResRT, Type, mk_closure, TResult, RT};
-use super::context::{Rlctx, LocalContext, Rgctx, get_type};
+use super::values::{TypecheckingErrors, ResRT, Type, mk_closure, RT, TResult};
 
 use std::rc::Rc;
 use std::borrow::Borrow;
@@ -16,33 +17,50 @@ impl<'ctx, T> EnvWrapper<'ctx, T>
 where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 {
     pub fn infer(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
+        println!("eval: {:?}", term);
         match term {
             Number(Num::Z(_))  => self.gctx.get_value(&T::_mpz()),
             Number(Num::Q(..)) => self.gctx.get_value(&T::_mpq()),
-            Ident(x)   => get_type(x, self.lctx.clone(), self.gctx.clone()),
+            Ident(x)   => self.get_type(x),
             AlphaTerm::Pi(a, b) => {
-                // may this only be star or also box?
-                self.infer_sort(a)?;
-                let val = self.eval(a)?;
+                // TODO: may this only be star or also box?
+                let val =
+                    if let SC(t1, t2) = &**a {
+                        let t1_ty = self.infer_sc(t1)?;
+                        self.check(t2, t1_ty.clone())?;
+                        Rc::new(Type::Run(t1, t1_ty))
+                    } else {
+                        self.infer_as_type(a)?;
+                        self.eval(a)?
+                    };
                 let env = self.update_local(val);
+                // this may be both type and kind
                 env.infer_sort(b)
             },
             AnnLam(a, m) => {
-                let val = self.infer(a)?;
+                self.infer_as_type(a)?;
+                let val = self.eval(a)?;
                 let env = self.update_local(val.clone());
-                env.infer(m)?;
-                let closure = mk_closure(m, env.lctx.clone());
+                let t2 = env.infer(m)?;
+                let closure = const_closure(t2);
                 Ok(Rc::new(Type::Pi(val, closure)))
             }
             App(m, n) => {
                 let f_ty = self.infer(m)?;
                 if let Type::Pi(a,b) = f_ty.borrow() {
-                    self.check(n, a.clone())?;
-                    return b(self.eval(n)?, self)
+                    if let Type::Run(a, b) = a.borrow() {
+                        // run_sc(a);
+                        panic!("run not implemented");
+                    } else {
+                        println!("checking {:?} against {:?}, with {:?}", n, a, f_ty);
+                        self.check(n, a.clone())?;
+                        return b(self.eval(n)?, self)
+                    }
                 };
                 Err(TypecheckingErrors::NotPi)
             }
             Asc(a, m) => {
+                println!("asc: {:?}", a);
                 self.infer_sort(a)?;
                 let ty = self.infer(a)?;
                 self.check(m, ty.clone())?;
@@ -50,17 +68,17 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             }
             AlphaTerm::Lam(_) => Err(TypecheckingErrors::CannotInferLambda),
             Hole => Err(TypecheckingErrors::CannotInferHole),
-            // only allowed when infering and only inside of a pi or annotated lambda.
-            SC(t1, t2) => {
-                unimplemented!()
-                // let t1_ = infer_sc(t1, lctx.clone(), gctx)?;
-                // let t2 = infer_sc(t2, lctx, gctx)?;
-                // Ok(Rc::new(Type::Run(t1, t2)))
-            }
-
+            SC(..) => Err(TypecheckingErrors::UnexpectedSC)
         }
     }
 
+    pub fn infer_as_type(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
+        let x = self.infer(term)?;
+        match x.borrow() {
+            Type::Star => Ok(x),
+            _ => Err(TypecheckingErrors::ExpectedSort)
+        }
+    }
     pub fn infer_sort(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
         let x = self.infer(term)?;
         match x.borrow() {
@@ -68,260 +86,195 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             _ => Err(TypecheckingErrors::ExpectedSort)
         }
     }
+
+    pub fn infer_sc(&self, sc: &'ctx AlphaTermSC<T>) -> ResRT<'ctx, T> {
+        match sc {
+        AlphaTermSC::Number(Num::Z(_)) => self.gctx.get_value(&T::_mpz()),
+        AlphaTermSC::Number(Num::Q(..)) => self.gctx.get_value(&T::_mpq()),
+        AlphaTermSC::Ident(x) => self.get_type(x),
+        AlphaTermSC::Let(m, n) => {
+            let m_ty = self.infer_sc(m)?;
+            let env = self.update_local(m_ty);
+            env.infer_sc(n)
+        },
+        AlphaTermSC::App(f, args) => {
+            println!("app sc: {:?}", f);
+            println!("args sc: {:?}", args);
+            let mut f_ty = self.get_type(f)?;
+            let mut env = self.clone();
+            // Since im too stupid to make a program a Pi type, we do the following:
+            if let Type::Prog(params, _) = self.get_value(f)?.borrow() {
+                if args.len() != args.len() {
+                    return Err(TypecheckingErrors::WrongNumberOfArguments);
+                }
+                for (arg,param) in args.iter().zip(params.iter()) {
+                    let arg = self.infer_sc(arg)?;
+                    self.same(arg, param.clone())?;
+                }
+                // TODO: do we really need to check the body again?
+                return Ok(f_ty)
+            }
+            // The case for PI
+            for arg in args.iter() {
+                 if let Type::Pi(a,b) = f_ty.borrow() {
+                     // 1. check arg matches type of function
+                    let arg_ty = env.infer_sc(arg)?;
+                    env.same(arg_ty, a.clone())?;
+                     // 2. We dont allow x in the
+                    env.allow_dbi += 1;
+                     // hacky way to force evaluation
+                    f_ty = b(env.gctx.kind.clone(), &env)?;
+                 } else {
+                    return Err(TypecheckingErrors::NotPi);
+                 }
+            }
+            Ok(f_ty)
+        },
+        AlphaTermSC::Numeric(num) => self.infer_num(num),
+        AlphaTermSC::Compound(com) => self.infer_compound(com),
+        AlphaTermSC::SideEffect(se) => self.infer_sideeffect(se)
+        }
+    }
+
+    fn infer_sideeffect(&self,
+                        sc: &'ctx SideEffectSC<AlphaTermSC<T>>) -> ResRT<'ctx, T>
+    {
+        match sc {
+            Do(a, b) => {
+                self.infer_sc(a)?;
+                self.infer_sc(b)
+            },
+            MarkVar(_, var) => {
+                let var_ty = self.infer_sc(var)?;
+                Ok(var_ty)
+            },
+            IfMarked{n: _n, c, tbranch, fbranch} => {
+                let _var_ty    = self.infer_sc(c)?;
+                let tbranch_ty = self.infer_sc(tbranch)?;
+                let fbranch_ty = self.infer_sc(fbranch)?;
+                self.same(tbranch_ty.clone(), fbranch_ty)?;
+                Ok(tbranch_ty)
+            }
+        }
+    }
+
+    fn infer_compound(&self,
+                      sc: &'ctx CompoundSC<AlphaTerm<T>, AlphaTermSC<T>, AlphaPattern<T>>
+                     ) -> ResRT<'ctx, T>
+    {
+        match sc {
+            Fail(x) => { self.infer_as_type(x)?; Ok(self.eval(x)?) },
+            IfEq { a, b, tbranch, fbranch } => {
+                let a_ty = self.infer_sc(a)?;
+                let b_ty = self.infer_sc(b)?;
+                self.same(a_ty, b_ty)?;
+                let tbranch_ty = self.infer_sc(tbranch)?;
+                let fbranch_ty = self.infer_sc(fbranch)?;
+                self.same(tbranch_ty.clone(), fbranch_ty)?;
+                Ok(tbranch_ty)
+            }
+            Match(scrut, cases) => {
+                let scrut_ty = self.infer_sc(scrut)?;
+                let mut t_ty : Option<RT<_>> = None;
+                for i in cases.iter() {
+                    let env = self.clone();
+                    let (p, t) = i;
+                    let (pat_ty, local_env) = env.infer_pattern(p)?;
+                    if let Some(p_ty) = pat_ty {
+                        env.same(p_ty, scrut_ty.clone())?;
+                    };
+                    let cur_ty = local_env.infer_sc(t)?;
+                    env.same(cur_ty.clone(), scrut_ty.clone())?;
+                    if t_ty.is_none() {
+                        t_ty = Some(cur_ty);
+                    }
+                }
+                // // safe to unwrap since there is always atleast 1 case by construction
+                Ok(t_ty.unwrap())
+            }
+        }
+    }
+
+    fn infer_pattern(&self,
+                     p: &'ctx AlphaPattern<T>,
+                    ) -> TResult<(Option<RT<'ctx, T>>, Self), T>
+    {
+        match p {
+            AlphaPattern::Default => Ok((None, self.clone())),
+            AlphaPattern::Symbol(x) => Ok((Some(self.get_type(x)?), self.clone())),
+            AlphaPattern::App(id, args) => {
+                let mut head = self.get_type(id)?;
+                let mut env = self.clone();
+                for _i in 0..*args {
+                    (head, env) = env.force_pi(head)?;
+                }
+                if let Type::Pi(..) = head.borrow() {
+                    return Err(TypecheckingErrors::NotFullyApplied)
+                }
+                Ok((Some(head), env))
+            }
+        }
+    }
+
+    // indirection to since we might now assign to a borrow...
+    fn force_pi(&self, ty: RT<'ctx, T>) -> TResult<(RT<'ctx, T>, Self), T> {
+        if let Type::Pi(dom, ran) = ty.borrow() {
+            println!("dom: {:?}\n\n", dom);
+            Ok((ran(dom.clone(), self)?, self.update_local(dom.clone())))
+        } else {
+            Err(TypecheckingErrors::NotPi)
+        }
+    }
+
+    fn infer_num(&self, sc: &'ctx NumericSC<AlphaTermSC<T>>) -> ResRT<'ctx, T>
+        where T: Clone + PartialEq + std::fmt::Debug + BuiltIn
+    {
+        match sc {
+            Sum(x, y) | Prod(x, y) | Div(x, y) => {
+                let x_ty = self.infer_sc(x)?;
+                let y_ty = self.infer_sc(y)?;
+                let x_bor = x_ty.borrow();
+                if Type::ZT != *x_bor || Type::QT != *x_bor {
+                    return Err(TypecheckingErrors::ExpectedNum)
+                };
+                if *x_bor != *y_ty.borrow() {
+                    return Err(TypecheckingErrors::ExpectedSameNum)
+                };
+                Ok(x_ty)
+            }
+            Neg(x) => {
+                let x_ty = self.infer_sc(x)?;
+                let x_bor = x_ty.borrow();
+                if Type::ZT != *x_bor || Type::QT != *x_bor {
+                    return Err(TypecheckingErrors::ExpectedNum)
+                };
+                Ok(x_ty)
+            },
+            ZtoQ(z) => {
+                let z_ty = self.infer_sc(z)?;
+                if Type::ZT != *z_ty.borrow() {
+                    return Err(TypecheckingErrors::NotZ)
+                }
+                Ok(z_ty)
+            },
+            ZBranch { n, tbranch, fbranch }
+            | NegBranch { n, tbranch, fbranch } => {
+                let n_ty = self.infer_sc(n)?;
+                let n_ty = n_ty.borrow();
+                if Type::ZT != *n_ty || Type::QT != *n_ty {
+                    return Err(TypecheckingErrors::ExpectedNum)
+                };
+                let tbranch_ty = self.infer_sc(tbranch)?;
+                let fbranch_ty = self.infer_sc(fbranch)?;
+                if tbranch_ty != fbranch_ty {
+                    return Err(TypecheckingErrors::ExpectedSameInBranch)
+                };
+                Ok(tbranch_ty)
+            }
+        }
+    }
 }
 
-// pub fn infer<'a, T>(term: &'a AlphaTerm<T>,
-//                     lctx: Rlctx<'a,T>,
-//                     gctx: Rgctx<'a, T>) -> ResRT<'a,T>
-// where   T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
-// {
-//     match term {
-//         Number(Num::Z(_))  => gctx.get_value(&T::_mpz()),
-//         Number(Num::Q(..)) => gctx.get_value(&T::_mpq()),
-//         Ident(x)   => get_type(x, lctx, gctx),
-//         AlphaTerm::Pi(a, b) => {
-//             // may this only be star or also box?
-//             infer_sort(a, lctx.clone(), gctx.clone())?;
-//             let val = eval(a, lctx.clone(), gctx.clone())?;
-//             infer_sort(b, LocalContext::insert(val.clone(), lctx), gctx)
-//         },
-//         AnnLam(a, m) => {
-//             let val = infer(a, lctx.clone(), gctx.clone())?;
-//             infer(m, LocalContext::insert(val.clone(), lctx.clone()), gctx.clone())?;
-//             let closure = mk_closure(m, lctx);
-//             Ok(Rc::new(Type::Pi(val, closure)))
-//         }
-//         App(m, n) => {
-//             let f_ty = infer(m, lctx.clone(), gctx.clone())?;
-//             if let Type::Pi(a,b) = f_ty.borrow() {
-//                 check(n, a.clone(), lctx.clone(), gctx.clone())?;
-//                 return b(eval(n, lctx, gctx.clone())?, gctx)
-//             };
-//             Err(TypecheckingErrors::NotPi)
-//         }
-//         Asc(a, m) => {
-//             infer_sort(a, lctx.clone(), gctx.clone())?;
-//             let ty = infer(a, lctx.clone(), gctx.clone())?;
-//             check(m, ty.clone(), lctx, gctx)?;
-//             Ok(ty)
-//         }
-//         AlphaTerm::Lam(_) => Err(TypecheckingErrors::CannotInferLambda),
-//         Hole => Err(TypecheckingErrors::CannotInferHole),
-//         // only allowed when infering and only inside of a pi or annotated lambda.
-//         SC(t1, t2) => {
-//             let _ = infer_sc(t1, lctx.clone(), gctx.clone())?;
-//             let t2 = infer_sc(t2, lctx, gctx)?;
-//             Ok(Rc::new(Type::Run(t1, t2)))
-//         }
-//     }
 
-// }
 
-// pub fn infer_sort<'a, T>(term: &'a AlphaTerm<T>,
-//                   lctx: Rlctx<'a, T>,
-//                   gctx: Rgctx<'a, T>) -> ResRT<'a, T>
-// where   T: PartialEq + Clone + BuiltIn + std::fmt::Debug,
-// {
-//     let x = infer(term, lctx, gctx)?;
-//     match x.borrow() {
-//         Type::Box | Type::Star => Ok(x),
-//         _ => Err(TypecheckingErrors::ExpectedSort)
-//     }
-// }
 
-// fn infer_sc<'a, T>(sc: &'a AlphaTermSC<T>,
-//                  lctx: Rlctx<'a, T>,
-//                  gctx: Rgctx<'a, T>) -> ResRT<'a, T>
-//     where T: Clone + PartialEq + std::fmt::Debug + BuiltIn
-// {
-//     match sc {
-//     AlphaTermSC::Number(Num::Z(_)) => gctx.get_value(&T::_mpz()),
-//     AlphaTermSC::Number(Num::Q(..)) => gctx.get_value(&T::_mpq()),
-//     AlphaTermSC::Ident(x) => get_type(x, lctx, gctx),
-//     AlphaTermSC::Let(m, n) => {
-//         let m_ty = infer_sc(m, lctx.clone(), gctx.clone())?;
-//         let lctx = LocalContext::insert(m_ty, lctx);
-//         infer_sc(n, lctx, gctx)
-//     },
-//     AlphaTermSC::App(m, n) => {
-//         // TODO: check if a occurs free in b,
-//         // TODO: check if fully applied??
-//         todo!()
-//         // let m_ty = infer_sc(m, lctx.clone(), gctx.clone())?;
-//         //     if let Type::Pi(a,b) = m_ty.borrow() {
-//         //         let n_ty = infer_sc(n, lctx, gctx)?;
-//         //         if
-
-//         //     }
-//         // }
-//     },
-//     AlphaTermSC::Numeric(num) => infer_num(num, lctx, gctx),
-//     AlphaTermSC::Compound(com) => infer_compound(&**com, lctx, gctx),
-//     AlphaTermSC::SideEffect(se) => infer_sideeffect(se, lctx, gctx)
-//     }
-// }
-
-// fn infer_sideeffect<'a, T>(sc: &'a SideEffectSC<AlphaTermSC<T>>,
-//                  lctx: Rlctx<'a, T>,
-//                  gctx: Rgctx<'a, T>) -> ResRT<'a, T>
-//     where T: Clone + PartialEq + std::fmt::Debug + BuiltIn
-// {
-//     match sc {
-//         Do(a, b) => {
-//             infer_sc(a, lctx.clone(), gctx.clone())?;
-//             infer_sc(b, lctx, gctx)
-//         },
-//         MarkVar(_, var) => {
-//             let var_ty = infer_sc(var, lctx.clone(), gctx)?;
-//             // TODO: make check about lambda bound variable.
-//             Ok(var_ty)
-//         },
-//         IfMarked{n: _n, c, tbranch, fbranch} => {
-//             let _var_ty    = infer_sc(c, lctx.clone(), gctx.clone())?;
-//             let tbranch_ty = infer_sc(tbranch, lctx.clone(), gctx.clone())?;
-//             let fbranch_ty = infer_sc(fbranch, lctx, gctx)?;
-//             // TODO: make check about lambda bound variable.
-//             if tbranch_ty != fbranch_ty {
-//                 return Err(TypecheckingErrors::ExpectedSameInBranch)
-//             }
-//             Ok(tbranch_ty)
-//         }
-//     }
-// }
-
-// fn infer_compound<'a, T>(sc: &'a CompoundSC<AlphaTermSC<T>, AlphaPattern<T>>,
-//                  lctx: Rlctx<'a, T>,
-//                  gctx: Rgctx<'a, T>) -> ResRT<'a, T>
-//     where T: Clone + PartialEq + std::fmt::Debug + BuiltIn
-// {
-//     match sc {
-//         Fail(x) => {
-//             let x_ty = infer_sc(x, lctx, gctx)?;
-//             if Type::Star != *x_ty.borrow() {
-//                 return Err(TypecheckingErrors::ExpectedSort)
-//             }
-//             Ok(x_ty)
-
-//         }
-//         IfEq { a, b, tbranch, fbranch } => {
-//             let a_ty = infer_sc(a, lctx.clone(), gctx.clone())?;
-//             let b_ty = infer_sc(b, lctx.clone(), gctx.clone())?;
-//             if a_ty != b_ty {
-//                 // TODO: misleading
-//                 return Err(TypecheckingErrors::ExpectedSameInBranch)
-//             }
-//             let tbranch_ty = infer_sc(tbranch, lctx.clone(), gctx.clone())?;
-//             let fbranch_ty = infer_sc(fbranch, lctx.clone(), gctx.clone())?;
-//             if tbranch_ty != fbranch_ty {
-//                 return Err(TypecheckingErrors::ExpectedSameInBranch)
-//             }
-//             Ok(tbranch_ty)
-//         }
-//         Match(scrut, cases) => {
-//             let scrut_ty = infer_sc(scrut, lctx.clone(), gctx.clone())?;
-//             // Terrible structure
-//             let mut t_ty = None;
-//             for i in cases.iter() {
-//                 let (p, t) = i;
-//                 let p_ty = infer_pattern(p, lctx.clone(), gctx.clone())?;
-//                 let lctx =
-//                     match p_ty {
-//                         (Some(p_ty), lctx) => {
-//                             if &*p_ty != &*scrut_ty {
-//                                 return Err(TypecheckingErrors::ExpectedSameInBranch)
-//                             }
-//                             lctx.clone()
-//                         },
-//                         (None, lctx) => lctx.clone()
-//                     };
-//                 if t_ty.is_none() {
-//                     t_ty = Some(infer_sc(t, lctx.clone(), gctx.clone())?);
-//                 } else if t_ty != Some(infer_sc(t, lctx.clone(), gctx.clone())?) {
-//                         return Err(TypecheckingErrors::ExpectedSameInBranch)
-//                 }
-//             }
-//             // safe to unwrap since there is always atleast 1 case by construction
-//             Ok(t_ty.unwrap())
-//         }
-//     }
-// }
-
-// fn infer_pattern<'a, T>(p: &'a AlphaPattern<T>,
-//                  lctx: Rlctx<'a, T>,
-//                  gctx: Rgctx<'a, T>) -> TResult<(Option<RT<'a, T>>, Rlctx<'a,T>), T>
-//     where T: Clone + PartialEq + std::fmt::Debug + BuiltIn
-// {
-//     match p {
-//         AlphaPattern::Default => Ok((None, lctx)),
-//         AlphaPattern::Symbol(x) => Ok((Some(get_type(x, lctx.clone(), gctx)?), lctx)),
-//         AlphaPattern::App(id, args) => {
-//             let mut lctx = lctx;
-//             let mut head = get_type(id, lctx.clone(), gctx.clone())?;
-//             for _i in 0..*args {
-//                 (head, lctx) = force_pi(head, lctx, gctx.clone())?;
-//             }
-//             if let Type::Pi(..) = head.borrow() {
-//                 return Err(TypecheckingErrors::NotPi)
-//             }
-//             Ok((Some(head), lctx))
-//         }
-//     }
-// }
-// fn force_pi<'a, T>(ty: RT<'a, T>, lctx: Rlctx<'a, T>, gctx: Rgctx<'a, T>)
-//                    -> TResult<(RT<'a,T>, Rlctx<'a, T>), T>
-// where T: Clone + PartialEq + std::fmt::Debug + BuiltIn {
-//     match ty.borrow() {
-//         Type::Pi(dom, ran) =>
-//             Ok((ran(dom.clone(), gctx)?, LocalContext::insert(dom.clone(), lctx))),
-//         _ => Err(TypecheckingErrors::NotPi)
-//     }
-// }
-
-// fn infer_num<'a, T>(sc: &'a NumericSC<AlphaTermSC<T>>,
-//                  lctx: Rlctx<'a, T>,
-//                  gctx: Rgctx<'a, T>) -> ResRT<'a, T>
-//     where T: Clone + PartialEq + std::fmt::Debug + BuiltIn
-// {
-//     match sc {
-//         Sum(x, y) | Prod(x, y) | Div(x, y) => {
-//             let x_ty = infer_sc(x, lctx.clone(), gctx.clone())?;
-//             let y_ty = infer_sc(y, lctx, gctx)?;
-//             let x_bor = x_ty.borrow();
-//             if Type::ZT != *x_bor || Type::QT != *x_bor {
-//                 return Err(TypecheckingErrors::ExpectedNum)
-//             };
-//             if *x_bor != *y_ty.borrow() {
-//                 return Err(TypecheckingErrors::ExpectedSameNum)
-//             };
-//             Ok(x_ty)
-//         }
-//         Neg(x) => {
-//             let x_ty = infer_sc(x, lctx.clone(), gctx.clone())?;
-//             let x_bor = x_ty.borrow();
-//             if Type::ZT != *x_bor || Type::QT != *x_bor {
-//                 return Err(TypecheckingErrors::ExpectedNum)
-//             };
-//             Ok(x_ty)
-//         },
-//         ZtoQ(z) => {
-//             let z_ty = infer_sc(z, lctx.clone(), gctx)?;
-//             if Type::ZT != *z_ty.borrow() {
-//                 return Err(TypecheckingErrors::NotZ)
-//             }
-//             Ok(z_ty)
-//         },
-//         ZBranch { n, tbranch, fbranch } | NegBranch { n, tbranch, fbranch } => {
-//             let n_ty = infer_sc(n, lctx.clone(), gctx.clone())?;
-//             let n_ty = n_ty.borrow();
-//             if Type::ZT != *n_ty || Type::QT != *n_ty {
-//                 return Err(TypecheckingErrors::ExpectedNum)
-//             };
-//             let tbranch_ty = infer_sc(tbranch, lctx.clone(), gctx.clone())?;
-//             let fbranch_ty = infer_sc(fbranch, lctx.clone(), gctx)?;
-//             if tbranch_ty != fbranch_ty {
-//                 return Err(TypecheckingErrors::ExpectedSameInBranch)
-//             };
-//             Ok(tbranch_ty)
-//         }
-//     }
-// }

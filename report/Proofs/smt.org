@@ -1,1 +1,0 @@
-* TODO Satisfiability modulo theories

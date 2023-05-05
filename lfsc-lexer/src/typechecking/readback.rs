@@ -1,7 +1,7 @@
 use std::{rc::Rc, borrow::Borrow};
 
 use lfsc_syntax::{ast::AlphaTerm,  abinder, ast::BuiltIn};
-use lfsc_syntax::ast::Ident::*;
+use lfsc_syntax::ast::{Ident::*, Num};
 use lfsc_syntax::ast::AlphaTerm::*;
 
 use super::values::mk_neutral_var_with_type;
@@ -26,7 +26,7 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                     val: RT<'ctx, T>) -> TResult<AlphaTerm<T>, T>
     {
         // neutral values can be readback without a type
-        if let Value::Neutral(_, a) =  val.borrow() {
+        if let Value::Neutral(_, a) = val.borrow() {
             return self.readback_neutral(ty, a.clone())
         }
         match ty.borrow() {
@@ -38,6 +38,7 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                 Ok(abinder!(lam, env.readback(ran_, app)?))
             }
             Type::Box => {
+                println!("Box:: {:?}", val);
                 match val.borrow() {
                     Value::Pi(at, bt) => {
                         let dom = self.readback(ty.clone(), at.clone())?;
@@ -46,32 +47,35 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                                          self)?;
                         let ran = env.readback(ty.clone(), cls_res)?;
                         Ok(abinder!(pi, dom, ran))
-                    }
+                    },
+                    Value::Star => Ok(Ident(Symbol(T::_type()))),
                     Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
                     Value::QT => Ok(Ident(Symbol(T::_mpq()))),
-
-                    Value::Star => todo!(),
-                    Value::Z(_) => todo!("readback z"),
-
-                    Value::Q(..) => todo!("readback q"),
-                    Value::Box => {dbg!(&self.gctx); todo!()},
-                    Value::Lam(_) => todo!("readback lam"),
-                    Value::Neutral(_, _) => unreachable!("neutral should have been handled above"),
-                    Value::Run(..) => todo!()
+                    _ => Err(TypecheckingErrors::ReadBackMismatch),
                 }
             }
-            Type::Star => todo!(),
             Type::ZT => {
-                todo!("readback zt")
+                match val.borrow() {
+                    Value::Z(p) => Ok(Number(Num::Z(*p))),
+                    _ => Err(TypecheckingErrors::ReadBackMismatch),
+                }
             },
             Type::QT => {
-                todo!("readback qt")
+                match val.borrow() {
+                    Value::Q(p, q) => Ok(Number(Num::Q(*p, *q))),
+                    _ => Err(TypecheckingErrors::ReadBackMismatch),
+                }
             },
-            // what to do about numbers?
-            Value::Neutral(..) => Err(TypecheckingErrors::NeutralUsedAsType),
-            Value::Z(_) | Value::Q(..) => Err(TypecheckingErrors::NumberUsedAsType),
-            Value::Lam(_) => Err(TypecheckingErrors::LamUsedAsType),
-            Value::Run(..) => todo!()
+            // TODO:: should we have this both here and for box??
+            Type::Star => {
+                match val.borrow() {
+                    Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
+                    Value::QT => Ok(Ident(Symbol(T::_mpq()))),
+                    _ => Err(TypecheckingErrors::ReadBackMismatch),
+                }
+            },
+            Value::Neutral(..) => unreachable!(),
+            _ => Err(TypecheckingErrors::ValueUsedAsType)
         }
     }
 

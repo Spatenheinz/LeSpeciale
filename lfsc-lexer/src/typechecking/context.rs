@@ -1,16 +1,12 @@
 use lfsc_syntax::ast::Ident;
 
-use super::values::{Neutral, Type, Value, RT, TResult, TypecheckingErrors};
+use super::values::{Neutral, Type, Value, RT, TypecheckingErrors, TResult, ResRT};
 use std::rc::Rc;
 use std::cell::RefCell;
 
 #[derive(Debug)]
 pub struct LookupErr {err: String}
 
-pub type LResult<T, K> = TResult<T, K>;
-
-
-#[cfg(feature = "conslist")]
 pub type Rlctx<'a, T> = Rc<LocalContext<'a, T>>;
 
 // pub type RGCTX<'a, T> = Rc<GlobalContext<'a, T>>;
@@ -32,7 +28,7 @@ pub enum LocalContext<'a, K: Copy> {
 
 // pub fn init_with_str<'a>() -> Rc<GlobalContext<'a, &'a str>> {
 pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
-    let mut ctx = GlobalContext::new();
+    let ctx = GlobalContext::new();
     ctx.define("type", Rc::new(Type::Box),  Rc::new(Type::Star));
     ctx.define("mpz",  Rc::new(Type::Star), Rc::new(Type::ZT));
     ctx.define("mpq",  Rc::new(Type::Star), Rc::new(Type::QT));
@@ -40,18 +36,6 @@ pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
     // Rc::new(ctx)
 }
 
-pub fn get_type<'ctx, K>
-    (key: &Ident<K>,
-     lctx: Rlctx<'ctx, K>,
-     rctx: Rgctx<'ctx, K>)
-     -> LResult<RT<'ctx, K>, K>
-where K: std::fmt::Debug + PartialEq + Copy
-{
-    match key {
-        Ident::DBI(i) => lctx.get_type(*i),
-        Ident::Symbol(name) => rctx.get_type(name),
-    }
-}
 
 fn from_entry_to_value<'a, K: Copy>(entry: &TypeEntry<'a, K>, key: Ident<K>)
                                      -> RT<'a, K> {
@@ -122,6 +106,10 @@ where K: PartialEq + std::fmt::Debug + Copy
         }
     }
 
+    pub fn contains(&self, key: &K) -> bool {
+        self.keys.borrow().contains(key)
+    }
+
     pub fn insert(&self, key: K, ty: RT<'a, K>) {
        self.keys.borrow_mut().push(key);
        self.values.borrow_mut().push(TypeEntry::IsA { ty, marks: RefCell::new(0)})
@@ -145,7 +133,7 @@ where K: PartialEq + std::fmt::Debug + Copy
     // }
 
 
-    pub fn get_value(&self, key: &K) -> LResult<RT<'a, K>, K>
+    pub fn get_value(&self, key: &K) -> ResRT<'a, K>
     where K: std::fmt::Debug {
         self.keys
             .borrow()
@@ -157,7 +145,7 @@ where K: PartialEq + std::fmt::Debug + Copy
             .ok_or(lookup_err(Ident::Symbol(key)))
     }
 
-    pub fn get_type(&self, key: &K) -> LResult<RT<'a, K>, K>
+    pub fn get_type(&self, key: &K) -> ResRT<'a, K>
     where K: std::fmt::Debug {
         self.keys
             .borrow()
@@ -171,7 +159,9 @@ where K: PartialEq + std::fmt::Debug + Copy
 }
 
 fn lookup_err<K, T>(key: Ident<K>) -> TypecheckingErrors<T>
-where K: std::fmt::Debug {
+where K: std::fmt::Debug,
+      T: Copy
+{
     TypecheckingErrors::LookupFailed(LookupErr { err: format!("{:?} not found", key) })
 }
 
@@ -186,7 +176,7 @@ where K: PartialEq + std::fmt::Debug + Copy
         Rc::new(LocalContext::Cons(
             TypeEntry::IsA { ty, marks: RefCell::new(0)}, ctx))
     }
-    pub fn get(&self, key: u32) -> LResult<&TypeEntry<'a, K>, K> {
+    pub fn get(&self, key: u32) -> TResult<&TypeEntry<'a, K>, K> {
         match self {
             LocalContext::Nil => Err(lookup_err(Ident::<K>::DBI(key))),
             LocalContext::Cons(ty, ctx) => {
@@ -199,11 +189,11 @@ where K: PartialEq + std::fmt::Debug + Copy
         }
     }
 
-    pub fn get_value(&self, key: u32) -> LResult<RT<'a, K>, K> {
+    pub fn get_value(&self, key: u32) -> ResRT<'a, K> {
         self.get(key).map(|v| from_entry_to_value(v, Ident::<K>::DBI(key)))
     }
 
-    pub fn get_type(&self, key: u32) -> LResult<RT<'a, K>, K> {
+    pub fn get_type(&self, key: u32) -> ResRT<'a, K> {
         self.get(key).map(|v| from_entry_to_type(v))
     }
 }

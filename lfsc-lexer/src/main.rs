@@ -15,19 +15,23 @@ fn main() {
     println!("{:?}", parsed);
     let mut normalized = vec![];
     for x in parsed.unwrap().1.into_iter() {
-        normalized.push(alpha_convert_command(x));
-
+        let a = alpha_convert_command(x);
+        println!("{:?}", a);
+        normalized.push(a);
     };
     println!();
     let gctx = Rc::new(init_with_str());
     // let gctx = init_with_str();
     for x in normalized.iter() {
-      let _ = handle_command(x, gctx.clone());
+      if let Err(x) =  handle_command(x, gctx.clone()) {
+          println!("Error: {:?}", x);
+          return
+      }
     }
+    dbg!(gctx);
     // let ty = gctx.get_type(&"holds").unwrap();
     // println!("ref of ty: {:?}", Rc::strong_count(&ty));
     // drop(gctx);
-    dbg!(gctx);
     // let path = std::fs::read_dir("./signatures").unwrap();
     // for i in path {
     //     let i = i.unwrap();

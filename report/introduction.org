@@ -2,3 +2,44 @@
 :PROPERTIES:
 :UNNUMBERED: nil
 :CUSTOM_ID: intro
+:END:
+
+Extended Berkeley Package Filters (eBPF) is a subsystem in the Linux kernel,
+which allows users of the system to dynamically load eBPF bytecode into the kernel.
+The program can then be executed when certain events happen.
+This technology enables many interesting features, such as high-speed package filtering
+(which was the initial intend with the system)
+and Express Data Path (XDP) by circumventing the network stack of the operating system.
+Furthermore it can be used as system monitoring by access to kernel probes etc.
+
+eBPF allows untrusted users to run arbitrary code in the kernel, which in itself is no problem if the
+program is non-malicious, but can be detremental if not.
+Programs that run in the Linux kernel must therefore be both safe and secure.
+an usafe program in the linux kernel might break the system alltogether,
+whilst a malicious users could get access to secrets.
+To prevent this the eBPF subsystem will perform an abstract interpretation of a program
+and then reject unsafe programs, before they are loaded into the kernel.
+This process is called the verifier.
+The verifier has been subject to multiple bugs in the past, which can lead to priveledge escalation\cite{TODO: ebpf priveledge}.
+Furthermore the verifier will outright reject programs with loops,
+since the domain of the abstract interpretation have no way to tell if the program will terminate (and this ofcourse is not possible in general).
+
+An alternative to verifying the safety of programs in general is to do a formal proof of safety.
+An automatic way to do this is to reduce the problem of program verification to satisfiability of programs.
+This is done by generating a formula that describe the properties of a program, a so called verification condition, and then checking the satisfiability of the negated formula.
+The process of generating a verification condition is the fairly cheap,
+however checking the validity of the formula can be quite a heavy task.
+Proof Carrying Code is an architecture and security mechanism first introduced by Necula\cite{necula} in 1998
+which moves the responsibility of proving that a certain program follows a set of security parameters to the user and then have the kernel check that this proof along with some additional checking. The general concept is described more in detail in\ref{}. All in all these tasks are far cheaper task than producing a proof.
+
+In this project I investigate the feasibility of a proofchecker that can run inside the Linux kernel written in Rust.
+The proof checker leverages the Curry-howard correspondence and amounts to typechecking a dependently typed language, Logical Framework with Side Conditions (LFSC).
+
+\ref{} explains the necessary understanding PCC
+\ref{} explains how we enables the feature of a proof checker that can run in hte Linux Kernel.
+\ref{} gives a formal defintion of the LFSC language
+\ref{} describes the concrete syntax and gives an example
+\ref{} presents the overall design of the proof checker, whilst the concrete implementation is covered in \ref{}.
+Lastly I evaluate the performance of the proof checker and analyze the feasibility comparative to the verifier.
+
+Enjoy.

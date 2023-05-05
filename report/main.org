@@ -7,7 +7,7 @@
 #+LATEX_HEADER_EXTRA: \subtitle{For PCC'ifying the eBPF syscall}
 #+LATEX_HEADER_EXTRA: \repo{github.com}
 #+LATEX_HEADER_EXTRA: \advisor{Advisor: Ken Friis Larsen}
-#+LATEX_HEADER_EXTRA: \frontpageimage{croissant.png}
+#+LATEX_HEADER_EXTRA: #\frontpageimage{croissant.png}
 
 #+BEGIN_abstract
 This project investigates the possibility of using Proof Carrying Code (PCC) for the EBPF Linux subsystem.
@@ -17,6 +17,7 @@ and an implementation in Rust.
 In doing so this project investigates both how suitable Rust is for implementing a PCC architecture that can run in the Linux kernel,
 aswell as considering if LFSC is at all useful when under the constraint of the Linux kernel.
 #+END_abstract
+
 
 #+include: introduction.org
 

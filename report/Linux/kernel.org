@@ -1,1 +1,9 @@
+The linux kernel is a monolithic kernel which means not only does it contain the core necessities for a operating system but also a virtual interface to communicate with hardware, such as filesystems, networkstacks and device drivers. All of these run in kernel space and is made available to the user through a common interface called system calls (syscalls).
+So in general all communication between user space and kernel space will happen through the systemcall.
+In some sense it is also possible to communicate between the two using the filesystem however this is merely an additional layer of abstraction.
+
+Despite being monolithic, the Linux kernel is modular, meaning it is possible to dynamically load kernel modules, Essentially we can extend kernel to undertake arbitrarily complex services.
+Kernel modules works very similar to filesystems in general.\footnote{this might be slightly simpified}
+
+In the following sections \ref{}-\ref{} we will describe what and why of ebpf and discuss the different ways to realize the PCC architecture for the eBPF subsystem.
 

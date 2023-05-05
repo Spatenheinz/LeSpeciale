@@ -69,11 +69,12 @@ pub fn parse_hole(it : &str) -> IResult<&str, Term<&str>> {
     map(reserved("_"), |_| Term::Hole)(it)
 }
 
-const KEYWORDS: [&str; 20] = ["let", "pi", "lam", "do", "match",
+const KEYWORDS: [&str; 25] = ["let", "pi", "lam", "do", "match",
                              "mpz_add", "mpz_mul", "mpz_div", "mpz_neg",
                              "mpz_to_mpq", "mp_ifzero", "mp_ifneg",
                              "markvar", "ifmarked", "default", "fail",
-                             "run", "define", "declare", "check"];
+                             "run", "define", "declare", "check", "function",
+                             "program", "run", "ifequal", "provided"];
 
 pub fn reserved<'a>(expected: &'a str)
                     -> impl FnMut(&'a str) -> IResult<&'a str, &'a str> {
@@ -97,6 +98,10 @@ fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
             |(ty, val)| Term::Ascription { ty: Box::new(ty), val: Box::new(val)},
         ),
         map(
+            preceded((reserved("#")), tuple((parse_ident, parse_term, parse_term))),
+            |(var, typ, body)| binder!(lam, var : typ, body),
+        ),
+        map(
             preceded(alt((reserved("lam"),reserved("\\"))), tuple((parse_ident, parse_term))),
             |(var, body)| binder!(lam, var, body),
         ),
@@ -105,8 +110,8 @@ fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
         //     |(var, ty, body)| binder!(biglam, var : ty, body),
         // ),
         map(preceded(alt((reserved("provided"), reserved("^"))),
-                     pair(parse_sc, parse_sc)),
-            |(x,y)| Term::SC(x, y)),
+                     pair(parse_sc, parse_term)),
+            |(x,y)| Term::SC(x, Box::new(y))),
     ))(it)
 }
 
@@ -124,12 +129,14 @@ fn parse_sc_opt(it: &str) -> IResult<&str, TermSC<&str>> {
     if let res @ Ok(..) = terminated(parse_sc_, closed)(it) {
         return res;
     }
-    let (rest, head) = parse_sc(it)?;
-    let (rest, tail) =
-        fold_many0(parse_sc, || head.clone(),
-            |acc, x| TermSC::App(Box::new(acc), Box::new(x)))(rest)?;
+    let (rest, head) = parse_ident(it)?;
+    let (rest, tail) = many0(parse_sc)(rest)?;
     let (rest, _) = closed(rest)?;
-    Ok((rest, tail))
+    if tail.is_empty() {
+        Ok((rest, TermSC::Var(head)))
+    } else {
+         Ok((rest, TermSC::App(head, tail)))
+    }
 }
 
 fn parse_sc_(it: &str) -> IResult<&str, TermSC<&str>> {
@@ -148,15 +155,16 @@ fn parse_sc_(it: &str) -> IResult<&str, TermSC<&str>> {
 
 }
 
-fn parse_compound(it : &str) -> IResult<&str, CompoundSC<TermSC<&str>, Pattern<&str>>> {
+fn parse_compound(it : &str) -> IResult<&str, CompoundSC<Term<&str>, TermSC<&str>, Pattern<&str>>> {
+    println!("parse_compound: {:?}", it);
     alt((
         map(preceded(reserved("fail"),
-                     parse_sc), CompoundSC::Fail),
+                     parse_term), CompoundSC::Fail),
         // map(preceded(reserved("compare"),
         //               tuple((parse_sc, parse_sc, parse_sc, parse_sc))),
         //     |(a,b,tbranch,fbranch)|
         //     CompoundSC::Compare{a,b,tbranch, fbranch}),
-        map(preceded(reserved("if_equal"),
+        map(preceded(reserved("ifequal"),
                      tuple((parse_sc, parse_sc, parse_sc, parse_sc))),
             |(a,b,tbranch,fbranch)|
             CompoundSC::IfEq{a,b,tbranch, fbranch}),
@@ -168,6 +176,7 @@ fn parse_compound(it : &str) -> IResult<&str, CompoundSC<TermSC<&str>, Pattern<&
 }
 
 fn parse_pat(it : &str) -> IResult<&str, Pattern<&str>> {
+    println!("parse_pat: {}", it);
     let f = alt((
         map(reserved("default"), |_| Pattern::Default),
         map(parse_ident, |x| Pattern::Symbol(Ident::Symbol(x))),
@@ -262,7 +271,7 @@ pub fn parse_num(it: &str) -> IResult<&str, Num> {
         Ok((rest, q)) => Ok((
             rest,
             Num::Q(p.parse::<i32>().unwrap(),
-                   p.parse::<i32>().unwrap()))),
+                   q.parse::<i32>().unwrap()))),
         Err(_) => {
             Ok((rest,
                 Num::Z(p.parse::<i32>().unwrap())))

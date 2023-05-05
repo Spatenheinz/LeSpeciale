@@ -12,7 +12,7 @@ macro_rules! binder {
     (pi, $v:ident : $ty:expr, $body:expr) => {
         $crate::ast::Term::Binder {
             kind: $crate::ast::BinderKind::Pi,
-            var: var!($v),
+            var: $v,
             ty: Some(Box::new($ty)),
             body: Box::new($body),
         }
@@ -20,7 +20,7 @@ macro_rules! binder {
     (lam, $v:ident, $body:expr) => {
         $crate::ast::Term::Binder {
             kind: $crate::ast::BinderKind::Lam,
-            var: var!($v),
+            var: $v,
             ty: None,
             body: Box::new($body),
         }
@@ -28,7 +28,7 @@ macro_rules! binder {
     (lam, $v:ident : $ty:expr, $body:expr) => {
         $crate::ast::Term::Binder {
             kind: $crate::ast::BinderKind::Lam,
-            var: var!($v),
+            var: $v,
             ty: Some(Box::new($ty)),
             body: Box::new($body),
         }
@@ -36,7 +36,7 @@ macro_rules! binder {
     (biglam, $v:ident : $ty:expr, $body:expr) => {
         $crate::ast::Term::Binder {
             kind: $crate::ast::BinderKind::BigLam,
-            var: var!($v),
+            var: $v,
             ty: Some(Box::new($ty)),
             body: Box::new($body),
         }
