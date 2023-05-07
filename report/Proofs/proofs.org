@@ -105,7 +105,7 @@ we write them as such and use \Sigma, \Sigma' to denote the concatenation of the
 The typesystem of LFSC is syntax directed meaning there we have only a single typing rule for each syntactical object.
 We achieve this by bidirectional typing.
 That means instead of stating that an expression must have a type,
-we can either construct a type from it (called synthesis)
+we can either construct a type from it (called inference)
 or we can check that an expression has a type.
 #+begin_export latex
 \begin{align*}
@@ -122,29 +122,32 @@ Valid signatures:
 \begin{figure}[h!]
 \begin{equation*}
 \inference[EMPTY-SIG ]{}
-{\lra{} \checked}
-\\
+{\lra{} \ \checked}
+\end{equation*}
+\begin{equation*}
 \inference[KIND-SIG ]{\Sigma \ \checked & \vdashs K & a \notin dom(\Sigma)}
 {\Sigma, a: K \ \checked}
-\\
-\inference[TYPE-SIG ]{\Sigma \ \checked & \vdashs A : K & c \notin dom(\Sigma)}
-{\Sigma, c: K \ \checked}
 \end{equation*}
+\begin{equation*}
+\inference[TYPE-SIG ]{\Sigma \ \checked & \vdashs A : K & c \notin dom(\Sigma)}
+{\Sigma, c: A \ \checked}
+\end{equation*}
+\caption{Valid signatures}
 \end{figure}
 #+end_export
-empty contexts are valid.
-TODO: write something more.
 
 Valid contexts:
 #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
-\inference[EMPTY-CTX ]{\Sigma \checked}
+\inference[EMPTY-CTX ]{\Sigma \ \checked}
 {\vdashs \lra{}}
-\\
-\inference[KIND-SIG ]{\vdashs \Gamma & \Gamma \vdashs A: Type & x \notin dom(\Sigma)}
+\end{equation*}
+\begin{equation*}
+\inference[TYPE-CTX ]{\vdashs \Gamma & \Gamma \vdashs A: Type & x \notin dom(\Sigma)}
 {\vdashs \Gamma, x: A}
 \end{equation*}
+\caption{Valid contexts}
 \end{figure}
 #+end_export
 
@@ -154,45 +157,238 @@ Valid contexts:
 \begin{equation*}
 \inference[TYPE ]{\vdash \Gamma}
 {\context \mathbf{type} \Rightarrow \mathbf{kind}}
-\\
-\inference[TYPEC ]{\vdash \Gamma}
-{\context \mathbf{type^c} \Rightarrow \mathbf{kind}}
-\\
+\qquad
+\inference[TYPEc ]{\vdash \Gamma}
+{\context \mathbf{type}^c \Rightarrow \mathbf{kind}}
+\end{equation*}
+
+\begin{equation*}
 \inference[LOOKUP-CTX ]{\vdash \Gamma & x: A \in \Gamma}
 {\context \synth{x}{A} }
-\\
+\end{equation*}
+
+\begin{equation*}
 \inference[LOOKUP-KIND-SIG ]{\vdash \Gamma & a: K \in \Sigma}
 {\context \synth{a}{K} }
-\\
+\qquad
 \inference[LOOKUP-TYPE-SIG ]{\vdash \Gamma & c: A \in \Sigma}
 {\context \synth{c}{A} }
-\\
 \end{equation*}
+\caption{Typing rules for looking up types.}
 \end{figure}
 #+end_export
+
 #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
-\inference[ANN ]{\context \check{M}{A} }
+\inference[ANN ]{\context \tycheck{M}{A} }
 {\context \synth{M : A}{A} }
-\\
-\inference[PI ]{\context \check{M}{A} & \contextcons{x : A} \synth{B}{\alpha} & \alpha \in \{ \mathbf{type}, \mathbf{type^c}, \mathbf{kind} \}  }
-{\context \synth{\Pi x : A. B}{\alpha} }
-\\
-\inference[PI-SIDE ]{\context \synth{S, A} & \synth{T, A} & \contextcons{x : A} \synth{B}{\mathbf{type}} }
-{\context \synth{\Pi x : {S T}. B}{\mathbf{type^c}} }
-\\
-\inference[TYPE-APP ]{\context \synth{A}{\Pi x : B. K} & \context \check{M}{B} }
-{\context \synth{A M}{\subst[M/x]K} }
-\\
-\inference[APP ]{ \context \synth{M}{\Pi x : A. B} & \context \check{N}{A} }
-{\context \synth{M N}{\subst[M/x]N} }
-\\
-\inference[APP-SC ]{ \context \synth{M}{\Pi x : A. B} & \context \check{N}{A} }
-{\context \synth{M N}{\subst[M/x]N} }
-\\
 \end{equation*}
+
+\begin{equation*}
+\inference[PI ]{\context \tycheck{A}{\mathbf{type}} & \contextcons{x : A} \synth{B}{\alpha} & \alpha \in \{ \mathbf{type}, \mathbf{type^c}, \mathbf{kind} \}  }
+{\context \synth{\Pi x : A. \ B}{\alpha} }
+\end{equation*}
+
+\begin{equation*}
+\inference[PI-SIDE ]{\context \synth{S}{A} & \synth{TODO}{A} & \contextcons{x : A} \synth{B}{\mathbf{type}} }
+{\context \synth{\Pi x : \{S \; T\}. \ B}{\mathbf{type^c}} }
+\end{equation*}
+
+\begin{equation*}
+\inference[TYPE-APP ]{\context \synth{A}{\Pi x : B. \ K} & \context \tycheck{M}{B} }
+{\context \synth{A M}{\subst{M}{x}{K}} }
+\end{equation*}
+
+\begin{equation*}
+\inference[APP ]{ \context \synth{M}{\Pi x : A. \ B} & \context \tycheck{N}{A} }
+{\context \synth{M N}{\subst{M}{x}{N}} }
+\end{equation*}
+
+\begin{equation*}
+\inference[APP-SC ]{ \context \synth{M}{\Pi x : \{S \; T\}. \ B} & \context \tycheck{N}{A} }
+{\context \synth{M N}{\subst{M}{x}{TODO}} }
+\end{equation*}
+
+\begin{equation*}
+\inference[LAMANN ]{\context \synth{A}{\mathbf{type}} & \contextcons{x : A} \synth{M}{B}  }
+{\context \synth{\lambda x : A. \ M}{\Pi x : A. \ B} }
+\end{equation*}
+
+\begin{equation*}
+\inference[LAM ]{\contextcons{x : A} \synth{M}{B}  }
+{\context \tycheck{\lambda x. \ M}{\Pi x : A. \ B} }
+\end{equation*}
+\caption{Bidirectional typing rules for LFSC}
 \end{figure}
 #+end_export
 
 For brevity we simply use \vdash instead of \vdash_\Sigma when its meaning is obvious.\footnote{what is the right word here?}
+#+begin_export latex
+\begin{figure}[h!]
+\begin{equation*}
+\inference[IFMARKED ]{\context \synth{S}{A} & \synth{T_1}{B} & \synth{T_2}{B}}
+{\context \synth{\mathbf{ifmarked} \; n \; S T_1 T_2}{B} }
+\end{equation*}
+\begin{equation*}
+\inference[MARKVAR ]{\context \synth{S}{A}}
+{\context \synth{\mathbf{markvar} \; n \; S}{A} }
+\end{equation*}
+\begin{equation*}
+\inference[Let ]{\context \synth{S}{A} & \contextcons{x: A} \synth{T}{B} }
+{\context \synth{\mathbf{let} \; x \; S \; T}{B} }
+\end{equation*}
+\begin{equation*}
+\inference[DO ]{\context \synth{S}{A} & \context \synth{T}{B} }
+{\context \synth{\mathbf{do} \; S \; T}{B} }
+\end{equation*}
+\caption{Typing rules for sideeffects}
+\end{figure}
+#+end_export
+#+begin_export latex
+\begin{figure}[h!]
+\begin{multline*}
+\inference[PROGAPP ]{ \context \synth{f}{\{x_1: A_1, \dots, x_1 : A : A_n \} . S} \\
+& \forall i \in \{ 1, \dots, n \}. (\context \tycheck{T_i}{A_i})\\
+& \contextcons{x_1 : A_1,\dots, x_n : A_n} \synth{S}{B} }
+{\context \synth{f (T_1, \dots, T_n)}{B}}
+\end{multline*}
+\begin{equation*}
+\inference[MATCH ]{\context \synth{S}{A} & \forall i \in \{ 1, \dots, n\}.(\context \synth{P_i}{A} & \contextcons{\mathbf{ctx}(P_i)} \synth{T_i}{B} ) }
+{\context \synth{\mathbf{match} \; S \; (P_1, T_1) \dots (P_n,T_n)}{B} }
+\end{equation*}
+\begin{equation*}
+\inference[IFEQ ]{\context \synth{S_1}{A} & \context \synth{S_2}{A} & \context \synth{T_1}{B} & \context \synth{T_2}{B} }
+{\context \synth{\mathbf{ifeq} \; S_1 \; S_2 \; T_1 \; T_2}{B} }
+\end{equation*}
+\begin{equation*}
+\inference[FAIL ]{\context \synth{A}{\mathbf{type}}}
+{\context \synth{\mathbf{fail} \; A}{A} }
+\end{equation*}
+\caption{Typing rules for compound sideconditions}
+\end{figure}
+#+end_export
+
+#+begin_export latex
+\begin{figure}[h!]
+\begin{equation*}
+\inference[INT ]{ }
+{\context \synth{n}{\mathbf{integer}}}
+\end{equation*}
+\begin{equation*}
+\inference[NEG ]{\context \synth{S}{\mathbf{integer}} }
+{\context \synth{- S}{\mathbf{integer}}}
+\end{equation*}
+\begin{equation*}
+\inference[Z-TO-Q ]{\context \synth{S}{\mathbf{integer}} }
+{\context \synth{\mathbf{ztoq} \; S}{\mathbf{rational}}}
+\end{equation*}
+\begin{equation*}
+\inference[BINOP ]{\context \synth{S}{\mathbf{integer}} & \synth{T}{\mathbf{integer}} }
+{\context \synth{S \oplus T}{\mathbf{integer}} }\oplus \in \{+, *, / \}
+\end{equation*}
+\begin{equation*}
+\inference[IFNEG ]{\context \synth{S}{\mathbf{integer}} & \context \synth{T}{A} & \context \synth{U}{A} }
+{\context \synth{\mathbf{ifneg} \; S \; T \; U}{A} }
+\end{equation*}
+\begin{equation*}
+\inference[IFZERO ]{\context \synth{S}{\mathbf{integer}} & \context \synth{T}{A} & \context \synth{U}{A} }
+{\context \synth{\mathbf{ifzero} \; S \; T \; U}{A} }
+\end{equation*}
+\caption{Typing rules for numerical sideconditions}
+\end{figure}
+#+end_export
+
+#+begin_export latex
+\begin{figure}[h!]
+\begin{equation*}
+\inference[CST-O ]{ }
+{ \judge{1}{c}{c}{1} }
+\qquad
+\inference[VAR-O ]{ }
+{ \judge{1}{x}{x}{1} }
+\qquad
+\inference[NUM-O ]{ }
+{ \judge{1}{r}{r}{1} }
+\end{equation*}
+
+\begin{equation*}
+\inference[CST-APP ]{ \forall i \in \{ 1, \dots, n\} . (\judge{i}{S_i}{S_i'}{i+1}) }
+{ \judge{1}{(c \; S_1 \dots S_n)}{(c \; S_1' \dots S_n')}{n+1} }
+\end{equation*}
+
+\begin{equation*}
+\inference[LET-O ]{ \judge{1}{S}{S'}{2} & \judge{2}{\subst{S'}{x}{T}}{T'}{3} }
+{ \judge{1}{(\mathbf{let}\; x \; S \; T)}{T'}{3} }
+\qquad
+\inference[DO-O ]{ \judge{1}{S}{S'}{2} & \judge{2}{T}{T'}{3} }
+{ \judge{1}{(\mathbf{do}\; S \; T)}{T'}{3} }
+\end{equation*}
+\begin{equation*}
+\inference[IFEQUAL-T ]{ \judge{1}{S_1}{S_1'}{2} & \judge{2}{S_2}{S_2'}{3} & S_1' \equiv_{\beta\eta} S_2' & \judge{3}{T_1}{T_2'}{4} }
+{ \judge{1}{(\mathbf{ifequal}\; S_1 \; S_2 \; T_1 \; T_2)}{T_2'}{4} }
+\end{equation*}
+\begin{equation*}
+\inference[IFEQUAL-F ]{ \judge{1}{S_1}{S_1'}{2} & \judge{2}{S_2}{S_2'}{3} & S_1' \not\equiv_{\beta\eta} S_2' & \judge{3}{T_1}{T_2'}{4} }
+{ \judge{1}{(\mathbf{ifequal}\; S_1 \; S_2 \; T_1 \; T_2)}{T_2'}{4} }
+\end{equation*}
+
+\begin{equation*}
+\inference[MATCH-O ]{
+\judge{1}{S}{(c \; S_1 \dots S_m)}{2}
+& \exists i. P_i = (c x_1 \dots x_m)
+& \judge{2}{\lbrack S_1'/x_1,\dots, S_m/x_1 \rbrack T_i}{T'}{3} }
+{ \judge{1}{(\mathbf{match} \; S \; (P_1 T_1) \dots (P_n T_n) )}{T'}{3} }
+\end{equation*}
+\begin{multline*}
+\inference[FUN-APP ]{
+\forall i \in \{ 1, \dots, n\}. (\Delta \vdash \judge{i}{S_i}{S_i'}{i+1})\\
+& (f (x_1 : A_1 \dots x_n : A_n) : B = T) \in \Delta
+& \Delta \vdash \judge{n+1}{\lbrack S_1'/x_1, \dots S_n'/x_n \rbrack T }{T'}{n+2}
+}
+{ \judge{1}{(f \; S_1 \dots S_n)}{T'}{n+2} }
+\end{multline*}
+
+\begin{equation*}
+\inference[BINOP-O ]{\judge{1}{S}{r_1}{2} & \judge{2}{T}{r_2}{3} & r = r_1 \oplus r_2 }
+{\judge{1}{S \oplus T}{r}{3} }\oplus \in \{+, *, / \}
+\end{equation*}
+
+\begin{equation*}
+\inference[NEG-O ]{\judge{1}{S}{r}{2} }
+{\judge{1}{- S}{r}{2} }
+\qquad
+\inference[ZTOQ-O ]{\judge{1}{S}{z}{2} & r = z/z }
+{\judge{1}{\mathbf{ztoq}\; S}{r}{2} }
+\end{equation*}
+
+\begin{equation*}
+\inference[IFNEG--T ]{ \judge{1}{S}{r}{2} &  r < 0 & \judge{2}{T}{T'}{3} }
+{ \judge{1}{(\mathbf{ifneg} \; S \; T \; U)}{T'}{3} }
+\qquad
+\inference[IFNEG--F ]{ \judge{1}{S}{r}{2} &  r \ge 0 & \judge{2}{U}{U'}{3} }
+{ \judge{1}{(\mathbf{ifneg} \; S \; T \; U)}{U'}{3} }
+\end{equation*}
+\begin{equation*}
+\inference[IFZERO--T ]{ \judge{1}{S}{r}{2} &  r = 0 & \judge{2}{T}{T'}{3} }
+{ \judge{1}{(\mathbf{ifzero} \; S \; T \; U)}{T'}{3} }
+\qquad
+\inference[IFZERO--F ]{ \judge{1}{S}{r}{2} &  r \ne 0 & \judge{2}{U}{U'}{3} }
+{ \judge{1}{(\mathbf{ifzero} \; S \; T \; U)}{U'}{3} }
+\end{equation*}
+
+\begin{equation*}
+\inference[IFMARKED--T ]{ \judge{1}{S}{x}{2} &  \sigma_2 x & \judge{2}{T}{T'}{3} }
+{ \judge{1}{(\mathbf{ifmarked} \; S \; T \; U)}{T'}{3} }
+\qquad
+\inference[IFMARKED--F ]{ \judge{1}{S}{x}{2} &  \neg \sigma_2 x & \judge{2}{U}{U'}{3} }
+{ \judge{1}{(\mathbf{ifmarked} \; S \; T \; U)}{U'}{3} }
+\end{equation*}
+\begin{equation*}
+\inference[MARKVAR-O ]{ \judge{1}{S}{x}{2} }
+{ \judge{1}{(\mathbf{markvar} \; S)}{x}{2}\lbrack x \mapsto \neg \sigma_2 x \rbrack }
+\end{equation*}
+\caption{Operational semantics for side conditions}
+\end{figure}
+#+end_export
+Errors are not included in the operational semantics. Errors might occur when *fail* is evaluated, a match does not match any pattern, if *markvar* or *ifmarked* does not evaluate to a variable, if division by 0 is reached or a free identifier is found.

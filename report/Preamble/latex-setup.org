@@ -54,10 +54,11 @@
 
 % macros
 #+LATEX_HEADER: \newcommand{\lra}[1]{\langle #1 \rangle}
-#+LATEX_HEADER: \newcommand{\check}[2]{#1 \Leftarrow #2}
+#+LATEX_HEADER: \newcommand{\tycheck}[2]{#1 \Leftarrow #2}
 #+LATEX_HEADER: \newcommand{\synth}[2]{#1 \Rightarrow #2}
 #+LATEX_HEADER: \newcommand{\contextcons}[1]{\Gamma,#1\vdash}
 #+LATEX_HEADER: \newcommand{\context}{\Gamma\vdash}
 #+LATEX_HEADER: \newcommand{\vdashs}{\vdash_\Sigma}
 #+LATEX_HEADER: \newcommand{\nilsig}{\langle\rangle}
 #+LATEX_HEADER: \newcommand{\subst}[3]{[#1/#2]#3}
+#+LATEX_HEADER: \newcommand{\judge}[4]{\sigma_{#1};#2 \downarrow #3;\sigma_{#4}}
