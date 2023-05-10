@@ -237,34 +237,6 @@ fn marks<'a>(p: &'a str) -> impl FnMut(&'a str) -> IResult<&'a str, u32> {
     }
 }
 
-
-    // Following needs be parenthesized
-    //
-    // SIDEEFFECTS-SC
-    // do A B... looks like it is nested
-    // mark var
-    // if marked
-
-    // Compound
-    // match
-    // if equal
-    // compare
-    // fail
-
-    // NUMERICS
-    // mpadd (SUM)
-    // mpmul (PROD)
-    // mpdiv (DIV)
-    // mpneg (NEG)
-    // mpztompq
-    // mpifneg
-    // mpifzero
-
-    // ~
-
-    // let binding
-    // application
-
 pub fn parse_num(it: &str) -> IResult<&str, Num> {
     let (rest, p) = lexeme(digit1)(it)?;
     match lexeme(preceded(tag("/"), digit1::<&str, VerboseError<&str>>))(rest) {
@@ -279,7 +251,7 @@ pub fn parse_num(it: &str) -> IResult<&str, Num> {
     }
 }
 
-
+// Helpers for composability
 fn closed(it: &str) -> IResult<&str, ()> {
     value((), lexeme(char(')')))(it)
 }

@@ -1,6 +1,5 @@
 * Introduction
 :PROPERTIES:
-:UNNUMBERED: nil
 :CUSTOM_ID: intro
 :END:
 

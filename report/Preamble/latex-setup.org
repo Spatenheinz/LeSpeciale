@@ -49,6 +49,10 @@
 #+LATEX_HEADER: \addbibresource{references.bib}
 % semantics
 #+LATEX_HEADER: \usepackage{semantic}
+% syntax
+#+LATEX_HEADER: \usepackage{syntax}
+#+LATEX_HEADER: \setlength{\grammarparsep}{8pt plus 1pt minus 1pt} % increase separation between rules
+#+LATEX_HEADER: \setlength{\grammarindent}{7em} % increase separation between LHS/RHS
 % checkmark
 #+LATEX_HEADER: \usepackage{ wasysym }
 

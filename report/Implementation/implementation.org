@@ -1,38 +1,377 @@
-* TODO [0/5] The in-kernel proof checker
-In this Section we provide a highlevel overview of the in-kernel proof checker.
-Followed by an indepth description of implementation for each subpart of the design.
+* The in-kernel proof checker
+# In this Section we provide a highlevel overview of the in-kernel proof checker.
+# Followed by an indepth description of implementation for each subpart of the design.
 
-** TODO Overall design
-We can split the actual design into multiple levels.
-Firstly we must consider the overall interaction between the code producer and the code consumer.
-In this interaction we will strive for doing as little work as possible inside the kernel.
-Specifically we want the following properties for an implementation:
+# ** TODO Overall design
+# We can split the actual design into multiple levels.
+# Firstly we must consider the overall interaction between the code producer and the code consumer.
+# In this interaction we will strive for doing as little work as possible inside the kernel.
+# Specifically we want the following properties for an implementation:
 
-1. The implementation should be correct and follow soundness of the LFSC typesystem.
-2. The implementation must be both memory and runtime efficient (comparative to the verifier).
-3. The implementation should be safe.
-4. The implementation should be simple in nature, to minimize the risk of bugs (WELL, NICE NOT NEED?)
+# 1. The implementation should be correct and follow soundness of the LFSC typesystem.
+# 2. The implementation must be both memory and runtime efficient (comparative to the verifier).
+# 3. The implementation should be safe.
+# 4. The implementation should be simple in nature, to minimize the risk of bugs (WELL, NICE NOT NEED?)
 
-Moving as much computation to user-space as possible will give the best chance of an implementation that
-will be competitive with the verifier whilst being less code heavy and proovably correct.
-Unsurprisingly, most of the work still needs to reside in the kernel,
+# Moving as much computation to user-space as possible will give the best chance of an implementation that
+# will be competitive with the verifier whilst being less code heavy and proovably correct.
+# Unsurprisingly, most of the work still needs to reside in the kernel,
 
-however if we require that the input must be using De Bruijn indices for bound variables we can
-eliminate a fraction of both memory from variable names when looking up variables.
-Furthermore we get equality for free, as it simply amounts to syntactical equality.
+# however if we require that the input must be using De Bruijn indices for bound variables we can
+# eliminate a fraction of both memory from variable names when looking up variables.
+# Furthermore we get equality for free, as it simply amounts to syntactical equality.
 
-By using Rust as implementation language, we can get a lot of the requirements for free.
-Although it does not guarantee the implementation to be safe in terms of malicious inputs,
-it will greatly decrease the risk of any memory leak.
+# By using Rust as implementation language, we can get a lot of the requirements for free.
+# Although it does not guarantee the implementation to be safe in terms of malicious inputs,
+# it will greatly decrease the risk of any memory leak.
 
-ALL OF THIS IS GARBAGE!!!
+# ALL OF THIS IS GARBAGE!!!
+In this section i present some implementation specific design decisions I have taken
+to reduce the amount of memory needed, the efficiency of the typechecking algorithm
+and some pure restrictions posed by the current status of Rust in the kernel.
+Duely note however than my current implementation does not actually run inside the kernel but rather
+is subject to experiments I have done along the way.
+
+The implementation uses normalization by evaluation with De Bruijn indices and explicit substitutions.
+
+*** De Bruijn Indicies
+The reason I have decided to use De Brujin indices is two-fold.
+First, using debrujin indices uses less memory than explicit naming,
+the improvement might be negliable but is there nonetheless and
+secondly, using De Bruijn indices allows for easier consideration of \alpha-equivalence between two terms, meaning that they have the same meaning, since \alpha-equivalence amounts to syntactical equivalence with De Bruijn indices.
+Consider the types:
+\( (\lambda x. \lambda y. x y) y\)
+then if we were to do direct substitution in
+\( \lbrack x/y \rbrack (\lambda y. x y) \)
+we would get
+\( \lambda y. y y \)
+which changes the meaning of the term.
+De Brujin indices instead swap each bound variable with a positive integer.
+The meaning of the integer $n$ is then constituted by the $n^th$ enclosing abstraction, \Pi or \lambda.
+This further reduce the need for a binding name.
+Specifically if we have the following
+\( \lambda x . \lambda y . \lambda y . x y \) and \( \lambda y . \lambda x . \lambda x . y x \)
+which are alpha-equivalent since they are the same function, but not syntactically identical.
+however in using De Bruijn notation we get:
+\( \lambda \lambda 2 0\) for both, since the outermost binder in the inner application is described by the outermost lambda, whilst the argument for the application is 0, since it is captured by the innermost abstraction.
+Hence we see that they are now syntactical equivalent and capture avoiding since
+\( (\lambda \lambda 1 0) y\) reduces to \( \lambda \lambda 1 y \).
+I will only consider De Bruijn notation for bound variables, this way we get around any capture avoiding complications.
+We could potentially also consider using De Bruijn indices for free variables, however this would complicate the code as this would require lifting binders.
+TODO: give an example.
+Although it could be interesting to consider De Bruijn levels since these are not relative to the scope.
+
+We also consider De Bruijn indices for other binders such as in the program definitions, for instance a program like:
+#+begin_src
+(function sc_arith_add_nary ((t1 term) (t2 term)) term
+  (a.+ t1 t2))
+#+end_src
+ will get converted into
+#+begin_src
+(function sc_arith_add_nary ((term) (term)) term
+  (a.+ 1 0))
+#+end_src
+We can similarly do the same for pattern matching, when a constructor is applied to multiple arguments.
+#+begin_src
+  (match t
+    ((apply t1 t2)
+      (let t12 (getarg f t1)
+        (ifequal t12 l tt (nary_ctn f t2 l))))
+    (default ff))
+#+end_src
+gets converted into:
+#+begin_src
+  (match t
+    ((apply 2)
+      (let (getarg f 1)
+        (ifequal 0 l tt (nary_ctn f 1 l))))
+    (default ff))
+#+end_src
+Notice here that the arguments ~t1~ and ~t2~ is substituted by a 2, we need to save the number of arguments to not lose the meaning of the constructor, as they must be fully applied. In the example we likewise eliminated the binder of the "let".
+
+*** Explicit substitutions
+We have already touched upon substitution, but another matter at which we shall consider it is the sheer cost of direct substitution. When doing direct substitution on terms we cause an explosion in size of the term and thus wastes memory and execution time because we have to copy the struct at each occurence.
+In the substitution $\( \subst{M}{x}{N} \) then if $M$ is large or if $x$ occurs many times in $N$ we can potentially generate
+a new term which are exponentially bigger than the two terms to begin with.
+Considering explicit substitution on the other hand allow us to not generate anything enecessarily large and keep the computation at a minimum.
+I consider a substitution which is lazy, meaning we use the result of a substititution when necessary and then proceed.
+TODO: example.
+I will not go into detail about how the abstract syntax and type system looks with explicit substitution.
+
+*** Normalization by evaluation
 
 
-** IDEA The Linux build system?
+** Reading and formatting proofs
+Section \ref{} describes the concrete syntax of LFSC, proofs generated by CVC5 will be in this format, however by the reasoning above we would prefer the format to be using De Bruijn indices.
+Therefore I propose a interface which is split in two. As presented in Figure \ref{}, we have a parser, converter and formatter pipeline in userspace and then we have a parser to get the correct form in kernel space.
+The parser in user space will parse the concrete syntax. The converter will then \alpha-convert the AST and lastly a converter can realize the converted ast.
+This convertion could be a pretty printer or a serializer into some specific format that can easily be deserialized.
+This structure gives more leeway in terms of structure.
+For instance the Kernel can be picky about arbitrary nested parenthesis making it less errorprone to stack overflows,
+(In reality, the current implementation is stack safe wrt. nested parenthesis).
+I have looked into using a zero copy serialization framework, however i have not found one that has been easily usable in the kernel.
 
-** TODO Reading proofs
+My first implementation was a handwritten lexer and recursive descent parser, however this implementation quickly got scrapped, when realizing how crates can be used in the Rust kernel development.
 
-** TODO Typechecking LFSC
+*** What restrictions is imposed by the Rust kernel?
+In the Rust kernel development framework not a lot of functionality is exposed.
+The crates immediately exposed in the kernel is ~alloc~, ~core~, ~kernel~, ~compiler_builtins~ and ~macros~.
+The ~macros~ crate is tiny and exposes the ability to easily describe a LKM meta-data.
+The ~compiler_builtins~ are a compiler built in functionality which usually resides in the standard library ~std~. The builtins supported in the kernel at the moment is nothing more than a way to handle panics (exceptions).
+The ~kernel~ crate exposes the kernel APIs, such as character devices, file descriptors etc.
+The functionality of this crate is mostly intended for use in LKMs, which for time being is the inteded use for Rust.
+Rust is not considered to be part of the core kernel, which need to communicate which each other but rather for "leafs" in the kernel hierachy.
+The ~alloc~ and ~core~ crates constitutes most of the ~std~ library in Rust and is respectively the implementation of a memory allocator and core functionality. The ~alloc~ and ~core~ crates are often
+in embedded system and others where the is no operating system or kernel to provide the functionality of the standard library.
+The ~core~ crate exposes basic functionality such as primitive types, references etc.
+The ~alloc~ crate exposes memory allocations and in userspace uses some exposure of malloc, while in kernel space may use either ~kmalloc~ or ~kvmalloc~ to allocate physical and virtual memory inside the kernel.
+In its current form the ~alloc~ crate does not provide much functionality.
+Only simple allocation types such as ~Box~ are exposed and their API is conservative.
+The reason behind is that the kernel "apparently" has no way to handle Out-Of-Memory cases.\footnote{What about the OOM killer?}
+Thus most datastructures are simply not allowed, because they dont expose a secure way to allocate memory. Whenever a new allocation need to happen a ~try_new()~ function can be called, which will return a ~Result~ type with either a reference or an error.
+The only modifiable datastructures available is ~Vec~, a dynamic array, this might take a toll on the performance. A discussion on the matter is presented in Section \ref{}.
+Furthermore the ~alloc~ crate is compiled with a ~no_rc~ feature meaning there is no way to use the reference counted pointers defined in Rust, because the maintainers of the Rust functionality in Linux have decided that it is unnecessary since the C part of the kernel
+already defines reference counting.
+To the best of my knowledge there is no clear exposure of this functionality however in any of the currently supported crates.
+It is however fairly easy to remove this restriction.
+
+It is possible to compile crates that support a ~no_std~ feature (it relies on ~alloc~ and ~core~) and that also does no memory allocations.
+From my investigation I have found the parser combinator library ~nom~ to be compilable in the kernel.
+I use this library for my parser.
 
 
-** TODO Plugging into the eBPF syscall
+** Abstract syntax in Rust
+Despite being similar to C and CPP in syntax, Rust provides a much richer typesystem that allow us to create enumerations which has fields aka Sum types.
+We might for instance define a construction for Identifiers as such:
+#+begin_src rust
+pub enum Ident<Id> {
+  Symbol(Id),
+  DBI(u32)
+}
+#+end_src
+
+An identifier can either be a Symbol if it is free or a De Bruijn index if it is bound.
+Terms are then defined almost identical to constructs described in \ref{}.
+The major difference comes from the way we represent binders.
+#+begin_src rust
+pub enum BinderKind {
+  Pi,
+  Lam,
+}
+pub enum Term<Id> {
+  Binder{ kind: BinderKind, var: Id,
+          ty: Option<Box<Type<Id>>>,
+          body: Box<Term<Id>> },
+  // rest of terms
+}
+#+end_src
+
+A binder is either a \Pi type or a \lambda abstraction, that abstract the var in the body.
+We use an option type as \lambda abstractions might contain an annotation but can have an annonymous type aswell.
+This structure is convenient in the frontend representation of the language as this allow for simpler \alpha-normalization.
+In the backend language we however, split this structure into seperate constructors of the ~AlphaTerm~ enum.
+
+#+begin_src rust
+pub enum AlphaTerm<Id> {
+    Number(Num),
+    Hole,
+    Ident(Ident<Id>),
+    Pi(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
+    Lam(Box<AlphaTerm<Id>>),
+    AnnLam(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
+    Asc(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
+    SC(AlphaTermSC<Id>, Box<AlphaTerm<Id>>),
+    App(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
+}
+#+end_src
+
+We define a similar structure for the rest of the language.
+We parameterize ~AlphaTerm~ by ~Id~ which is the data representation of symbols.
+In the specific implementation we consider a ~&str~, which is a reference to a fixed sized string.
+We use this type over a ~String~ type because it is more efficient and there is no need for a term to
+own the string.
+Having terms parameterized by the Identifer type allow for easily convertion to using De Bruijn levels instead of
+string identifiers.
+
+
+*** Parsing lFSC
+We use ~nom~ for parsing. ~nom~ is a parser combinator library that has evolved over the years from being mainly driven by macros
+to in version 7 using composable closures. It is mainly focused around parsing bytes and hereby also ~str~.
+The interfacing is a little confusing at times because there are many ways to call and compose parsers.
+I have settled for a structure that look mostly like the following:
+
+#+begin_src rust
+pub fn parse_file(it: &str) -> IResult<&str, Vec<StrCommand>> {
+    delimited(ws, many0(parse_command), eof)(it)
+}
+#+end_src
+That is, we have our input string, ~it~, which is parsed with a parser.
+We define the parser for a file by compostion. ~delimited~ takes 3 parsers, parse the first, the second and then the third and return the result of the second.
+This style is the one propsed from the ~nom~ maintainers\cite{nom combinators}.
+We can parse term binders as such:
+#+begin_src rust
+fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
+    alt((
+        map(
+            preceded(alt((reserved("let"),reserved("@"))),
+                          tuple((parse_ident, parse_term, parse_term))),
+            |(var, val, body)|  binder!(let var, val, body)
+        ),
+        map(
+            preceded(alt((reserved("pi"),reserved("!"))),
+                     tuple((parse_ident, parse_term, parse_term))),
+            |(var, ty, body)| binder!(pi, var : ty,  body),
+        ),
+        ...
+    ))(it)
+}
+#+end_src
+We parse the different aspects of a binder, indentifier, binding term and the bound term and the construct the appropriate binder.
+Notice here that /let x = M in N/ is syntactical sugar for \( (\lambda x. N) M \) and is not the same /let/ as in side conditions.
+We might be able to do some fancy combination of conditional compilation and macros to reuse this code,
+but for now we settle on the kernel parser being a copy of the userspace parser with identifier parsing removed in binders.
+
+*** Convertion from terms
+With front end language, we can pretty simply convert it the language into the backend language.
+We traverse the AST and uses an environment to update symbols appropriately.
+The lookup is simply a collection on names that need be substituted.
+The environment is simply a vector if ~&str~.
+When a new binder is found we push it to the end of a the vector. When we meet a symbol we can then look up if it should be converted into a binder.
+#+begin_src rust
+fn lookup_(vars: &[&str], var: &str) -> Option<u32> {
+    vars.iter().rev()
+               .position(|&x| x == var)
+               .map(|x| (x as u32))
+}
+#+end_src
+and specifically map the option as follow:
+#+begin_src rust
+pub(crate) trait Lookup<'a> {
+    fn lookup(vars: &[&'a str], var: &'a str) -> Self;
+}
+
+impl<'a> Lookup<'a> for StrAlphaTerm<'a> {
+    fn lookup(vars: &[&'a str], var: &'a str) -> Self {
+        lookup_(vars, var).map(|x| Ident(DBI(x)))
+                          .unwrap_or(Ident(Symbol(var)))
+    }
+}
+#+end_src
+
+One thing to note however is that this approach is errorprone.
+Consider the expression:
+\( \lambda x . ((\lambda y . x y) : (\lambda z. z)) \)
+then we push x to the ~vars~ environment, to update the body of the abstraction and then we have two branches of the ascription,
+the type and the term. When transforming the type, we push ~y~ to ~vars~, then we replace ~x~ with the index 1.
+Then we replace and ~y~ with 1.
+We then get to transforming the term of the ascription and because vectors are a mutable structure, when pushing z it will lie at vars[2].
+For a simple solution, I define a a function ~local~ inspired by the effectful function ~local~ of the Reader monad.
+
+#+begin_src rust
+fn local<'a, 'b, Input, Output>
+    (fun: impl Fn(Input, &mut Vec<&'a str>) -> Output + 'b,
+     vars: &'b mut Vec<&'a str>
+    ) -> Box<dyn FnMut(Input) -> Output + 'b>
+{
+    Box::new(move |term| {
+      let len = vars.len();
+      let aterm = fun(term, vars);
+      vars.truncate(len);
+      aterm
+    })
+}
+#+end_src
+We create a closure which takes in a term, the closure will call ~fun~ with the term and the environment as arguments and then it will truncate the environment to its size before ~fun~ was called.
+
+We can then use the function as such:
+#+begin_src rust
+  Term::Ascription { ty, val } => {
+      let mut alpha_local = local(alpha_normalize, vars);
+      let ty = alpha_local(*ty);
+      let val = alpha_local(*val);
+      Asc(Box::new(ty), Box::new(val))
+  },
+#+end_src
+
+Following these rules we simply convert the AST.
+
+*** Serialization
+To feed the transformed AST to the kernel we imagine a function that can convert this into a format the kernel can read.
+I have not focused on this part and thus have no implementation for it at the moment.
+Ideally we would want to serialize the data into a binary format that is easy to deserialize.
+I have spent some time looking into good libraries for this and formats such as Cap'n Proto or rkyv,
+however they are not implemented with ~no_std~ that support ~no_oom_handling~ and are thus not feasible without much further work.
+We could also introduce a specific binary format which could then be parsed using nom,
+which has decent support for zero copy, given the right circumstances.
+Again this would require a fairly deep knowledge of when zero copy is supported in Nom.
+The most simple solution would be to implement a pretty-printer.
+
+** Typechecking LFSC
+In this section i describe the implementation that corresponds to Section \ref{} through \ref{}.
+I present how the code is structured and why I have decided to do so.
+
+*** Values
+as mentioned, we consider typechecking using normalization by evaluation. To define what an evaluation look like we need another type.
+We define them as such:\footnote{Notice here that Z and Q should actually have unbounded integers as fields. I have not looked into a solution that is compatible with the kernel}
+#+begin_src rust
+pub enum Value<'a, T: Copy> {
+    Pi(RT<'a, T>, Closure<'a, T>),
+    Lam(Closure<'a, T>),
+    Box,
+    Star,
+    ZT,
+    Z(i32),
+    QT,
+    Q(i32, i32),
+    Neutral(RT<'a, T>, Rc<Neutral<'a, T>>),
+    Run(&'a AlphaTermSC<T>, RT<'a, T>),
+    Prog(Vec<RT<'a, T>>, &'a AlphaTermSC<T>),
+}
+#+end_src
+A value might be one of the abstractions in the term language, as these cannot be reduced further.
+It can be a \square or a \star where \star is /kind/ and \square is a sort classifying kinds.
+It can then be the value of a \mathcal{Z} or \mathcal{Q} or it can be the base types: \mathcal{Z} and \mathcal{Q}.
+Neutral expressions, consists of an RT which is the type describing it, and a the neutral expression it describe.
+The RT typesynonym is a reference counted pointer to a value.
+The reason we use reference counting is to reduce the overall memory needed.
+It allow us to only define a value once isntead of having to potentially cloning it again and again.
+This may not be immediately obvious for the simpler types, but for the complex values that contain closures which captures
+term this may get costly quickly.
+We use reference counter over compile time references because we dont immediately know the owner of a value and thus also not the lifetime of it. Considering that most of the functions I am gonna describe produces values, the value will be handed to the caller of the function, but in some cases the owner may be the environment or we would have to clone values from the context.
+Further because of the lifetime guarantee there is no way to create a value and return a reference to it.
+
+Values can then also be
+Or it can be a program
+or a run command.\footnote{would it make sense for programs and run commands to be neutral?, and should holes be neutral? they dont have an associated type.}
+
+Neutral types are:
+#+begin_src rust
+#[derive(Debug, Clone)]
+pub enum Neutral<'a, T: Copy>
+{
+    Var(T),
+    DBI(u32),
+    Hole(RefCell<Option<RT<'a, T>>>),
+    App(Rc<Neutral<'a, T>>, Normal<'a, T>),
+    // SC
+}
+
+#[derive(Debug, Clone)]
+pub struct Normal<'a, T: Copy>(pub Rc<Type<'a, T>>, pub Rc<Value<'a, T>>);
+#+end_src
+
+*** Contexts
+The context has been the most complicated part of this implementation.
+As described in \ref{} we consider two levels of environments.
+Signatures \Sigma are used for the global context while /Context/  \Gamma is used for the local context.
+They have a similar interface but internally works quite differently.
+A global context is defined as such:
+#+begin_src rust
+pub struct GlobalContext<'a, K: Copy> {
+    pub kind: RT<'a, K>,
+    keys: RefCell<Vec<K>>,
+    values: RefCell<Vec<TypeEntry<'a, K>>>,
+}
+#+end_src
+The kind field is simply meant to be a \square and is only place like this for ease of use.
+The kind then has a ~keys~ and a ~values~ field. These are vectors (although in the future should probably be either a hashmap or btree or the likes of that.), wrapped in a RefCell. A RefCell is a smart pointer that allows for interior mutability, this allows us to consider them as mutable even though they are not.

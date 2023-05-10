@@ -90,9 +90,7 @@ pub fn alpha_normalize<'a>(term: StrTerm<'a>,
             App(Box::new(f), Box::new(a))
         }
         Term::SC(x, y) => {
-            let mut alpha_local = local(alpha_normalize_sc, vars);
-            let x = alpha_local(x);
-            drop(alpha_local);
+            let x = local(alpha_normalize_sc, vars)(x);
             let y = local(alpha_normalize, vars)(*y);
             SC(x, Box::new(y))
         },
