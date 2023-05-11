@@ -20,10 +20,11 @@ fn main() {
         normalized.push(a);
     };
     println!();
-    let gctx = Rc::new(init_with_str());
+    // let gctx = Rc::new(init_with_str());
+    let mut gctx = init_with_str();
     // let gctx = init_with_str();
     for x in normalized.iter() {
-      if let Err(x) =  handle_command(x, gctx.clone()) {
+      if let Err(x) =  handle_command(x, &mut gctx) {
           println!("Error: {:?}", x);
           return
       }

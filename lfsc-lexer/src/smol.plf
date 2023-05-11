@@ -87,6 +87,14 @@
                     (! l term
                     (! r (^ (sc_resolution c1 c2 pol l) c) (holds c))))))))))
 
+(function nary_extract ((f term) (t term) (n mpz)) term
+  (match t
+    ((apply t1 t2)
+      (mp_ifzero n
+        (getarg f t1)
+        (nary_extract f t2 (mp_add n (mp_neg 1))))))
+)
+
 (declare f_and term)
 (define and (# t1 term (# t2 term (apply (apply f_and t1) t2))))
 

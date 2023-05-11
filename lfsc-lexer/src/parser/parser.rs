@@ -70,7 +70,7 @@ pub fn parse_hole(it : &str) -> IResult<&str, Term<&str>> {
 }
 
 const KEYWORDS: [&str; 25] = ["let", "pi", "lam", "do", "match",
-                             "mpz_add", "mpz_mul", "mpz_div", "mpz_neg",
+                             "mp_add", "mp_mul", "mp_div", "mp_neg",
                              "mpz_to_mpq", "mp_ifzero", "mp_ifneg",
                              "markvar", "ifmarked", "default", "fail",
                              "run", "define", "declare", "check", "function",
@@ -188,13 +188,13 @@ fn parse_pat(it : &str) -> IResult<&str, Pattern<&str>> {
 
 fn parse_numeric(it : &str) -> IResult<&str, NumericSC<TermSC<&str>>> {
     let f = alt((
-        map(preceded(reserved("mpz_add"),
+        map(preceded(reserved("mp_add"),
                  bin_op), |(x,y)| NumericSC::Sum(x,y)),
-        map(preceded(reserved("mpz_mul"),
+        map(preceded(reserved("mp_mul"),
                  bin_op), |(x,y)| NumericSC::Prod(x,y)),
-        map(preceded(reserved("mpz_div"),
+        map(preceded(reserved("mp_div"),
                  bin_op), |(x,y)| NumericSC::Div(x,y)),
-        map(preceded(alt((reserved("mpz_neg"),reserved("~"))),
+        map(preceded(alt((reserved("mp_neg"),reserved("~"))),
                  parse_sc), NumericSC::Neg),
         map(preceded(reserved("mpz_to_mpq"),
                  parse_sc), NumericSC::ZtoQ),

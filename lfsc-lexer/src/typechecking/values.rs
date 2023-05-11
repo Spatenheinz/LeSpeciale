@@ -4,49 +4,49 @@ use std::cell::RefCell;
 
 use lfsc_syntax::ast::{AlphaTerm, AlphaTermSC, Ident, BuiltIn};
 
-use super::{EnvWrapper, context::LocalContext};
+use super::{EnvWrapper, context::{LocalContext, GlobalContext}};
 
-pub type Closure<'a,T> =
-    Box<dyn Fn(RT<'a, T>, &EnvWrapper<'a, T>) -> ResRT<'a, T> + 'a>;
+pub type Closure<'term, T> =
+    Box<dyn Fn(RT<'term, T>, &GlobalContext<'term, T>, u32) -> ResRT<'term, T> + 'term>;
 
 pub fn const_closure<T>(cons: RT<T>) -> Closure<T>
 where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 {
-    Box::new(move |_, _| { Ok(cons.clone()) })
+    Box::new(move |_,_,_| { Ok(cons.clone()) })
 }
 
-pub fn mk_closure<'a, T>(body: &'a AlphaTerm<T>,
-                         lctx: super::context::Rlctx<'a, T>,
-                        ) -> Closure<'a, T>
+pub fn mk_closure<'term, T>(body: &'term AlphaTerm<T>,
+                         lctx: super::context::Rlctx<'term, T>,
+                        ) -> Closure<'term, T>
 where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 {
-    Box::new(move |v, env|{
+    Box::new(move |v, gctx, allow_dbi|{
              let lctx = LocalContext::insert(v, lctx.clone());
-             let env = EnvWrapper::new(lctx, env.gctx.clone(), env.allow_dbi);
+             let env = EnvWrapper::new(lctx, gctx, allow_dbi);
              env.eval(body)})
 }
 
 pub type TResult<T, K> = Result<T, TypecheckingErrors<K>>;
-pub type Type<'a, T> = Value<'a, T>;
-pub type RT<'a, T> = Rc<Type<'a, T>>;
-pub type ResRT<'a, T> = TResult<RT<'a, T>, T>;
+pub type Type<'term, T> = Value<'term, T>;
+pub type RT<'term, T> = Rc<Type<'term, T>>;
+pub type ResRT<'term, T> = TResult<RT<'term, T>, T>;
 
 // #[derive(Clone)]
-pub enum Value<'a, T: Copy> {
-    Pi(RT<'a, T>, Closure<'a, T>),
-    Lam(Closure<'a, T>),
+pub enum Value<'term, T: Copy> {
+    Pi(RT<'term, T>, Closure<'term, T>),
+    Lam(Closure<'term, T>),
     Box, // Universe
     Star,
     ZT,
     Z(i32), // TODO: should in fact be unbounded
     QT,
     Q(i32, i32), // TODO: should in fact be unbounded
-    Neutral(RT<'a, T>, Rc<Neutral<'a, T>>),
-    Run(&'a AlphaTermSC<T>, RT<'a, T>),
-    Prog(Vec<RT<'a, T>>, &'a AlphaTermSC<T>),
+    Neutral(RT<'term, T>, Rc<Neutral<'term, T>>),
+    Run(&'term AlphaTermSC<T>, RT<'term, T>),
+    Prog(Vec<RT<'term, T>>, &'term AlphaTermSC<T>),
 }
 
-// fn unfold<'a, T>(f: &Closure<'a, T>) -> RT<'a, T>
+// fn unfold<'term, T>(f: &Closure<'term, T>) -> RT<'term, T>
 // where T: Copy + fmt::Debug + BuiltIn + PartialEq
 // {
 //     let v = mk_neutral_var_with_type(Type::Box.into());
@@ -75,7 +75,7 @@ pub enum Value<'a, T: Copy> {
 
 
 
-impl<'a, T: Copy + fmt::Debug> fmt::Debug for Value<'a, T> {
+impl<'term, T: Copy + fmt::Debug> fmt::Debug for Value<'term, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Value::Pi(a, _) => write!(f, "∏ {:?}", a),
@@ -93,7 +93,7 @@ impl<'a, T: Copy + fmt::Debug> fmt::Debug for Value<'a, T> {
     }
 }
 
-impl<'a, T: Copy> PartialEq for Value<'a, T> {
+impl<'term, T: Copy> PartialEq for Value<'term, T> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -103,12 +103,25 @@ impl<'a, T: Copy> PartialEq for Value<'a, T> {
             (Value::Box, Value::Box) => true,
             (Value::Star, Value::Star) => true,
             (Value::ZT, Value::ZT) => true,
-            (Value::Z(i), Value::Z(j)) => i == j,
             (Value::QT, Value::QT) => true,
+            (Value::Z(i), Value::Z(j)) => i == j,
             (Value::Q(i, j), Value::Q(k, l)) => i == k && j == l,
             // (Value::Neutral(a, n), Value::Neutral(b, m)) => a == b && n == m,
             // (Value::Run(_, t), Value::Run(_, u)) => t == u,
             _ => false,
+        }
+    }
+    fn ne(&self, other: &Self) -> bool {
+        println!("wtf");
+        match (self, other) {
+            (Value::Box, Value::Box) => false,
+            (Value::Star, Value::Star) => false,
+            (Value::ZT, Value::ZT) => false,
+            (Value::QT, Value::QT) => false,
+            (Value::Z(i), Value::Z(j)) => i != j,
+            (Value::Q(i, j), Value::Q(k, l)) => i == k && j == l,
+            // TODO: extremely dangerous
+            _ => true,
         }
     }
 }
@@ -182,10 +195,6 @@ pub fn is_neutral<T>(v: &Value<T>) -> bool
 where T: Copy
 {
     matches!(v, Value::Neutral(_, _))
-    // matches! v {
-    //     Value::Neutral(_, _) => true,
-    //     _ => false,
-    // }
 }
 
 #[derive(Debug)]
@@ -230,14 +239,14 @@ where T: Copy
 
 
 #[derive(Debug, Clone)]
-pub enum Neutral<'a, T: Copy>
+pub enum Neutral<'term, T: Copy>
 {
     Var(T),
     DBI(u32),
-    Hole(RefCell<Option<RT<'a, T>>>),
-    App(Rc<Neutral<'a, T>>, Normal<'a, T>),
+    Hole(RefCell<Option<RT<'term, T>>>),
+    App(Rc<Neutral<'term, T>>, Normal<'term, T>),
     // SC
 }
 
 #[derive(Debug, Clone)]
-pub struct Normal<'a, T: Copy>(pub Rc<Type<'a, T>>, pub Rc<Value<'a, T>>);
+pub struct Normal<'term, T: Copy>(pub Rc<Type<'term, T>>, pub Rc<Value<'term, T>>);

@@ -1,0 +1,18 @@
+* Logical Framework with Side Conditions
+LFSC is a extention of the Edinbourgh Logical Framework (LF)\cite{} and is a predicative typed lambda calculus with dependent types. This allow proof systems to be encoded as signatures, which amounts to a set of typing declarations. LFSC extends LF by including sideconditions. In this context sideconditions is a operational semantic which might be evaluated during typechecking.
+I will in the following section describe the calculus and its typing along with the operational semantic of sideconditions.
+
+** Abstract Syntax
+#+include: syntax.org
+
+** Signatures and Contexts
+#+include: signatures.org
+
+** Typing
+#+include: typing.org
+
+*** Operational Semantics of Sideconditions
+#+include: operational_sem.org
+
+** Concrete Syntax
+#+include: grammar.org

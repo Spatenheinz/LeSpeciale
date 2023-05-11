@@ -1,0 +1,37 @@
+** Concrete syntax of LFSC
+In this section I present the concrete syntax of LFSC.
+#+begin_export latex
+\begin{grammar}
+<commands> ::= ('('<command> ')')*
+
+<command> ::= 'declare' <ident> <type>
+\alt define <ident> <term>
+\alt check <term>
+\alt program <args> <type> <sidecondition>
+\alt function <args> <type> <sidecondition>
+\alt run <sidecondition>
+
+<term> ::= <literals>
+\alt '(' <compound_term> ')'
+
+<literals> ::= <integer>
+\alt <rational>
+\alt <ident>
+\alt <_>
+
+<compound_term> ::= '@' <ident> <term> <term>
+\alt ('!' | 'forall') <ident> <type> <term>
+\alt ':' <type> <term>
+\alt '#' <ident> <type> <term>
+\alt ('\' | 'lam') <ident> <term>
+\alt '^' <sidecondition> <sidecondition>
+\alt '(' <term> ')'
+
+<sidecondition> ::= <literals>
+\alt '(' compound_sidecondition ')'
+\alt '(' numeric ')'
+\alt '(' sideeffect ')'
+\alt '(' 'let' <ident> <sidecondition> <sidecondition> ')'
+
+\end{grammar}
+#+end_export

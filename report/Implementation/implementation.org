@@ -94,9 +94,11 @@ We have already touched upon substitution, but another matter at which we shall 
 In the substitution $\( \subst{M}{x}{N} \) then if $M$ is large or if $x$ occurs many times in $N$ we can potentially generate
 a new term which are exponentially bigger than the two terms to begin with.
 Considering explicit substitution on the other hand allow us to not generate anything enecessarily large and keep the computation at a minimum.
-I consider a substitution which is lazy, meaning we use the result of a substititution when necessary and then proceed.
+I consider a substitution which is lazy, meaning we use the result of a substititution, by lookup, when necessary and then proceed.
+Specifically we use closures which close a \Gamma
 TODO: example.
-I will not go into detail about how the abstract syntax and type system looks with explicit substitution.
+I will not go into detail about how the abstract syntax and type system looks with explicit substitution, as there is no significant difference
+with having constructs for explicit substitution as presented in \ref{} as opposed to storing it in \Gamma.
 
 *** Normalization by evaluation
 
@@ -329,7 +331,8 @@ pub enum Value<'a, T: Copy> {
 }
 #+end_src
 A value might be one of the abstractions in the term language, as these cannot be reduced further.
-It can be a \square or a \star where \star is /kind/ and \square is a sort classifying kinds.
+It can be a \square or a \star where \star is /kind/ and \square is a sort classifying kinds, these specifically correspond to *kind* and *type*.
+Notice that we dont consider a *type^c* as it by construction will never clash with *type*
 It can then be the value of a \mathcal{Z} or \mathcal{Q} or it can be the base types: \mathcal{Z} and \mathcal{Q}.
 Neutral expressions, consists of an RT which is the type describing it, and a the neutral expression it describe.
 The RT typesynonym is a reference counted pointer to a value.
@@ -338,7 +341,28 @@ It allow us to only define a value once isntead of having to potentially cloning
 This may not be immediately obvious for the simpler types, but for the complex values that contain closures which captures
 term this may get costly quickly.
 We use reference counter over compile time references because we dont immediately know the owner of a value and thus also not the lifetime of it. Considering that most of the functions I am gonna describe produces values, the value will be handed to the caller of the function, but in some cases the owner may be the environment or we would have to clone values from the context.
-Further because of the lifetime guarantee there is no way to create a value and return a reference to it.
+Further because of the lifetime guarantee there is no way to create a value and return a reference to it. Although we cant fully utilize the borrowing system, reference counting in Rust makes for lot cleaner code. The reference counted smartpointer looks as follows:
+
+#+begin_src rust
+pub struct Rc<T: ?Sized> {
+    ptr: NonNull<RcBox<T>>,
+    phantom: PhantomData<RcBox<T>>,
+}
+#+end_src
+An Rc is nothing more than a struct, which contains a pointer to the inner value that is referenced, along with a phantom field.
+The fanthom field is merely there to keep strong static typing in a similar way to a phantom type in Haskell.
+The ptr in this struct points to the following struct:
+#+begin_src rust
+#[repr(C)]
+struct RcBox<T: ?Sized> {
+    strong: Cell<usize>,
+    weak: Cell<usize>,
+    value: T,
+}
+#+end_src
+Which contains the values and the counts for strong and week reference counts. Whenever the Rc is then cloned we simply take the RcBox inside of Rc and increment the pointer, and construct a new Rc struct. The ease of use then comes from the drop trait which will either decrement the inner RcBox and drop the Rc or it will drop both if the strong count is 0.
+Hence, allowing us to only specify when we want a new reference, but dont need to decrement or drop manually.
+
 
 Values can then also be
 Or it can be a program
@@ -367,11 +391,119 @@ Signatures \Sigma are used for the global context while /Context/  \Gamma is use
 They have a similar interface but internally works quite differently.
 A global context is defined as such:
 #+begin_src rust
-pub struct GlobalContext<'a, K: Copy> {
-    pub kind: RT<'a, K>,
-    keys: RefCell<Vec<K>>,
-    values: RefCell<Vec<TypeEntry<'a, K>>>,
+pub struct GlobalContext<'term, K: Copy> {
+    pub kind: RT<'term, K>,
+    keys: Vec<K>,
+    values: Vec<TypeEntry<'term, K>>,
 }
 #+end_src
 The kind field is simply meant to be a \square and is only place like this for ease of use.
-The kind then has a ~keys~ and a ~values~ field. These are vectors (although in the future should probably be either a hashmap or btree or the likes of that.), wrapped in a RefCell. A RefCell is a smart pointer that allows for interior mutability, this allows us to consider them as mutable even though they are not.
+The kind then has a ~keys~ and a ~values~ field.
+These are vectors (although in the future should probably be either a hashmap or btree or the likes of that) and does not
+cause too muche trouble with the borrow-checker, since the global environment is passed around as a shared reference in all but one function, ~handle_command~ which will typecheck and command and add the results to the vector, as explained pr \ref{}.
+
+The global context will only ever get updated in toplevel commands,
+thus we also dont have to think about truncation or anything of the likes.
+It is therefore also safe to mutate the interior of the struct as no shared borrow will occur at the same time as a exclusive borrow.
+The shared borrows are limited to looking up a values and the mutable references are limited to inserting a new value.
+Both the global and the local context contain typeentries of the following form:
+#+begin_src rust
+pub enum TypeEntry<'a, Key: Copy> {
+    Def { ty: RT<'a, Key>, val: RT<'a, Key> },
+    IsA { ty: RT<'a, Key>, marks: RefCell<u32> },
+}
+#+end_src
+Notice here that this does not directly correspond to our definition in \ref{}, since values can represent both types and kinds, we would only really need ~IsA~ and then appropriately ensure that kinds are only defined in the toplevel.
+The ~Def~ constructor is used for definitions such that we can express \( c = M : A \) in the signatures and hereby stating that /c/ is a term /M/ with type /A/. This is purely useful when considering evaluation.
+Thus the global context exposes the following functions:
+#+begin_src rust
+pub fn insert(&self, key: K, ty: RT<'a, K>)
+pub fn define(&self, name: K, ty: RT<'a, K>, val: RT<'a, K>)
+pub fn get_value(&self, key: &K) -> ResRT<'a, K>
+pub fn get_type(&self, key: &K) -> ResRT<'a, K>
+#+end_src
+If one tries to get the value of a IsA type, they get a neutral expression consisting of the stored type ~ty~ and a neutral symbol.
+
+The local context exposes a much similar interface although it is not possible to define a term inside the term language itself and thus no such function can exist. The datastructure of the local context however is a linked list rather than a vector.
+We want to be able to truncate for similar reason described previously by pushing values in the \alpha convertion, but we cannot simply truncate a vector. \footnote{I think this is wrong and it might be a better solution. However the tailcall in the could potentially make this faster with linked list? Although do we even need to truncate.}
+
+Most functions we use such as ~eval~, ~infer~ etc, needs to have access to both \Sigma and \Gamma and thus for simplicity we define the following state.
+
+#+begin_src rust
+struct EnvWrapper<'global, 'term, T: Copy> {
+    pub lctx: Rlctx<'term, T>,
+    pub gctx: Rgctx<'global, 'term, T>,
+    pub allow_dbi: u32,
+}
+#+end_src
+The Rlctx is a typesynonym for a reference counted \Gamma. Whereas Rgctx is a standard reference to \Sigma.
+The allow_dbi field is used to ensure that function not considered programs must only be regular arrow types and not dependent types.
+We define a wrapper for the common interface and instatiate a new ~EnvWrapper~ in ~handle_command~.
+
+*** Commands
+We define a single function to handle a specific command and then apply this on an iterator of all commands.
+The function starts by constructing the environment wrapper, with the current \Sigma and an empty \Gamma.
+- Declarations first check that the symbol we want to bind \(\alpha \notin dom(\Sigma)\)
+and then infers the type to make sure \(\alpha : K\) or \(\alpha : A\).
+We then evaluate the expression and insert it, as an ~IsA~.
+- Definitions is similar, however we forbid kindlevel definitions.
+- Checks is nothing more than infering the type to check for welltypedness.
+- Programs are complicated for multiple reasons.
+  Firstly we check that the return type of a program is a type, either built in or a declared inductive datatype.
+  We then check each argument against the empty \Gamma and add them to a \Gamma' which will be used for checking the body.
+  Because we have an environment wrapper defined we must drop it, before we can mutably borrow it to add define a program,
+  before we can check the body. We must do it in this specific order, as programs may be recursive and thus we need access
+  to the type of the program before we check the body.
+  #+begin_src rust
+let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx, 0);
+    ... other cases ...
+    Command::Prog { cache: _chache, id, args, ty, body } => {
+      ... typesignature check ...
+      let lctx = tmp_env.lctx.clone();
+      drop(tmp_env); // drop before we can push
+      let typ = Rc::new(Value::Prog(args_ty.clone(), body));
+      gctx.define(id, res_ty.clone(), typ);
+
+      let env = EnvWrapper::new(lctx, gctx, 0); // make new
+      let body_ty = env.infer_sc(body)?;
+      ... sameness check }
+  #+end_src
+  We then lastly check that the body has the same type as the return value.
+  Notice further that we must create a ~Prog~ type instead of a ~Pi~ type as we cannot construct a ~&AlphaTerm~.
+  This has the neat sideeffect that we dont have to check for ~Pi~ types that actually describe programs when checking terms.
+
+*** Inferring types.
+We define an ~infer~ function for each of the constructs in the language,
+The functions are implemented as inherent implementations (concretely associated functions) and has the types:
+#+begin_src rust
+impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
+where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
+{
+    pub fn infer(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T>
+    pub fn infer_sc(&self, sc: &'ctx AlphaTermSC<T>) -> ResRT<'ctx, T> {
+    fn infer_sideeffect(&self, sc: &'ctx AlphaSideEffectSC<T>) -> ResRT<'ctx, T>
+    fn infer_compound(&self, sc: &'ctx AlphaCompoundSC<T>) -> ResRT<'ctx, T>
+    fn infer_num(&self, sc: &'ctx AlphaNumericSC<T>) -> ResRT<'ctx, T>
+}
+#+end_src
+We here define that the typeparameter ~T~ describes the symbols and must implement the traits ~PartialEq~,
+which is used in the context to lookup a symbol.
+It must also be copy. We uses this stricter trait than clone, as it allows for quick "copying" and is a satisfied criteria for both &str and u32's that could be used for De Bruijn levels.
+And lastly it must implement the BuiltIn trait\footnote{The debug trait is not strictly necessary (but is indeed nice for debugging)}. The BuiltIn trait defines how the builtin types *type*, *mpz* and *mpq* is defined.
+For &str this is simply a stringification of the literals, for u32 prepresented De bruijn indices these may be 0,1,2.
+
+The functions follow closely the rules in \ref{}.
+For instance it will be a typechecking error if a sideconditions (in terms) are tried, unless the sidecondition is nested in a \Pi or if we try to infer the type of an annonymous typed lambda.
+*** Checking types
+We only define a single function for typechecking. It takes a term and a value/type \tau' and check against it.
+We match on term and if it an annonymous lambda then we check follow rule: LAM of Figure ref{}, otherwise
+we infer the type of the term to \tau and convert \tau and \tau to their canonical form using reification as decribed in \ref{} and check for equality.
+
+*** Reification
+TODO: read and explain before I look at the code so i am sure it works correctly.
+
+*** evaluation
+We define evaluation on two levels, both on terms and on the functional sidecondition language.
+Evaluation of the term language... TODO.
+
+Evaluation of the sideconditions follow the operational sematics. TODO..

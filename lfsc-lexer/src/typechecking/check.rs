@@ -1,32 +1,19 @@
-use lfsc_syntax::ast::{AlphaTerm, BuiltIn, AlphaTermSC};
-use lfsc_syntax::ast::AlphaTerm::*;
+use lfsc_syntax::ast::{AlphaTerm, BuiltIn};
 use super::EnvWrapper;
-use super::values::{Value, TResult, RT, Neutral, TypecheckingErrors};
+use super::values::{Value, TResult, RT, TypecheckingErrors, mk_neutral_var_with_type};
 
-use std::rc::Rc;
 use std::borrow::Borrow;
 
-// #[macro_export]
-// macro_rules! check {
-//     ($node:tt, $term:ident, $tau:ident) => {
-//             let t = self.infer_$node($term)?;
-//             self.convert(t, $tau.clone(), self.gctx.kind.clone())
-//     }
-// };
-
-impl<'ctx, T> EnvWrapper<'ctx, T>
+impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
 where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 {
-    pub fn check(&self,
-                 term: &'ctx AlphaTerm<T>,
-                 tau: RT<'ctx, T>) -> TResult<(), T>
+    pub fn check(&self, term: &'ctx AlphaTerm<T>, tau: RT<'ctx, T>) -> TResult<(), T>
     {
         match term {
             AlphaTerm::Lam(body) => {
                 if let Value::Pi(a,b) = tau.borrow() {
-                    let val = b(Rc::new(Value::Neutral(a.clone(),
-                                        Rc::new(Neutral::DBI(0)))),
-                                self)?;
+                    let val = b(mk_neutral_var_with_type(a.clone()),
+                                self.gctx, self.allow_dbi)?;
                     let env = self.update_local(val.clone());
                     return env.check(body, val)
                 }
@@ -36,7 +23,6 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             _ => {
                 let t = self.infer(term)?;
                 println!("term: {:?} -- type in check: {:?} must be {:?}", term, t, tau);
-                // self.convert(t, tau, Rc::new(Value::Star))
                 self.convert(t, tau, self.gctx.kind.clone())
             }
         }

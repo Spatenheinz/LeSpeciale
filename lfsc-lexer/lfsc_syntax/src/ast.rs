@@ -101,6 +101,7 @@ pub enum NumericSC<SC> {
     ZBranch { n: SC, tbranch: SC, fbranch: SC },
     NegBranch { n: SC, tbranch: SC, fbranch: SC },
 }
+pub type AlphaNumericSC<Id> = NumericSC<AlphaTermSC<Id>>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Pattern<Id> {
@@ -126,12 +127,17 @@ pub enum CompoundSC<Term, SC, Pattern> {
     Fail(Term),
 }
 
+pub type AlphaCompoundSC<Id> = CompoundSC<AlphaTerm<Id>,
+                                          AlphaTermSC<Id>,
+                                          AlphaPattern<Id>>;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum SideEffectSC<SC> {
     IfMarked { n: u32, c: SC, tbranch: SC, fbranch: SC },
     MarkVar(u32, SC), // can only be a variable however, can be both explicit and DBI
     Do(SC, SC),
 }
+pub type AlphaSideEffectSC<Id> = SideEffectSC<AlphaTermSC<Id>>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TermSC<Id> {

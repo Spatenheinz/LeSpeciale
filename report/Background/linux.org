@@ -1,0 +1,15 @@
+
+** TODO Linux
+#+include: kernel.org
+
+** TODO eBPF
+#+include: ebpf.org
+
+** TODO Proof Carrying Code
+#+include: pcc.org
+
+** TODO Rust - In the kernel?
+#+include: rust.org
+
+** TODO Curry Howard Isomorphism
+#+include: curryhoward.org

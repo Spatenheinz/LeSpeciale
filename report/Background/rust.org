@@ -1,0 +1,69 @@
+Rust is a modern systems programming language that was first introduced in 2010.
+It was designed to address common issues faced by developers in writing low-level, high-performance code, such as memory safety and thread safety.
+
+One of the key features of Rust is its ownership model, which ensures that memory is managed efficiently and safely.
+Rust's ownership model is based on the concept of ownership and borrowing, which allows the compiler to track the lifetime of objects and manage memory
+without the need for a garbage collector.
+This ensures that common issues like null pointer dereferences, use-after-free errors and buffer overflows can occur,
+while at the same time being comparable to C in performance.
+
+Rust's syntax is similar to that of C and C++, but it also includes modern language features like pattern matching, closures, and iterators.
+Rust also has a strong focus on performance and optimization, which makes it an ideal language for building high-performance applications and systems.
+
+The borrow checker is a form of static analysis which ensures that a program complies with the ownership rules. The rules are 3 fold.
+- Each value has an owner.
+- There can only be one owner for each value.
+- When the owner goes out of scope, its values are freed (dropped in Rust terminology).
+
+if we for instance consider:
+
+#+begin_src rust
+fn main() {
+let x : i32 = 42;
+}
+#+end_src
+
+then the value of 42 has an owner ~x~. When the ~main()~ function ends then the owner ~x~ goes out of scope and the value is dropped.
+This specific type of ~x~ is ~i32~ and will thus reside on the stack, however if we needed something that was heap allocated then we could create a value like:
+#+begin_src rust
+fn main() {
+let y : Box<i32> = Box::new(42);
+}
+#+end_src
+then ~y~ will be a ~Box~ type, which is the simplest form of heap allocation.
+a call to ~drop~ will be performed.
+There are then 3 ways in which ownership can be transfered by either ~move~, ~copy~ or ~clone~.
+For primitive types (those that usually reside on the stack) can be copied from one variable to another,
+while the heap allocated values can be either ~cloned~, which essentially works as a ~mempy~ or by moving it,
+this means that the snippet below will get a compile time error at line 6, because the variable that owns
+the box containing 42 is no longer owned by y.
+#+begin_src rust
+fn main() {
+let y : Box<i32> = Box::new(42);
+let z = y.clone();
+assert_eq!(y, z);
+let a = y;
+assert_eq!(y, z);
+}
+#+end_src
+However cloning can be pretty inefficient and should most often be avoided, however Rust allows borrowing of values.
+Borrowing literally describes the action of receiving something with the promise of return.
+When borrowing a value the memory address of the value is referenced, by an & and is essentially just a pointer.
+It is however worth noting that a reference cannot be ~NULL~ and thus by mere construction eliminates ~NULL~ pointer problems.
+There are two types of references, exclusive and shared references.
+Exclusive references can mutate the borrowed value, while a shared reference may only read the reference.
+There are 3 rules that borrowing is subject to:
+- There can exist a single exclusive reference or multiple shared references at a given time
+- References must always be valid, which mean it is impossible the borrow a value after its owner has gone out of scope.
+- A value cannot be modified whilst referenced.
+These rules invariantly ensure that a reference is always as it seems to the borrower.
+If multiple mutable borrows were allowed at the same time or even at the same time as a shared reference, then
+one of the mutable borrows may destroy the reference for the others.
+An example where this is extremely obvious is when we consider a reference to a datastructure that might need to be reallocated,
+such as dynamic arrays. In such a situation the address of the old array will no longer be valid.
+This is also ensured by rule 3.
+This is what constitutes the basics of the Rust programming language and this different memory model has made
+Rust gain popularity in recent years, especially in the systems programming community, due to its combination of performance, safety, and ease-of-use.
+This popularity also includes the Linux Development community, where safety, security and reliability is mission critical.
+As of kernel 6.1 Rust is officially supported in the kernel (albeit fairly limited as described throughout this report).
+Because of these promises I wanted to see if Rust would be a suitable language to use for an in kernel proof checker

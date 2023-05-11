@@ -8,11 +8,9 @@ use super::values::mk_neutral_var_with_type;
 use super::{values::{RT, Normal, Value, Type, Neutral, TypecheckingErrors, TResult},
 };
 
-use super::nbe::do_app;
-
 use super::EnvWrapper;
 
-impl<'ctx, T> EnvWrapper<'ctx, T>
+impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
 where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
 {
     pub fn readback_normal(&self, normal: Normal<'ctx, T>)
@@ -33,8 +31,8 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
             Type::Pi(dom, ran) => {
                 let env = self.update_local(dom.clone());
                 let var = mk_neutral_var_with_type(dom.clone());
-                let ran_ = ran(var.clone(), self)?;
-                let app = do_app(val, var, self)?;
+                let ran_ = ran(var.clone(), self.gctx, self.allow_dbi)?;
+                let app = self.do_app(val, var)?;
                 Ok(abinder!(lam, env.readback(ran_, app)?))
             }
             Type::Box => {
@@ -44,7 +42,7 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                         let dom = self.readback(ty.clone(), at.clone())?;
                         let env = self.update_local(at.clone());
                         let cls_res = bt(mk_neutral_var_with_type(at.clone()),
-                                         self)?;
+                                         self.gctx, self.allow_dbi)?;
                         let ran = env.readback(ty.clone(), cls_res)?;
                         Ok(abinder!(pi, dom, ran))
                     },

@@ -1,0 +1,110 @@
+The Linux kernel's ability to extend the kernel through Loadable Kernel Modules (LKMs) has been a useful feature. However, LKMs have inherent security risks and require root privileges, limiting their use to trusted users. A malicious LKM can destroy a kernel completely, especially considering that kernel modules may be proprietary. This creates a tradeoff between extensionality and trust, with LKMs providing little security.
+
+BPF (Berkeley Package Filter) as it was originally presented is a system for effective filtering of network packages by allowing dynamically loaded package filters from userspace into the network stack in kernel space.
+the extended Berkeley Packet Filter (eBPF) was later introduced in the Linux kernel, offering a different approach to kernel extension.
+The eBPF virtual machine leverages the privileges of the kernel to oversee the entire system, enabling more powerful control. It is a just-in-time (JIT) compiled RISC instruction set running inside the kernel and it seeks to be secure by performing static analysis of the very limited language, which is desgined to not be turing complete.
+
+The eBPF program loading process involves obtaining a program using an abstraction tool such as BCC or libbpf or writing the program by hand. The verifier then performs static analysis in the form of abstract interpretation using tristate numbers and cycle detection. The verifier checks criteria such as division by zero, no backward jumps (i.e., loops), and more. If the program is allowed by the verifier, it is JIT-compiled, making eBPF programs as fast as native code.
+
+eBPF programs are event-driven, meaning they can be attached to a certain hook, and every time an event occurs, the program is triggered. For example, a program can be attached to a socket, and every time something is written to this socket, the program is triggered. Although an eBPF program lives in kernel space, it conceptually resides somewhere between user and kernel space. It can interact with both kernel and user space through two ways.
+
+First, eBPF programs cannot call kernel functions directly as eBPF is designed to be kernel version agnostic (in reality, this is not always the case, due to the verifier). Instead, the eBPF subsystem provides a stable API of helper functions to provide functionality not immediately accessible in the limited instruction set. Second, the subsystem provides a collection of key-value stores called maps in a variety of different data structures such as ring buffers, arrays, etc. These data structures also reside in kernel space and are constructed through the bpf syscall, allowing eBPF programs to read and write to a map. Users can also read and write to the maps using the bpf syscall.
+
+
+# As mentioned the Linux kernel allow arbitrary extending the kernel thorugh Loadable Kernel Modules (LKMs),
+# so what even is the point of eBPF?
+# The two main reasons for this is that LKMs requires both root priveledge and are unsafe by nature.
+# The unsafety comes from the fact that a kernel modules like any other kernel code has ring 0 permission meaning very little security is provided and thus a malicious LKM can destroy a kernel completely.
+# This becomes especially apparent when considering that kernel modules might be proprietary.
+# Once again we reach a dilemma of extensionality vs trust.
+# LKM in general has no reason to provide any safety measures because of the priveledge requirements,
+# but this blindness to trust in the user (superuser in this case) can be detremental to a system.\footnote{is this to aggressive and dark?} eBPF takes a different approach.
+
+# BPF (Berkeley Package Filter), as it was originally presented,
+# eBPF leverages the priveledges of the kernel to oversee the entire systems and thus allows for more powerful
+# control.
+# eBPF is a virtual machine that JIT-compiles a RISC instruction set (also called eBPF..), running inside the kernel.
+# eBPF programs are event-driven and must be attached to a hook to be executed. The exact process is as follows:
+# 1. A user optains a eBPF program, either using an abstraction tool such as BCC, libbpf etc. or if none of these tool provide the intend can write the concrete program by hand.
+# 2. the program can be loaded using the bpf syscall. The verifier will perform static analysis in the form of abstract interpretation using tristate numbers ~tnums~ cycle detection etc. Later in this section we go through exactly what the verifier does, but it will check certain criteria such as division by 0, no backwards jumps(i.e. loops) etc.
+# 3. If the program is allowed by the verifier it is JIT-compiled making eBPF programs as fast as native code.
+# 4. Programs can then be attached to a certain hook and every time an event occurs the program is triggered.
+#    An instance of this could be a socket, and every time something is written to this socket the program is triggered.
+# 5. Allthough an eBPF program lives in kernel space, it conceptually lives somewhere in between user and kernel space. But it has two way to interact with both kernel and user space.
+#    - Unlike LKMs eBPF programs cannot call kernel functions directly as eBPF is designed to be kernel version agnostic (in reality this is not really the case, because of the verifier),
+#      but the eBPF subsystem also provides a stable API of helper functions to provide functionality not immediately accessible in the limited instruction set.
+#    - The subsystem also provides a collection of key-values stores called maps, in a variety of different datastructures such as ring buffers, arrays, etc. These datastructures also live in kernel space and are constructed through the bpf syscall, eBPF programs can then read and write to a map. Likewise users can read and write to the maps using the ~bpf~ syscall.
+
+# Figure \ref{} shows the process of loading the ebpf program, whilst Figure \ref{} shows the interaction with maps.
+
+** The eBPF verifier
+This section serves as a mapping of the eBPF verifier. The purpose of this is to serve as a basis for further discussion on why using a Proof Carrying Code approach to eBPF.
+The mapping is quite verbose and may not be of interest if one has a general understanding of how the verifier works.
+
+*** The bpf syscall
+All interaction between user and kernel regarding eBPF related matter uses the bpf syscall\footnote{bpf() has syscall number 321} and has the following signature:
+
+#+begin_src c
+asmlinkage long sys_bpf(int cmd, union bpf_attr *attr, unsigned int size);
+#+end_src
+
+Argument ~cmd~ is an integer that defines the intended interaction, for the purpose of this report we only care about the cmd ~BPF_PROG_LOAD~. To be able to load a eBPF one of the following criteria must be met:
+either a program/user must be root or be bpf capable, or the kernel.unprivileged_bpf_disabled kernel parameter must be set to 0, meaning regular users are capable of loading programs. This features has been disabled on many modern Linux distributions for security reasons, such as redhat, ubuntu and suse.\cite{}
+
+the ~attr~ argument is a union of structures that must be correspond to the argument type.
+For program loading this stuct notably contains the type of program to load, which could be socket programs, kernel probes, Express Data Path etc.
+The syscall will call the appropriate cmd after some sanity checks, such as wellformedness of the ~bpf_attr~ union.
+
+*** ~bfp_prog_load~
+The ~bpf_prog_load~ will do a lot of checks related to capabilities and kernel configurations.
+These configurations includes memory alignment of the system etc.
+The specifics is irrelevant but it suggests that when designing a new BPF structure
+such checks should be considered.\footnote{An interesting sidenode is that eBPF programs must be between 1 and 1M instructions depending on user capabilities.}
+For instance, we might consider a static design where only users with network capabilities might load network related eBPF or we could consider a dynamic structure where capabilities are also included in the
+security policy.
+
+The program is then prepared for the verifier.\footnote{should I specify what is going on here?}
+
+*** Static analysis ~bpf_check~
+The ~bpf_check~ is what we usually denotes as the verifier. It will perform the static analysis.
+Firstly the checking environment is setup. This is a large struct and thus is allocated and deallocated attached at each call to ~bpf_check~ and is thus also too large to see here but can be seen in appendix \ref{}.
+a. Firstly subprograms and kernel functions\footnote{why does ebpf.io say no kernel functions?} are added to the instructions of the ebpf program.
+b. Afterwards the function ~check_subprogs~ is called, where some very basic testing is done, such as subprograms not being allowed to jump outside of its own address space. Control flow is here limited to subprogram and loops is in general not allowed. The last instruction must be either an exit or a jump to another subprogram.
+c. Next ~bpf_check~ will check the control flow graph to detect loops in the code.
+d. all the subprograms are then check according to their BPF TypeFormat (BTF), and the code is checked in a similar manner to the main program according to the abstract interpretation.
+
+The following is a simplification of\cite{}.
+A program must follow these requirements:
+e. Registers may not be read unless they have previously been written. This is to ensure no kernel memory can be leaked.
+f. Registers can either be scalars or pointers. after calls to kernel functions or when a subprogram ends, registers r1-r5 is forgotten and can then not be read before written. r6-r9 is callee saved and thus still available.
+g. Reading and writing may only be done by registers marked by ~ptr_to_ctx~, ~ptr_to_stack~ or ~ptr_to_map~.
+   These are bound and alignment checked.
+- stack space, for same reason as registers, may not be read before it has been written.
+- external calls are checked at entry to make sure the registers are appropriate wrt. to the external function.
+
+To keep track of this the verifier will do abstract interpretation. the verification process tracks
+minimum and maximum values in both the signed and unsigned domain.
+It furthermore use ~tnums~ which is a pair of a mask and a value.
+The mask tracks bits that are unknown.
+Set bits in the value are known to be 1.
+The program is then traversed and updated modulo the instructions.
+For instance if register ~r2~ is a scalar and known to be in the range between ~(0,IMAX)~ then after abstractly interpreting a conditional jump ~r2 > 42~ the current state is split in two and the state where the condition is taken now have an updated range of ~42 <= r2<= IMAX~ etc.
+Pointers are handled in a similar manner however since pointer arithmetic is inherently dangerous modifying a pointer is very limited in eBPF.
+Additionally pointers may be interpreted as different types of pointers and are check wrt. the program type they occur in. For instance...
+TBD...
+
+If all these requirements are met, then an eBPF program is loaded.
+This mapping ofcause is simplified a lot, but it shows that the current process of checking a valid
+eBPF program is not a simple task and thus a potential overhaul could be welcomming.
+The entire verification process (except for a few structs) is placed in ~kernel/bpf/verifier.c~ which at the time of writing is roughly 19000 lines of code, and these have in the past shown to errorprone.
+
+** eBPF and PCC
+From the description of PCC in \ref{} and the description of the eBPF subsystem above, it is straightforward to see responsibility differences.
+We can compare the two pipelines as follows:
+
+1. *Compilation and Cetification*: For PCC the untrusted program is both compiled and a certificate
+   for safety policy compliance is generated. eBPF does not really "do" anything at this stage as source code is passed directly to the kernel using the syscall.
+2. *Verification of certificate*: In PCC the consumer will check the validity of the certification wrt. the safety policy and the source program (possibly in native format), while eBPF will have to do a similar check but directly on the eBPF program. As mentioned the current eBPF verifier uses a abstract interpretation model with a tristate number domain, which is roughly equivalent in complexity.\footnote{is this even true? LOOK at verifier source code.}
+3. In both structures, once a certificate is checked the program is free to use possibly many times.
+
+So why would we want to swap out the current structure vs eBPF?

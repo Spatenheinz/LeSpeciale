@@ -1,5 +1,5 @@
-use lfsc_syntax::ast::{AlphaTerm, Num, BuiltIn, AlphaTermSC, NumericSC,
-                       CompoundSC, SideEffectSC, AlphaPattern};
+use lfsc_syntax::ast::{AlphaTerm, Num, BuiltIn, AlphaTermSC, AlphaNumericSC,
+                       AlphaCompoundSC, AlphaSideEffectSC, AlphaPattern};
 use lfsc_syntax::ast::AlphaTerm::*;
 use lfsc_syntax::ast::NumericSC::*;
 use lfsc_syntax::ast::CompoundSC::*;
@@ -7,13 +7,13 @@ use lfsc_syntax::ast::SideEffectSC::*;
 use crate::typechecking::values::const_closure;
 
 use super::EnvWrapper;
-use super::values::{TypecheckingErrors, ResRT, Type, mk_closure, RT, TResult};
+use super::values::{TypecheckingErrors, ResRT, Type, RT, TResult};
 
 use std::rc::Rc;
 use std::borrow::Borrow;
 
 
-impl<'ctx, T> EnvWrapper<'ctx, T>
+impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
 where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 {
     pub fn infer(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
@@ -54,7 +54,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                     } else {
                         println!("checking {:?} against {:?}, with {:?}", n, a, f_ty);
                         self.check(n, a.clone())?;
-                        return b(self.eval(n)?, self)
+                        return b(self.eval(n)?, self.gctx, self.allow_dbi)
                     }
                 };
                 Err(TypecheckingErrors::NotPi)
@@ -123,7 +123,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                      // 2. We dont allow x in the
                     env.allow_dbi += 1;
                      // hacky way to force evaluation
-                    f_ty = b(env.gctx.kind.clone(), &env)?;
+                    f_ty = b(env.gctx.kind.clone(), env.gctx, env.allow_dbi)?;
                  } else {
                     return Err(TypecheckingErrors::NotPi);
                  }
@@ -136,8 +136,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    fn infer_sideeffect(&self,
-                        sc: &'ctx SideEffectSC<AlphaTermSC<T>>) -> ResRT<'ctx, T>
+    fn infer_sideeffect(&self, sc: &'ctx AlphaSideEffectSC<T>) -> ResRT<'ctx, T>
     {
         match sc {
             Do(a, b) => {
@@ -158,9 +157,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    fn infer_compound(&self,
-                      sc: &'ctx CompoundSC<AlphaTerm<T>, AlphaTermSC<T>, AlphaPattern<T>>
-                     ) -> ResRT<'ctx, T>
+    fn infer_compound(&self, sc: &'ctx AlphaCompoundSC<T>) -> ResRT<'ctx, T>
     {
         match sc {
             Fail(x) => { self.infer_as_type(x)?; Ok(self.eval(x)?) },
@@ -174,6 +171,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                 Ok(tbranch_ty)
             }
             Match(scrut, cases) => {
+                println!("match: {:?}", cases);
                 let scrut_ty = self.infer_sc(scrut)?;
                 let mut t_ty : Option<RT<_>> = None;
                 for i in cases.iter() {
@@ -183,6 +181,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                     if let Some(p_ty) = pat_ty {
                         env.same(p_ty, scrut_ty.clone())?;
                     };
+                    println!("BOEFORE:\n\n");
                     let cur_ty = local_env.infer_sc(t)?;
                     env.same(cur_ty.clone(), scrut_ty.clone())?;
                     if t_ty.is_none() {
@@ -220,13 +219,13 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
     fn force_pi(&self, ty: RT<'ctx, T>) -> TResult<(RT<'ctx, T>, Self), T> {
         if let Type::Pi(dom, ran) = ty.borrow() {
             println!("dom: {:?}\n\n", dom);
-            Ok((ran(dom.clone(), self)?, self.update_local(dom.clone())))
+            Ok((ran(dom.clone(), self.gctx, self.allow_dbi)?, self.update_local(dom.clone())))
         } else {
             Err(TypecheckingErrors::NotPi)
         }
     }
 
-    fn infer_num(&self, sc: &'ctx NumericSC<AlphaTermSC<T>>) -> ResRT<'ctx, T>
+    fn infer_num(&self, sc: &'ctx AlphaNumericSC<T>) -> ResRT<'ctx, T>
         where T: Clone + PartialEq + std::fmt::Debug + BuiltIn
     {
         match sc {
@@ -234,7 +233,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                 let x_ty = self.infer_sc(x)?;
                 let y_ty = self.infer_sc(y)?;
                 let x_bor = x_ty.borrow();
-                if Type::ZT != *x_bor || Type::QT != *x_bor {
+                if Type::ZT != *x_bor && Type::QT != *x_bor {
                     return Err(TypecheckingErrors::ExpectedNum)
                 };
                 if *x_bor != *y_ty.borrow() {
@@ -245,7 +244,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             Neg(x) => {
                 let x_ty = self.infer_sc(x)?;
                 let x_bor = x_ty.borrow();
-                if Type::ZT != *x_bor || Type::QT != *x_bor {
+                if Type::ZT != *x_bor && Type::QT != *x_bor {
                     return Err(TypecheckingErrors::ExpectedNum)
                 };
                 Ok(x_ty)
@@ -259,16 +258,17 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             },
             ZBranch { n, tbranch, fbranch }
             | NegBranch { n, tbranch, fbranch } => {
+                println!("n: {:?}\n\n", n);
                 let n_ty = self.infer_sc(n)?;
+                println!("n_ty: {:?}\n\n", n_ty);
                 let n_ty = n_ty.borrow();
-                if Type::ZT != *n_ty || Type::QT != *n_ty {
+                if Type::ZT != *n_ty && Type::QT != *n_ty {
+                // if Type::ZT != *n_ty || Type::QT != *n_ty {
                     return Err(TypecheckingErrors::ExpectedNum)
                 };
                 let tbranch_ty = self.infer_sc(tbranch)?;
                 let fbranch_ty = self.infer_sc(fbranch)?;
-                if tbranch_ty != fbranch_ty {
-                    return Err(TypecheckingErrors::ExpectedSameInBranch)
-                };
+                self.same(tbranch_ty.clone(), fbranch_ty)?;
                 Ok(tbranch_ty)
             }
         }

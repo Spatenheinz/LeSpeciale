@@ -1,0 +1,21 @@
+Proof Carrying Code (PCC) is a mechanism designed to ensure the safe execution of programs from untrusted sources.
+
+The PCC architecture can be divided into two spaces, namely the code producer and the code consumer.
+
+The code producer aims to execute some code at the expense of the code consumer.
+In case there is not perfect trust between code consumer and code producer,
+the code consumer must protect itself from potentially malicious or unsafe programs.
+To achieve this, the code consumer issues a collection of safety rules, referred to as the safety policy,
+which the code producer must adhere to.
+Depending on the specific domain, the safety policy could include constraints such as no out-of-bounds memory operations and termination of loops and the likes that might require programs to not corrupt the consumer.
+The code producer then uses the safety policy to certify the program in a compilation stage of the untrusted code.
+The certification process produces both the native code to be executed at the consumer and the certificate for the safety of the native code.
+This process can potentially be computationally heavy,
+and it is preferable for the code producer to perform the certification and compilation.
+
+The next stage is the verification phase, where the producer hands over the results of the certification process to the consumer.
+The consumer then checks the validity of the proof in two ways.
+First, the safety proof must be valid modulo the safety policies,
+and second, the safety proof must correspond to the native code.
+This process should be quick and follow an algorithm trusted by the consumer.
+If both criteria are met, the consumer can mark the native code as safe and proceed to execute the program, possibly multiple times.

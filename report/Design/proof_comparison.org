@@ -1,0 +1,34 @@
+As mentioned in section\ref{} the code producer must hand over code in the appropriate format,
+as well as the certificate, so we must consider an appropriate format for the certificate.
+The process of checking the certificate should also be both fast and simple.
+I consider a PCC architecture which uses Verification condition generation on the eBPF
+most likely by using a derivation of Hoare Logic, since this propose an automatic way of
+generating formulas, which describes programs.\footnote{should i go more indepth with this?}
+The process of proving the validity of such a verification condition however is not a simple task
+and is, dependending on the logic,  undecidable.
+We will therefore require the code consumer to rely on the process of making this proof and then present
+the proof to the kernel.
+Checking the satisfiability of a formula can be done by a Satisfiability Modulo Theories (SMT) solver.
+In many SMT solvers it is possible to extract a proof that a certain formula is satisfiable.
+I have in this work considered two output formats/languages, Alethe and Logical Framework with Side Conditions (LFSC),
+supported by the CVC5 SMT solver.
+I will briefly describe why I have chosen to use the LFSC language over Alethe.
+Both formats follow the LISP family of languages and is therefore simple to parse.
+Alethe is designed to be easily readable by humans and is strutured as a box style proof.\footnote{example?}
+This is not a property necessary for a PCC architecture where we want to automate the entire process.
+By this construction the Alethe format provides a set of basic inference rules of which there are 91\cite{}
+on which proofs are built, for instance rule 20 denotes reflexivity often denoted as ~refl~ which describes syntactical
+equality between two terms modulo renaming of bound variables.
+This entails that an implementation must implement all rules necessary for a security policy and will thne not be easily extended
+in the future. LFSC on the otherhand is a metaframework that exploits the Curry-Howard isomorphism, explained in \ref{}.
+This metaframework allows for the security policy to be established by signatures, which can easily be extended.
+This is very much a property of interest, as eBPF might evolve to support new datastructures etc.
+Furthermore this approach can move bugs out of the in kernel certifier and into the specification.
+This will enable system administrators to quickly deploy fixes for a bug, by not allowing specific faulty signatures.
+It is hard to consider both time and memory used of the two languages, without actually implementing both of them.
+But if we consider the amount of code require for the two formats then there exists a rust implementation for an Alethe proof checker, called carcara\cite{}.
+This implementation is ~13500 lines of code, and this specific implementation does not even support all theories present in CVC5, such as bitvectors.
+LFSC has a proof checker written in C++ and its code is merely 5000 lines, while the signatures may be arbitrarily large.
+The solution I present is ~3000 lines.
+CVC5 provides some signatures constituting <1500 lines.
+Hence LFSC seems like a better choice for an in kernel proof checker.

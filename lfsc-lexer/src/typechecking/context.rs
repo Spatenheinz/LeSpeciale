@@ -7,33 +7,36 @@ use std::cell::RefCell;
 #[derive(Debug)]
 pub struct LookupErr {err: String}
 
-pub type Rlctx<'a, T> = Rc<LocalContext<'a, T>>;
+pub type Rlctx<'term, T> = Rc<LocalContext<'term, T>>;
 
 // pub type RGCTX<'a, T> = Rc<GlobalContext<'a, T>>;
-pub type Rgctx<'a, T> = Rc<GlobalContext<'a, T>>;
+// pub type Rgctx<'a, T> = Rc<GlobalContext<'a, T>>;
+pub type Rgctx<'own, 'term, T> = &'own GlobalContext<'term, T>;
 
 #[derive(Debug)]
-pub struct GlobalContext<'a, K: Copy> {
-    pub kind: RT<'a, K>,
-    keys: RefCell<Vec<K>>,
-    values: RefCell<Vec<TypeEntry<'a, K>>>,
+pub struct GlobalContext<'term, K: Copy> {
+    pub kind: RT<'term, K>,
+    keys: Vec<K>,
+    values: Vec<TypeEntry<'term, K>>,
 }
+// pub struct GlobalContext<'term, K: Copy> {
+//     pub kind: RT<'term, K>,
+//     keys: RefCell<Vec<K>>,
+//     values: RefCell<Vec<TypeEntry<'term, K>>>,
+// }
 
 #[derive(Debug)]
-#[cfg(feature = "conslist")]
 pub enum LocalContext<'a, K: Copy> {
     Nil,
     Cons(TypeEntry<'a, K>, Rlctx<'a, K>),
 }
 
-// pub fn init_with_str<'a>() -> Rc<GlobalContext<'a, &'a str>> {
 pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
-    let ctx = GlobalContext::new();
+    let mut ctx = GlobalContext::new();
     ctx.define("type", Rc::new(Type::Box),  Rc::new(Type::Star));
     ctx.define("mpz",  Rc::new(Type::Star), Rc::new(Type::ZT));
     ctx.define("mpq",  Rc::new(Type::Star), Rc::new(Type::QT));
     ctx
-    // Rc::new(ctx)
 }
 
 
@@ -101,23 +104,25 @@ where K: PartialEq + std::fmt::Debug + Copy
     pub fn new() -> Self {
         Self {
             kind: Rc::new(Value::Box),
-            keys: RefCell::new(Vec::new()),
-            values: RefCell::new(Vec::new()),
+            // keys: RefCell::new(Vec::new()),
+            // values: RefCell::new(Vec::new()),
+            keys: Vec::new(),
+            values: Vec::new(),
         }
     }
 
     pub fn contains(&self, key: &K) -> bool {
-        self.keys.borrow().contains(key)
+        self.keys.contains(key)
     }
 
-    pub fn insert(&self, key: K, ty: RT<'a, K>) {
-       self.keys.borrow_mut().push(key);
-       self.values.borrow_mut().push(TypeEntry::IsA { ty, marks: RefCell::new(0)})
+    pub fn insert(&mut self, key: K, ty: RT<'a, K>) {
+       self.keys.push(key);
+       self.values.push(TypeEntry::IsA { ty, marks: RefCell::new(0)})
     }
 
-    pub fn define(&self, name: K, ty: RT<'a, K>, val: RT<'a, K>) {
-     self.keys.borrow_mut().push(name);
-      self.values.borrow_mut().push(TypeEntry::Def { ty, val })
+    pub fn define(&mut self, name: K, ty: RT<'a, K>, val: RT<'a, K>) {
+      self.keys.push(name);
+      self.values.push(TypeEntry::Def { ty, val })
     }
 
     // fn get(&self, key: &K) -> LResult<&TypeEntry<'a, K>, K>
@@ -136,10 +141,9 @@ where K: PartialEq + std::fmt::Debug + Copy
     pub fn get_value(&self, key: &K) -> ResRT<'a, K>
     where K: std::fmt::Debug {
         self.keys
-            .borrow()
             .iter()
             .rev()
-            .zip(self.values.borrow().iter().rev())
+            .zip(self.values.iter().rev())
             .find(|(&n, _)| n == *key)
             .map(|(_, v)| from_entry_to_value(v, Ident::Symbol(*key)))
             .ok_or(lookup_err(Ident::Symbol(key)))
@@ -148,10 +152,9 @@ where K: PartialEq + std::fmt::Debug + Copy
     pub fn get_type(&self, key: &K) -> ResRT<'a, K>
     where K: std::fmt::Debug {
         self.keys
-            .borrow()
             .iter()
             .rev()
-            .zip(self.values.borrow().iter().rev())
+            .zip(self.values.iter().rev())
             .find(|(&n, _)| n == *key)
             .map(|(_, v)| from_entry_to_type(v))
             .ok_or(lookup_err(Ident::Symbol(key)))

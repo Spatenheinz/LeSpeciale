@@ -7,7 +7,7 @@ use lfsc_syntax::ast::AlphaTerm::*;
 use std::rc::Rc;
 use std::borrow::Borrow;
 
-impl<'ctx, T> EnvWrapper<'ctx, T>
+impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
 where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
 {
     pub fn eval(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T>
@@ -31,7 +31,7 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                 App(fun, arg) => {
                     let e1 = self.eval(fun)?;
                     let e2 = self.eval(arg)?;
-                    do_app(e1, e2, self)
+                    self.do_app(e1, e2)
                 },
                 Pi(ty, body) => {
                     let dom = self.eval(ty)?;
@@ -46,24 +46,22 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                 SC(..) => panic!("eval SC"),
             }
     }
+
+    pub fn do_app(&self, f: RT<'ctx, T>, arg: RT<'ctx, T>) -> ResRT<'ctx, T>
+    {
+    match f.borrow() {
+        Value::Lam(closure) => closure(arg, self.gctx, self.allow_dbi),
+        Value::Neutral(f, neu) => {
+            if let Value::Pi(dom, ran) = f.borrow() {
+                Ok(Rc::new(Value::Neutral(
+                    ran(arg.clone(), self.gctx, self.allow_dbi)?,
+                    Rc::new(Neutral::App(neu.clone(), Normal(dom.clone(), arg))))))
+            } else {
+                todo!("This should be an error")
+            }
+        }
+        _ => todo!("This should be an error"),
+    }
+    }
 }
 
-pub fn do_app<'ctx, T>(func: RT<'ctx, T>,
-                       arg: RT<'ctx, T>,
-                       env: &EnvWrapper<'ctx, T>) -> ResRT<'ctx, T>
-where T: PartialEq + std::fmt::Debug + Copy
-{
-   match func.borrow() {
-       Value::Lam(closure) => closure(arg, env),
-       Value::Neutral(f, neu) => {
-           if let Value::Pi(dom, ran) = f.borrow() {
-               Ok(Rc::new(Value::Neutral(
-                   ran(arg.clone(), env)?,
-                   Rc::new(Neutral::App(neu.clone(), Normal(dom.clone(), arg))))))
-           } else {
-               todo!("This should be an error")
-           }
-       }
-       _ => todo!("This should be an error"),
-   }
-}

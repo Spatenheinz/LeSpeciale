@@ -1,0 +1,7 @@
+ The Linux kernel is a monolithic kernel that provides not only the fundamental services necessary for a fully functioning operating system, but also a virtual interface for communication with hardware, including filesystems, network stacks, and device drivers, among others. This interface is accessed through system calls, which serve as a standard means of communication between user space and kernel space.
+It is worth noting that although communication between the two spaces is primarily carried out through system calls, there exists an additional layer of abstraction in the form of communication through the filesystem.
+
+Despite its monolithic architecture, the Linux kernel is characterized by its modular nature, allowing for the dynamic loading of kernel modules that can provide extended functionality and support for a diverse range of services. These modules function similarly to filesystems in their execution and can be loaded and unloaded as necessary.
+
+In the following sections \ref{}-\ref{} we will describe what and why of ebpf and discuss the different ways to realize the PCC architecture for the eBPF subsystem.
+

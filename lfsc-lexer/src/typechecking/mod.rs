@@ -1,5 +1,5 @@
-pub mod check;
 pub mod context;
+mod check;
 mod values;
 mod nbe;
 mod readback;
@@ -12,31 +12,31 @@ use std::{rc::Rc, borrow::Borrow};
 use lfsc_syntax::ast::{Command, StrAlphaCommand, Ident, BuiltIn};
 // use nbe::eval;
 
-use self::{context::{LocalContext, Rgctx, Rlctx},
+use self::{context::{LocalContext, Rgctx, Rlctx, GlobalContext},
            values::{TResult, RT, is_type_or_datatype, Value, TypecheckingErrors, Type, ResRT}};
 
 #[derive(Clone)]
-pub struct EnvWrapper<'ctx, T: Copy> {
-    pub lctx: Rlctx<'ctx, T>,
-    pub gctx: Rgctx<'ctx, T>,
+struct EnvWrapper<'global, 'term, T: Copy> {
+    pub lctx: Rlctx<'term, T>,
+    pub gctx: Rgctx<'global, 'term, T>,
     pub allow_dbi: u32,
 }
 
-impl<'ctx, T> EnvWrapper<'ctx, T>
+impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
 where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 {
-    pub fn new(lctx: Rlctx<'ctx, T>,
-               gctx: Rgctx<'ctx, T>,
+    pub fn new(lctx: Rlctx<'term, T>,
+               gctx: Rgctx<'global, 'term, T>,
            allow_dbi: u32) -> Self {
         Self { lctx, gctx, allow_dbi }
     }
 
-    pub fn update_local(&self, val: RT<'ctx, T>) -> Self {
+    pub fn update_local(&self, val: RT<'term, T>) -> Self {
         Self { lctx: LocalContext::insert(val, self.lctx.clone()),
-               gctx: self.gctx.clone(),
+               gctx: self.gctx,
                allow_dbi: self.allow_dbi }
     }
-    pub fn get_value(&self, key: &Ident<T>) -> ResRT<'ctx, T> {
+    pub fn get_value(&self, key: &Ident<T>) -> ResRT<'term, T> {
         match key {
             Ident::DBI(i) if self.allow_dbi >= *i => self.lctx.get_value(*i),
             Ident::DBI(_) => Err(TypecheckingErrors::DependentTypeNotAllowed),
@@ -44,23 +44,23 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    pub fn get_type(&self, key: &Ident<T>) -> ResRT<'ctx, T> {
+    pub fn get_type(&self, key: &Ident<T>) -> ResRT<'term, T> {
         match key {
             Ident::DBI(i) => self.lctx.get_type(*i),
             Ident::Symbol(name) => self.gctx.get_type(name),
         }
     }
     pub fn same(&self,
-                t1: RT<'ctx, T>,
-                t2: RT<'ctx, T>) -> TResult<(), T>
+                t1: RT<'term, T>,
+                t2: RT<'term, T>) -> TResult<(), T>
     {
         self.convert(t1, t2, self.gctx.kind.clone())
     }
 
     pub fn convert(&self,
-                t1: RT<'ctx, T>,
-                t2: RT<'ctx, T>,
-                tau: RT<'ctx, T>) -> TResult<(), T>
+                t1: RT<'term, T>,
+                t2: RT<'term, T>,
+                tau: RT<'term, T>) -> TResult<(), T>
     {
         println!("t1: {:?}\nt2: {:?}\ntau: {:?}", t1, t2, tau);
         let e1 = self.readback(tau.clone(), t1)?;
@@ -76,10 +76,10 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 
 pub fn handle_command<'a, 'b>(com: &'b StrAlphaCommand<'a>,
                              // lctx: RLCTX<'a,T>,
-                             gctx: Rgctx<'b, &'a str>) -> TResult<(), &'a str>
+                             gctx: &mut GlobalContext<'b, &'a str>) -> TResult<(), &'a str>
 {
     // let lctx = Rc::new(LocalContext::new());
-    let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx.clone(), 0);
+    let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx, 0);
     match com {
       Command::Declare(id, ty) => {
           // actually doing this for pi will check that it is a sort already,
@@ -115,6 +115,7 @@ pub fn handle_command<'a, 'b>(com: &'b StrAlphaCommand<'a>,
             if gctx.contains(id) {
                 return Err(TypecheckingErrors::SymbolAlreadyDefined(id))
             }
+            println!("Prog: {:?}\n\n\n", id);
             // check that type of the program is type or a datatype
             let res_kind = env.infer(ty)?;
             is_type_or_datatype(res_kind.borrow())?;
@@ -129,14 +130,18 @@ pub fn handle_command<'a, 'b>(com: &'b StrAlphaCommand<'a>,
                 tmp_env = tmp_env.update_local(ty.clone());
                 args_ty.push(ty);
             }
+            let lctx = tmp_env.lctx.clone();
+            drop(tmp_env);
             // order is important since it will allow us to introduce recursion for functions
+            println!("args: {:?}\n\n\n", args_ty);
             let typ = Rc::new(Value::Prog(args_ty.clone(), body));
             gctx.define(id, res_ty.clone(), typ);
 
-            let body_ty = tmp_env.infer_sc(body)?;
+            let env = EnvWrapper::new(lctx, gctx, 0);
+            let body_ty = env.infer_sc(body)?;
             println!("body type {:?}", body_ty);
             println!("result type {:?}", res_ty);
-            tmp_env.same(body_ty, res_ty.clone())?;
+            env.same(body_ty, res_ty.clone())?;
             Ok(())
         }
         Command::Run(..) => todo!(),
