@@ -58,23 +58,30 @@ fn parse_term_(it: &str) -> IResult<&str, Term<&str>> {
         return res;
     }
     let (rest, head) = parse_term(it)?;
-    let (rest, tail) =
-        fold_many0(parse_term, || head.clone(),
-            |acc, x| Term::App(Box::new(acc), Box::new(x)))(rest)?;
+    let (rest, tail) = many0(parse_term)(rest)?;
     let (rest, _) = closed(rest)?;
-    Ok((rest, tail))
+    if tail.is_empty() {
+        Ok((rest, head))
+    } else {
+        Ok((rest, Term::App(Box::new(head), tail)))
+    }
+    // let (rest, tail) =
+    //     fold_many0(parse_term, || head.clone(),
+    //         |acc, x| Term::App(Box::new(acc), Box::new(x)))(rest)?;
+    // let (rest, _) = closed(rest)?;
+    // Ok((rest, tail))
 }
 
 pub fn parse_hole(it : &str) -> IResult<&str, Term<&str>> {
     map(reserved("_"), |_| Term::Hole)(it)
 }
 
-const KEYWORDS: [&str; 25] = ["let", "pi", "lam", "do", "match",
+const KEYWORDS: [&str; 26] = ["let", "pi", "lam", "do", "match",
                              "mp_add", "mp_mul", "mp_div", "mp_neg",
                              "mpz_to_mpq", "mp_ifzero", "mp_ifneg",
                              "markvar", "ifmarked", "default", "fail",
                              "run", "define", "declare", "check", "function",
-                             "program", "run", "ifequal", "provided"];
+                             "program", "run", "ifequal", "provided", "default"];
 
 pub fn reserved<'a>(expected: &'a str)
                     -> impl FnMut(&'a str) -> IResult<&'a str, &'a str> {
@@ -156,7 +163,6 @@ fn parse_sc_(it: &str) -> IResult<&str, TermSC<&str>> {
 }
 
 fn parse_compound(it : &str) -> IResult<&str, CompoundSC<Term<&str>, TermSC<&str>, Pattern<&str>>> {
-    println!("parse_compound: {:?}", it);
     alt((
         map(preceded(reserved("fail"),
                      parse_term), CompoundSC::Fail),
@@ -176,7 +182,6 @@ fn parse_compound(it : &str) -> IResult<&str, CompoundSC<Term<&str>, TermSC<&str
 }
 
 fn parse_pat(it : &str) -> IResult<&str, Pattern<&str>> {
-    println!("parse_pat: {}", it);
     let f = alt((
         map(reserved("default"), |_| Pattern::Default),
         map(parse_ident, |x| Pattern::Symbol(Ident::Symbol(x))),

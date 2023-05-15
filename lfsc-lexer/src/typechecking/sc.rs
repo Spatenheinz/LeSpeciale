@@ -2,16 +2,18 @@ use std::borrow::Borrow;
 use std::rc::Rc;
 
 use lfsc_syntax::ast::{AlphaTermSC, Num, AlphaNumericSC, AlphaCompoundSC,
-                      AlphaSideEffectSC, BuiltIn};
+                      AlphaSideEffectSC, BuiltIn, AlphaPattern, Ident};
 use lfsc_syntax::ast::Ident::*;
 use lfsc_syntax::ast::AlphaTermSC::*;
 use lfsc_syntax::ast::NumericSC::*;
 use lfsc_syntax::ast::CompoundSC::*;
 use lfsc_syntax::ast::SideEffectSC::*;
+use crate::typechecking::values::{as_neutral, flatten};
+
 use super::EnvWrapper;
-use super::values::TypecheckingErrors::{NaN, DivByZero, ReachedFail};
+use super::values::TypecheckingErrors::{NaN, DivByZero, ReachedFail, NoMatch};
 // use super::context::{RLCTX, RGCTX, set_mark, get_mark, LocalContext};
-use super::values::{ResRT, Value, as_symbolic};
+use super::values::{ResRT, Value, as_symbolic, TResult};
 
 
 impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
@@ -29,7 +31,19 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                 let m = self.run_sc(m)?;
                 self.update_local(m).run_sc(n)
             },
-            App(m, n) => todo!(),
+            App(m, n) => {
+              let mut env = self.clone();
+              for e in n {
+                let e = self.run_sc(e)?;
+                env = env.insert_local(e);
+              }
+              let fun = env.get_value(m)?;
+              if let Value::Prog(_, body) = fun.borrow() {
+                env.run_sc(body)
+              } else {
+                Err(NaN)
+              }
+            }
             Numeric(num) => self.run_num(num),
             Compound(compound) => self.run_compound(compound),
             SideEffect(se) => self.run_sideeffect(se)
@@ -68,26 +82,48 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
         match sc {
         Fail(_) => Err(ReachedFail),
         IfEq { a, b, tbranch, fbranch } => {
-            todo!("figure out how to compare")
-            // let a = run_sc(a, lctx, gctx)?;
-            // let b = run_sc(b, lctx, gctx)?;
-            // // TODO check if alpha equivalent is enough or should we check specifically with holes?
-            // match (a.borrow(), b.borrow()) {
-            //     (a,b) if *a == *b => run_sc(tbranch, lctx, gctx),
-            //     (a,b) if *a != *b => run_sc(fbranch, lctx, gctx),
-            //     (Value::ZT,_) => unreachable!() // only to dominate the typechecker
-            // }
+            let a = self.run_sc(a)?;
+            let b = self.run_sc(b)?;
+            self.run_sc( if a == b { tbranch } else { fbranch })
         }
         Match(scrut, cases) => {
-            todo!("maybe easier after apply..")
+            let scrut = self.run_sc(scrut)?;
+            let scrut1 = as_neutral(&scrut)?;
+            let (c,xs) = flatten(&scrut1)?;
+            for (p,s) in cases {
+                let mut env = self.clone();
+                let (ci, si) = env.match_pattern(p)?;
+                if c == ci && xs.len() == (si as usize) {
+                   for x in xs.iter() {
+                       env = env.insert_local(x.clone());
+                   }
+                   return env.run_sc(s);
+                }
+                if Symbol(T::_default()) == ci {
+                    return env.run_sc(s);
+                }
+                // return env.run_sc(s);
+            };
+            Err(NoMatch)
         }
         }
+    }
+
+    #[inline(always)]
+    fn match_pattern(&self, p: &'term AlphaPattern<T>)
+                     -> TResult<(Ident<T>, u32), T>
+    {
+      match p {
+        AlphaPattern::Default => Ok((Ident::Symbol(T::_default()), 0)),
+        AlphaPattern::Symbol(c) => Ok((c.clone(), 0)),
+        AlphaPattern::App(c, xs) => Ok((c.clone(), *xs)),
+      }
     }
 
     fn run_num(&self, sc: &'term AlphaNumericSC<T>) -> ResRT<'term, T>
     {
         match sc {
-            Sum(x, y) | Prod(x, y) | Div(x, y) => self.binop(sc),
+            Sum(..) | Prod(..) | Div(..) => self.binop(sc),
             Neg(x) => {
                 match self.run_sc(x)?.borrow() {
                     Value::Z(x) => Ok(Rc::new(Value::Z(-x))),
@@ -98,9 +134,10 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             ZtoQ(z) => todo!(),
             ZBranch { n, tbranch, fbranch } | NegBranch { n, tbranch, fbranch } => {
                 let n = self.run_sc(n)?;
+              println!("n: {:?}", n);
                 let val = match n.borrow() {
                         Value::Z(x) => x,
-                        Value::Q(q,_) => q,
+                        Value::Q(q,_) => todo!("error on q"),
                         _ => return Err(NaN)
                     };
                 let cond = match sc {

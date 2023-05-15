@@ -8,6 +8,7 @@ pub trait BuiltIn {
     fn _mpz() -> Self;
     fn _mpq() -> Self;
     fn _type() -> Self;
+    fn _default() -> Self;
 }
 
 impl BuiltIn for &str {
@@ -19,6 +20,9 @@ impl BuiltIn for &str {
     }
     fn _type() -> Self {
         "type"
+    }
+    fn _default() -> Self {
+        "default"
     }
 }
 
@@ -57,7 +61,8 @@ pub enum Term<Id> {
     SC(TermSC<Id>, Box<Term<Id>>),
     // => alias for nested !-terms.
     Arrow { decls: Decls, result: Box<Term<Id>>},
-    App(Box<Term<Id>>, Box<Term<Id>>)
+    App(Box<Term<Id>>, Vec<Term<Id>>),
+    // App(Box<Term<Id>>, Box<Term<Id>>)
 }
 pub type StrTerm<'a> = Term<&'a str>;
 
@@ -77,8 +82,29 @@ pub enum AlphaTerm<Id> {
     // i dont know about the big lambda
     Asc(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
     SC(AlphaTermSC<Id>, Box<AlphaTerm<Id>>),
-    App(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
+    App(Box<AlphaTerm<Id>>, Vec<AlphaTerm<Id>>),
+    // App is no longer curried
+    // App(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
 }
+
+// pub fn hole_eq<'a, Id: PartialEq>(a: &'a mut AlphaTerm<Id>,
+//                                   b: &'a mut AlphaTerm<Id>) -> bool {
+//     use AlphaTerm::*;
+//     match (a, b) {
+//         (Number(n1), Number(n2)) => n1 == n2,
+//         (Ident(i1), Ident(i2)) => i1 == i2,
+//         (Pi(t1, b1), Pi(t2, b2)) => hole_eq(t1, t2) && hole_eq(b1, b2),
+//         (Lam(b1), Lam(b2)) => hole_eq(b1, b2),
+//         (AnnLam(t1, b1), AnnLam(t2, b2)) => hole_eq(t1, t2) && hole_eq(b1, b2),
+//         (Asc(t1, b1), Asc(t2, b2)) => hole_eq(t1, t2) && hole_eq(b1, b2),
+//         (SC(sc1, b1), SC(sc2, b2)) => sc1 == sc2 && hole_eq(b1, b2),
+//         (App(f1, a1), App(f2, a2)) => hole_eq(f1, f2) && hole_eq(a1, a2),
+//         (Hole, _) => { true }
+//         (_, Hole) => { true }
+//         _ => false
+//     }
+// }
+
 
 pub type StrAlphaTerm<'a> = AlphaTerm<&'a str>;
 

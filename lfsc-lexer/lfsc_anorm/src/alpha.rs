@@ -1,6 +1,6 @@
 use lfsc_syntax::ast::{Term, BinderKind, Command, StrTerm, StrAlphaTerm,
                        StrCommand, StrAlphaCommand,  StrSC, NumericSC,
-                       CompoundSC, Pattern, AlphaPattern, SideEffectSC};
+                       CompoundSC, Pattern, AlphaPattern, SideEffectSC, AlphaTerm};
 use lfsc_syntax::ast::AlphaTerm::*;
 use lfsc_syntax::ast::Ident::*;
 
@@ -60,6 +60,27 @@ pub fn alpha_normalize<'a>(term: StrTerm<'a>,
         Term::Hole => Hole,
         Term::Ident(Symbol(v)) => Lookup::lookup(vars, v),
         Term::Ident(DBI(d)) => Ident(DBI(d)),
+        // Hack
+        // Term::Binder {kind:BinderKind::Pi, var,
+        //               ty:Some(term), body } => {
+        //     if let Term::SC(sc, var) = *term {
+        //         if let Term::Ident(Symbol(n)) = *var {
+        //         let t1 = AlphaTerm::SC(alpha_normalize_sc(sc,vars),
+        //                                     Box::new(AlphaTerm::Ident(Symbol(n))));
+        //         vars.push(n);
+        //         let body = alpha_normalize(*body, vars);
+        //         Pi(Box::new(t1), Box::new(body))
+        //         } else {
+        //             panic!("should not happen");
+        //         }
+
+        //     } else {
+        //         let t1 = alpha_normalize(*term, vars);
+        //         vars.push(var);
+        //         let body = alpha_normalize(*body, vars);
+        //         Pi(Box::new(t1), Box::new(body))
+        //     }
+        // },
         Term::Binder {kind, var, ty, body } => {
             // only some binders contains type annotations.
             let ty = ty.map(|x| alpha_normalize(*x, vars));
@@ -86,9 +107,12 @@ pub fn alpha_normalize<'a>(term: StrTerm<'a>,
         Term::App(fun, arg) => {
             let mut alpha_local = local(alpha_normalize, vars);
             let f = alpha_local(*fun);
-            let a = alpha_local(*arg);
-            App(Box::new(f), Box::new(a))
-        }
+            let mut a = Vec::new();
+            for e in arg.into_iter() {
+                a.push(alpha_local(e));
+            };
+            App(Box::new(f), a)
+        },
         Term::SC(x, y) => {
             let x = local(alpha_normalize_sc, vars)(x);
             let y = local(alpha_normalize, vars)(*y);

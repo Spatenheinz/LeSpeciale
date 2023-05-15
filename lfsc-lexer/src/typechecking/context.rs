@@ -1,6 +1,7 @@
 use lfsc_syntax::ast::Ident;
 
 use super::values::{Neutral, Type, Value, RT, TypecheckingErrors, TResult, ResRT};
+use std::borrow::Borrow;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -14,19 +15,19 @@ pub type Rlctx<'term, T> = Rc<LocalContext<'term, T>>;
 pub type Rgctx<'own, 'term, T> = &'own GlobalContext<'term, T>;
 
 #[derive(Debug)]
-pub struct GlobalContext<'term, K: Copy> {
+pub struct GlobalContext<'term, K: Copy + PartialEq> {
     pub kind: RT<'term, K>,
     keys: Vec<K>,
     values: Vec<TypeEntry<'term, K>>,
 }
-// pub struct GlobalContext<'term, K: Copy> {
+// pub struct GlobalContext<'term, K: Copy + PartialEq> {
 //     pub kind: RT<'term, K>,
 //     keys: RefCell<Vec<K>>,
 //     values: RefCell<Vec<TypeEntry<'term, K>>>,
 // }
 
 #[derive(Debug)]
-pub enum LocalContext<'a, K: Copy> {
+pub enum LocalContext<'a, K: Copy + PartialEq> {
     Nil,
     Cons(TypeEntry<'a, K>, Rlctx<'a, K>),
 }
@@ -40,24 +41,36 @@ pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
 }
 
 
-fn from_entry_to_value<'a, K: Copy>(entry: &TypeEntry<'a, K>, key: Ident<K>)
+fn from_entry_to_value<'a, K: Copy + PartialEq>(entry: &TypeEntry<'a, K>, key: Ident<K>)
                                      -> RT<'a, K> {
        match entry {
          TypeEntry::Def { val, .. } => val.clone(),
-         TypeEntry::IsA { ty, .. } =>
+         TypeEntry::IsA { ty, .. } => {
+             if let Value::Neutral(_, hol) = ty.borrow() {
+                 if let Neutral::Hole(hol) = hol.borrow() {
+                     // if let Some(inner) = &*hol.borrow() {
+                     //     return inner.clone()
+                     // }
+                     return ty.clone();
+                 }
+             }
                Rc::new(Value::Neutral(ty.clone(),
                           Rc::new( match key {
                                      Ident::Symbol(key) => Neutral::Var(key),
                                      Ident::DBI(dbi) => Neutral::DBI(dbi)
-                                   }))),
+                                   })))
+            },
+         TypeEntry::Val { val } => val.clone(),
+
          }
 }
 
-fn from_entry_to_type<'a, K: Copy>(entry: &TypeEntry<'a, K>)
+fn from_entry_to_type<'a, K: Copy + PartialEq>(entry: &TypeEntry<'a, K>)
                                     -> RT<'a, K> {
        match entry {
          TypeEntry::Def { ty, .. } => ty.clone(),
          TypeEntry::IsA { ty, .. } => ty.clone(),
+         TypeEntry::Val { val } => panic!("from_entry_to_type: val"),
        }
 }
 
@@ -177,8 +190,16 @@ where K: PartialEq + std::fmt::Debug + Copy
 
     pub fn insert(ty: RT<'a, K>, ctx: Rlctx<'a, K>) -> Rlctx<'a, K> {
         Rc::new(LocalContext::Cons(
+            TypeEntry::Val { val : ty }, ctx))
+            // TypeEntry::IsA { ty, marks: RefCell::new(0)}, ctx))
+    }
+
+    pub fn decl(ty: RT<'a, K>, ctx: Rlctx<'a, K>) -> Rlctx<'a, K> {
+        Rc::new(LocalContext::Cons(
+            // TypeEntry::Val { val : ty }, ctx))
             TypeEntry::IsA { ty, marks: RefCell::new(0)}, ctx))
     }
+
     pub fn get(&self, key: u32) -> TResult<&TypeEntry<'a, K>, K> {
         match self {
             LocalContext::Nil => Err(lookup_err(Ident::<K>::DBI(key))),
@@ -202,7 +223,7 @@ where K: PartialEq + std::fmt::Debug + Copy
 }
 
 #[derive(Debug)]
-pub enum TypeEntry<'a, Key: Copy>
+pub enum TypeEntry<'a, Key: Copy + PartialEq>
 // where Key: Clone
 {
     // Dec { ty: RT<'a, Key> },
@@ -210,6 +231,7 @@ pub enum TypeEntry<'a, Key: Copy>
     // the val of IsA is the neutral term Neutral t
     // Symbolics can only ever be a IsA.
     IsA { ty: RT<'a, Key>, marks: RefCell<u32> },
+    Val { val: RT<'a, Key> },
 }
 
 #[cfg(test)]

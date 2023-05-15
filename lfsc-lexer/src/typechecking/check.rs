@@ -19,11 +19,11 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                 }
                 Err(TypecheckingErrors::NotPi)
             },
-            // Fv, Bv, Ascription, PI, Annotated, etc.
             _ => {
                 let t = self.infer(term)?;
-                println!("term: {:?} -- type in check: {:?} must be {:?}", term, t, tau);
-                self.convert(t, tau, self.gctx.kind.clone())
+                // println!("check: t = {:?}\n\n\n tau = {:?}", t, tau);
+                // println!("check: t = {:?}\n\n\n tau = {:?}", t, self.readback(self.gctx.kind.clone(), tau.clone()));
+                self.same(t, tau)
             }
         }
     }

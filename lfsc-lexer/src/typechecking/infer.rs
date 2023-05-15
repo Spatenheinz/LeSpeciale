@@ -1,14 +1,15 @@
 use lfsc_syntax::ast::{AlphaTerm, Num, BuiltIn, AlphaTermSC, AlphaNumericSC,
-                       AlphaCompoundSC, AlphaSideEffectSC, AlphaPattern};
+                       AlphaCompoundSC, AlphaSideEffectSC, AlphaPattern, Ident};
 use lfsc_syntax::ast::AlphaTerm::*;
 use lfsc_syntax::ast::NumericSC::*;
 use lfsc_syntax::ast::CompoundSC::*;
 use lfsc_syntax::ast::SideEffectSC::*;
-use crate::typechecking::values::const_closure;
+use crate::typechecking::values::{const_closure, Neutral};
 
 use super::EnvWrapper;
 use super::values::{TypecheckingErrors, ResRT, Type, RT, TResult};
 
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::borrow::Borrow;
 
@@ -17,24 +18,29 @@ impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
 where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 {
     pub fn infer(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
-        println!("eval: {:?}", term);
+        println!("infer: {:?}", term);
         match term {
             Number(Num::Z(_))  => self.gctx.get_value(&T::_mpz()),
             Number(Num::Q(..)) => self.gctx.get_value(&T::_mpq()),
             Ident(x)   => self.get_type(x),
             AlphaTerm::Pi(a, b) => {
-                // TODO: may this only be star or also box?
                 let val =
                     if let SC(t1, t2) = &**a {
                         let t1_ty = self.infer_sc(t1)?;
-                        self.check(t2, t1_ty.clone())?;
-                        Rc::new(Type::Run(t1, t1_ty))
+                        match &**t2 {
+                            Ident(Ident::Symbol(_name)) => {
+                                Rc::new(Type::Run(t1, t1_ty))
+                            },
+                            _ => {
+                            self.check(t2, t1_ty.clone())?;
+                            Rc::new(Type::Run(t1, t1_ty))
+                            }
+                        }
                     } else {
                         self.infer_as_type(a)?;
                         self.eval(a)?
                     };
                 let env = self.update_local(val);
-                // this may be both type and kind
                 env.infer_sort(b)
             },
             AnnLam(a, m) => {
@@ -48,19 +54,26 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             App(m, n) => {
                 let f_ty = self.infer(m)?;
                 if let Type::Pi(a,b) = f_ty.borrow() {
-                    if let Type::Run(a, b) = a.borrow() {
-                        // run_sc(a);
-                        panic!("run not implemented");
-                    } else {
-                        println!("checking {:?} against {:?}, with {:?}", n, a, f_ty);
-                        self.check(n, a.clone())?;
-                        return b(self.eval(n)?, self.gctx, self.allow_dbi)
+                   println!("checking {:?} against {:?}", n, a);
+                   if Hole == **n {
+                       let hole = Rc::new(Neutral::Hole(RefCell::new(None)));
+                       println!("holes: {:?}", hole);
+                       return b(Rc::new(Type::Neutral(a.clone(), hole)), self.gctx, self.allow_dbi)
+                   }
+                    if let Type::Run(sc, term) = a.borrow() {
+                     todo!()
                     }
+                   self.check(n, a.clone())?;
+                  println!("checked {:?} against {:?}", n, self.readback(self.gctx.kind.clone(), a.clone()));
+                    println!("evaluating {:?}", self.readback(self.gctx.kind.clone(),self.eval(n)?));
+                   let res = b(self.eval(n)?, self.gctx, self.allow_dbi)?;
+                    println!("res infer: {:?}", self.readback(self.gctx.kind.clone(), res.clone()));
+                     return Ok(res)
+
                 };
                 Err(TypecheckingErrors::NotPi)
             }
             Asc(a, m) => {
-                println!("asc: {:?}", a);
                 self.infer_sort(a)?;
                 let ty = self.infer(a)?;
                 self.check(m, ty.clone())?;

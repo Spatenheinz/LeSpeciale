@@ -13,10 +13,10 @@ use lfsc_syntax::ast::{Command, StrAlphaCommand, Ident, BuiltIn};
 // use nbe::eval;
 
 use self::{context::{LocalContext, Rgctx, Rlctx, GlobalContext},
-           values::{TResult, RT, is_type_or_datatype, Value, TypecheckingErrors, Type, ResRT}};
+           values::{TResult, RT, is_type_or_datatype, Value, TypecheckingErrors, Type, ResRT, ref_compare}};
 
 #[derive(Clone)]
-struct EnvWrapper<'global, 'term, T: Copy> {
+struct EnvWrapper<'global, 'term, T: Copy + PartialEq> {
     pub lctx: Rlctx<'term, T>,
     pub gctx: Rgctx<'global, 'term, T>,
     pub allow_dbi: u32,
@@ -31,8 +31,13 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
         Self { lctx, gctx, allow_dbi }
     }
 
-    pub fn update_local(&self, val: RT<'term, T>) -> Self {
+    pub fn insert_local(&self, val: RT<'term, T>) -> Self {
         Self { lctx: LocalContext::insert(val, self.lctx.clone()),
+               gctx: self.gctx,
+               allow_dbi: self.allow_dbi }
+    }
+    pub fn update_local(&self, val: RT<'term, T>) -> Self {
+        Self { lctx: LocalContext::decl(val, self.lctx.clone()),
                gctx: self.gctx,
                allow_dbi: self.allow_dbi }
     }
@@ -62,10 +67,10 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                 t2: RT<'term, T>,
                 tau: RT<'term, T>) -> TResult<(), T>
     {
-        println!("t1: {:?}\nt2: {:?}\ntau: {:?}", t1, t2, tau);
+        if ref_compare(t1.clone(), t2.clone()) { return Ok(()) }
+        println!("t1: {:?}\nt2: {:?}", t1.clone(), t2.clone());
         let e1 = self.readback(tau.clone(), t1)?;
-        let e2 = self.readback(tau.clone(), t2)?;
-        println!("e1: {:?}\ne2: {:?}", e1, e2);
+        let e2 = self.readback(tau, t2)?;
         if e1 == e2 {
             Ok(())
         } else {
@@ -75,7 +80,6 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 }
 
 pub fn handle_command<'a, 'b>(com: &'b StrAlphaCommand<'a>,
-                             // lctx: RLCTX<'a,T>,
                              gctx: &mut GlobalContext<'b, &'a str>) -> TResult<(), &'a str>
 {
     // let lctx = Rc::new(LocalContext::new());

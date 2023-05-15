@@ -5,8 +5,7 @@ use lfsc_syntax::ast::{Ident::*, Num};
 use lfsc_syntax::ast::AlphaTerm::*;
 
 use super::values::mk_neutral_var_with_type;
-use super::{values::{RT, Normal, Value, Type, Neutral, TypecheckingErrors, TResult},
-};
+use super::values::{RT, Normal, Value, Type, Neutral, TypecheckingErrors, TResult};
 
 use super::EnvWrapper;
 
@@ -36,19 +35,20 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                 Ok(abinder!(lam, env.readback(ran_, app)?))
             }
             Type::Box => {
-                println!("Box:: {:?}", val);
                 match val.borrow() {
                     Value::Pi(at, bt) => {
                         let dom = self.readback(ty.clone(), at.clone())?;
                         let env = self.update_local(at.clone());
                         let cls_res = bt(mk_neutral_var_with_type(at.clone()),
                                          self.gctx, self.allow_dbi)?;
-                        let ran = env.readback(ty.clone(), cls_res)?;
+                        let ran = env.readback(ty, cls_res)?;
                         Ok(abinder!(pi, dom, ran))
                     },
                     Value::Star => Ok(Ident(Symbol(T::_type()))),
                     Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
                     Value::QT => Ok(Ident(Symbol(T::_mpq()))),
+                    Value::Run(t1,t2) => self.readback(ty, t2.clone()),
+                    // Value::Run(t1,t2) => Ok(SC((*t1).clone(), Box::new(self.readback(ty, t2.clone())?))),
                     _ => Err(TypecheckingErrors::ReadBackMismatch),
                 }
             }
@@ -64,15 +64,6 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                     _ => Err(TypecheckingErrors::ReadBackMismatch),
                 }
             },
-            // TODO:: should we have this both here and for box??
-            Type::Star => {
-                match val.borrow() {
-                    Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
-                    Value::QT => Ok(Ident(Symbol(T::_mpq()))),
-                    _ => Err(TypecheckingErrors::ReadBackMismatch),
-                }
-            },
-            Value::Neutral(..) => unreachable!(),
             _ => Err(TypecheckingErrors::ValueUsedAsType)
         }
     }
@@ -83,14 +74,23 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                        ) -> TResult<AlphaTerm<T>, T>
     {
         match neu.borrow() {
-            Neutral::DBI(i) => Ok(Ident(DBI(*i))),
+            Neutral::DBI(i) => {
+                Ok(Ident(DBI(*i)))
+            },
+            Neutral::Hole(hol) => {
+                if let Some(ty) = &*hol.borrow() {
+                    // TODO: check the cost of this
+                    self.readback_neutral(_ty, ty.clone())
+                } else {
+                    Ok(Hole)
+                }
+            },
             Neutral::Var(name) => Ok(Ident(Symbol(*name))),
             Neutral::App(f, a) => {
                 let f = self.readback_neutral(_ty, f.clone())?;
                 let a = self.readback_normal(a.clone())?;
                 Ok(App(Box::new(f), Box::new(a)))
             },
-            Neutral::Hole(_) => todo!("readback hole"),
         }
     }
 }
