@@ -6,8 +6,12 @@ macro_rules! binder {
     (let $v:ident, $e:expr, $body:expr) => {
         $crate::ast::Term::App(
             Box::new(binder!(lam, $v, $body)),
-            Box::new($e),
+            vec![$e],
         )
+        // $crate::ast::Term::App(
+        //     Box::new(binder!(lam, $v, $body)),
+        //     Box::new($e),
+        // )
     };
     (pi, $v:ident : $ty:expr, $body:expr) => {
         $crate::ast::Term::Binder {

@@ -8,10 +8,10 @@ use lfsc_syntax::ast::AlphaTermSC::*;
 use lfsc_syntax::ast::NumericSC::*;
 use lfsc_syntax::ast::CompoundSC::*;
 use lfsc_syntax::ast::SideEffectSC::*;
-use crate::typechecking::values::{as_neutral, flatten};
+use crate::typechecking::values::{as_neutral, flatten, ref_compare};
 
 use super::EnvWrapper;
-use super::values::TypecheckingErrors::{NaN, DivByZero, ReachedFail, NoMatch};
+use super::values::TypecheckingErrors::{NaN, DivByZero, ReachedFail, NoMatch, self};
 // use super::context::{RLCTX, RGCTX, set_mark, get_mark, LocalContext};
 use super::values::{ResRT, Value, as_symbolic, TResult};
 
@@ -28,21 +28,31 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             Ident(DBI(i)) => self.lctx.get_value(*i),
             Ident(Symbol(x)) => self.gctx.get_value(x),
             Let(m, n) => {
+              println!("Let {:?} {:?}", m, n);
                 let m = self.run_sc(m)?;
                 self.update_local(m).run_sc(n)
             },
             App(m, n) => {
-              let mut env = self.clone();
+              let mut fun = self.get_value(m)?;
+              let mut args = Vec::with_capacity(n.len());
               for e in n {
-                let e = self.run_sc(e)?;
-                env = env.insert_local(e);
+                args.push(self.run_sc(e)?);
               }
-              let fun = env.get_value(m)?;
               if let Value::Prog(_, body) = fun.borrow() {
-                env.run_sc(body)
-              } else {
-                Err(NaN)
-              }
+                  println!("Running program {:?}\n with args {:?}", m, n);
+                  let mut env = self.clone();
+                  for e in args {
+                    println!("Inserting {:?}", env.readback(env.gctx.kind.clone(), e.clone()));
+                    env = env.insert_local(e);
+                  }
+                  let res = env.run_sc(body)?;
+                  println!("Result {:?}", env.readback(env.gctx.kind.clone(), res.clone()));
+                return Ok(res);
+              };
+              for e in args {
+                fun = self.do_app(fun, e)?
+              };
+              Ok(fun)
             }
             Numeric(num) => self.run_num(num),
             Compound(compound) => self.run_compound(compound),
@@ -84,9 +94,11 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
         IfEq { a, b, tbranch, fbranch } => {
             let a = self.run_sc(a)?;
             let b = self.run_sc(b)?;
-            self.run_sc( if a == b { tbranch } else { fbranch })
+          // TODO not good to use ref_compare. In case where holes are not filled we dont want to fill them.
+            self.run_sc( if ref_compare(a, b) { tbranch } else { fbranch })
         }
         Match(scrut, cases) => {
+          println!("Match {:?}\ncases:{:?}", scrut, cases);
             let scrut = self.run_sc(scrut)?;
             let scrut1 = as_neutral(&scrut)?;
             let (c,xs) = flatten(&scrut1)?;
@@ -102,9 +114,9 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                 if Symbol(T::_default()) == ci {
                     return env.run_sc(s);
                 }
-                // return env.run_sc(s);
             };
-            Err(NoMatch)
+          println!("No match for {:?} in {:?}", scrut, cases);
+          Err(NoMatch)
         }
         }
     }

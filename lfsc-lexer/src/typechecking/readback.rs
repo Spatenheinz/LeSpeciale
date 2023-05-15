@@ -47,7 +47,7 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                     Value::Star => Ok(Ident(Symbol(T::_type()))),
                     Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
                     Value::QT => Ok(Ident(Symbol(T::_mpq()))),
-                    Value::Run(t1,t2) => self.readback(ty, t2.clone()),
+                    Value::Run(t1,t2,_) => self.readback(ty, t2.clone()),
                     // Value::Run(t1,t2) => Ok(SC((*t1).clone(), Box::new(self.readback(ty, t2.clone())?))),
                     _ => Err(TypecheckingErrors::ReadBackMismatch),
                 }
@@ -89,7 +89,9 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
             Neutral::App(f, a) => {
                 let f = self.readback_neutral(_ty, f.clone())?;
                 let a = self.readback_normal(a.clone())?;
-                Ok(App(Box::new(f), Box::new(a)))
+                Ok(App(Box::new(f), vec![a]))
+                //TODO fix this to make sense
+                // Ok(App(Box::new(f), Box::new(a)))
             },
         }
     }

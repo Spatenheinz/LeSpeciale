@@ -42,7 +42,7 @@ pub enum Value<'term, T: Copy + PartialEq> {
     QT,
     Q(i32, i32), // TODO: should in fact be unbounded
     Neutral(RT<'term, T>, Rc<Neutral<'term, T>>),
-    Run(&'term AlphaTermSC<T>, RT<'term, T>),
+    Run(&'term AlphaTermSC<T>, RT<'term, T>, Rc<LocalContext<'term, T>>),
     Prog(Vec<RT<'term, T>>, &'term AlphaTermSC<T>),
 }
 
@@ -66,7 +66,7 @@ impl<'term, T: Copy + fmt::Debug + PartialEq> fmt::Debug for Value<'term, T> {
             //         None => write!(f, "_"),
             //     }
             // }
-            Value::Run(ty, t) => write!(f, "^ {:?} {:?}", ty, t),
+            Value::Run(ty, t, _) => write!(f, "^ {:?} {:?}", ty, t),
             Value::Prog(vars, t) => write!(f, "Prog: {:?}\n\t{:?}\n\t", vars, t),
         }
     }
@@ -94,7 +94,7 @@ impl<'term, T: Copy + PartialEq> PartialEq for Value<'term, T> {
                 // }
                 **n == **m && a == b
             }
-            (Value::Run(a, t), Value::Run(b, u)) => a == b && t == u,
+            (Value::Run(a, t,_), Value::Run(b, u,_)) => a == b && t == u,
             _ => false,
         }
     }
@@ -325,26 +325,6 @@ pub fn flatten<'term, T: Copy + PartialEq>(neu: &Neutral<'term, T>) -> TResult<(
         }
     }
 }
-
-// impl<'term, T: Copy + PartialEq> PartialEq for Neutral<'term, T> {
-//     #[inline]
-//     fn eq(&self, other: &Self) -> bool {
-//         match (self, other) {
-//             (Neutral::Var(a), Neutral::Var(b)) => a == b,
-//             (Neutral::DBI(a), Neutral::DBI(b)) => a == b,
-//             (Neutral::App(a, b), Neutral::App(c, d)) => a == c && b == d,
-//             (a, Neutral::Hole(hol)) => {
-//                 if let Some(t) = &*hol.borrow() {
-//                     a == &**t
-//                 } else {
-//                     hol.replace(Rc::new(a));
-//                     true
-//                 }
-//             }
-//             _ => false,
-//         }
-//     }
-// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Normal<'term, T: Copy + PartialEq>(pub Rc<Type<'term, T>>, pub Rc<Value<'term, T>>);

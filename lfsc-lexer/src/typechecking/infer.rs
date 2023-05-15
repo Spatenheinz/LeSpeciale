@@ -29,11 +29,11 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                         let t1_ty = self.infer_sc(t1)?;
                         match &**t2 {
                             Ident(Ident::Symbol(_name)) => {
-                                Rc::new(Type::Run(t1, t1_ty))
+                                Rc::new(Type::Run(t1, t1_ty, self.lctx.clone()))
                             },
                             _ => {
                             self.check(t2, t1_ty.clone())?;
-                            Rc::new(Type::Run(t1, t1_ty))
+                            Rc::new(Type::Run(t1, t1_ty, self.lctx.clone()))
                             }
                         }
                     } else {
@@ -51,31 +51,37 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                 let closure = const_closure(t2);
                 Ok(Rc::new(Type::Pi(val, closure)))
             }
-            App(m, n) => {
-                let f_ty = self.infer(m)?;
-                if let Type::Pi(a,b) = f_ty.borrow() {
-                   println!("checking {:?} against {:?}", n, a);
-                   if Hole == **n {
-                       let hole = Rc::new(Neutral::Hole(RefCell::new(None)));
-                       println!("holes: {:?}", hole);
-                       return b(Rc::new(Type::Neutral(a.clone(), hole)), self.gctx, self.allow_dbi)
-                   }
-                    if let Type::Run(sc, term) = a.borrow() {
-                     todo!()
+            App(f, args) => {
+                let mut f_ty = self.infer(f)?;
+                for n in args {
+                    f_ty = if let Type::Pi(a,b) = f_ty.borrow() {
+                     if Hole == *n {
+                         let hole = Rc::new(Neutral::Hole(RefCell::new(None)));
+                         println!("holes: {:?}", hole);
+                         b(Rc::new(Type::Neutral(a.clone(), hole)), self.gctx, self.allow_dbi)?
+                     } else {
+                        self.check(n, a.clone())?;
+                        println!("checked {:?} against {:?}", n, self.readback(self.gctx.kind.clone(), a.clone()));
+                        b(self.eval(n)?, self.gctx, self.allow_dbi)?
+                     }
+                    } else {
+                        return Err(TypecheckingErrors::NotPi)
                     }
-                   self.check(n, a.clone())?;
-                  println!("checked {:?} against {:?}", n, self.readback(self.gctx.kind.clone(), a.clone()));
-                    println!("evaluating {:?}", self.readback(self.gctx.kind.clone(),self.eval(n)?));
-                   let res = b(self.eval(n)?, self.gctx, self.allow_dbi)?;
-                    println!("res infer: {:?}", self.readback(self.gctx.kind.clone(), res.clone()));
-                     return Ok(res)
-
                 };
-                Err(TypecheckingErrors::NotPi)
-            }
+                if let Type::Pi(a, b) = f_ty.borrow() {
+                    if let Type::Run(sc, t, lctx) = a.borrow() {
+                        let env = EnvWrapper::new(lctx.clone(), self.gctx, self.allow_dbi);
+                        let sc = env.run_sc(sc)?;
+                        env.same(sc, t.clone())?;
+                        println!("sc");
+                        return b(t.clone(), self.gctx, self.allow_dbi);
+                    }
+                }
+                Ok(f_ty)
+            },
             Asc(a, m) => {
                 self.infer_sort(a)?;
-                let ty = self.infer(a)?;
+                let ty = self.eval(a)?;
                 self.check(m, ty.clone())?;
                 Ok(ty)
             }
@@ -111,8 +117,6 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             env.infer_sc(n)
         },
         AlphaTermSC::App(f, args) => {
-            println!("app sc: {:?}", f);
-            println!("args sc: {:?}", args);
             let mut f_ty = self.get_type(f)?;
             let mut env = self.clone();
             // Since im too stupid to make a program a Pi type, we do the following:
