@@ -1,0 +1,68 @@
+; WARNING: adding trust step for THEORY_REWRITE
+(define cvc.r0_3 (var 0 (BitVec 64)))
+(define cvc.r0_1 (var 1 (BitVec 64)))
+(define cvc.r1 (var 2 (BitVec 64)))
+(define cvc.post (var 3 (BitVec 1)))
+(check
+(@ t1 (= cvc.post cvc.post)
+(@ t2 (bvudiv cvc.r0_1 cvc.r1)
+(@ t3 (= cvc.r0_3 t2)
+(@ t4 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 bvn))))))))))))))))))))))))))))))))))))))))))))))))))))
+(@ t5 (bv (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 t4)))))))))))))
+(@ t6 (= cvc.r1 t5)
+(@ t7 (bv (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b1 t4)))))))))))))
+(@ t8 (= cvc.r0_1 t7)
+(@ t9 (= t5 cvc.r1)
+(@ t10 (= t6 t9)
+(@ t11 (= t7 cvc.r0_1)
+(@ t12 (= t2 cvc.r0_3)
+(# a0 (holds (not (=> t8 (=> (or t6 (or (=> (not t6) t3) false)) t1))))
+(: (holds false)
+
+(plet _  _ 
+
+(trust t10) ; from THEORY_REWRITE
+
+(\ p1
+
+(plet _  _ 
+
+(refl f_or)
+(\ p2
+
+
+(eq_resolve _  _  a0
+(trans _  _  _ 
+(cong _  _  _  _ 
+(refl f_not)
+(trans _  _  _ 
+(cong _  _  _  _ 
+(cong _  _  _  _ 
+(refl f_=>)
+(trust (= t8 t11)) ; from THEORY_REWRITE
+)
+(trans _  _  _ 
+(cong _  _  _  _ 
+(cong _  _  _  _ 
+(refl f_=>)
+(cong _  _  _  _ 
+(cong _  _  _  _  p2 p1)
+(cong _  _  _  _ 
+(cong _  _  _  _  p2
+(cong _  _  _  _ 
+(cong _  _  _  _ 
+(refl f_=>)
+(cong _  _  _  _ 
+(refl f_not) p1))
+(trust (= t3 t12)) ; from THEORY_REWRITE
+))
+(refl false))))
+(trust (= t1 true)) ; from THEORY_REWRITE
+)
+(trust (= (=> (or t9 (or (=> (not t9) t12) false)) true) true)) ; from THEORY_REWRITE
+))
+(trust (= (=> t11 true) true)) ; from THEORY_REWRITE
+))
+(trust (= (not true) false)) ; from THEORY_REWRITE
+)))))))))))))))))))))
+

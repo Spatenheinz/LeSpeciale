@@ -1,13 +1,16 @@
 pub mod ast;
 pub mod sexp;
+pub mod pretty;
 
 #[macro_export]
 macro_rules! binder {
     (let $v:ident, $e:expr, $body:expr) => {
-        $crate::ast::Term::App(
-            Box::new(binder!(lam, $v, $body)),
-            vec![$e],
-        )
+        $crate::ast::Term::Binder {
+            kind: $crate::ast::BinderKind::Let,
+            var: $v,
+            ty: Some(Box::new($e)),
+            body: Box::new($body),
+        }
         // $crate::ast::Term::App(
         //     Box::new(binder!(lam, $v, $body)),
         //     Box::new($e),

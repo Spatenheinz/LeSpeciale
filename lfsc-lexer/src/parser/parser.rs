@@ -98,7 +98,7 @@ fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
         map(
             preceded(alt((reserved("pi"),reserved("!"))),
                      tuple((parse_ident, parse_term, parse_term))),
-            |(var, ty, body)| binder!(pi, var : ty,  body),
+            |(var, ty, body)| binder!(pi, var : ty,  body)
         ),
         map(
             preceded(reserved(":"), tuple((parse_term, parse_term))),
@@ -149,7 +149,7 @@ fn parse_sc_opt(it: &str) -> IResult<&str, TermSC<&str>> {
 fn parse_sc_(it: &str) -> IResult<&str, TermSC<&str>> {
     alt((
         map(
-            preceded(alt((reserved("let"),reserved("@"))),
+            preceded(reserved("let"),
                           tuple((parse_ident, parse_sc, parse_sc))),
             |(var, val, body)|  TermSC::Let(var, Box::new(val), Box::new(body))),
         // side effects

@@ -38,6 +38,7 @@ pub enum BinderKind {
     Pi,
     // \ and lam : also called unascription is a lambda binder with None typing
     Lam,
+    Let,
     // % this is the big lambda case
     BigLam,
 }
@@ -73,6 +74,7 @@ pub enum AlphaTerm<Id> {
     Number(Num),
     Hole,
     Ident(Ident<Id>),
+    Let(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
     // a Pi binder consists of a type and a body
     Pi(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
     // a lambda binder consists of a body
@@ -199,6 +201,7 @@ pub type StrAlphaCommand<'a> = Command<&'a str, // Identifier
                                        AlphaTermSC<&'a str>, // Alpha normalized side condition
                                        Vec<StrAlphaTerm<'a>>>;
 pub type Program<'a> = Vec<StrCommand<'a>>;
+pub type AProgram<'a> = Vec<StrAlphaCommand<'a>>;
 
 #[derive(Debug, PartialEq)]
 pub enum Command<Id, Term, SC, Args> {

@@ -4,8 +4,9 @@ use lfsc_syntax::{ast::AlphaTerm,  abinder, ast::BuiltIn};
 use lfsc_syntax::ast::{Ident::*, Num};
 use lfsc_syntax::ast::AlphaTerm::*;
 
+use super::errors::TypecheckingErrors;
 use super::values::mk_neutral_var_with_type;
-use super::values::{RT, Normal, Value, Type, Neutral, TypecheckingErrors, TResult};
+use super::values::{RT, Normal, Value, Type, Neutral, TResult};
 
 use super::EnvWrapper;
 
@@ -15,7 +16,7 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
     pub fn readback_normal(&self, normal: Normal<'ctx, T>)
                            -> TResult<AlphaTerm<T>, T>
     {
-        self.readback(normal.0 , normal.1)
+        self.readback(normal.0, normal.1)
     }
 
     pub fn readback(&self,
@@ -30,7 +31,7 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
             Type::Pi(dom, ran) => {
                 let env = self.update_local(dom.clone());
                 let var = mk_neutral_var_with_type(dom.clone());
-                let ran_ = ran(var.clone(), self.gctx, self.allow_dbi)?;
+                let ran_ = ran(var.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?;
                 let app = self.do_app(val, var)?;
                 Ok(abinder!(lam, env.readback(ran_, app)?))
             }
@@ -40,7 +41,7 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                         let dom = self.readback(ty.clone(), at.clone())?;
                         let env = self.update_local(at.clone());
                         let cls_res = bt(mk_neutral_var_with_type(at.clone()),
-                                         self.gctx, self.allow_dbi)?;
+                                         self.gctx, self.allow_dbi, self.hole_count.clone())?;
                         let ran = env.readback(ty, cls_res)?;
                         Ok(abinder!(pi, dom, ran))
                     },
@@ -48,7 +49,6 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                     Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
                     Value::QT => Ok(Ident(Symbol(T::_mpq()))),
                     Value::Run(t1,t2,_) => self.readback(ty, t2.clone()),
-                    // Value::Run(t1,t2) => Ok(SC((*t1).clone(), Box::new(self.readback(ty, t2.clone())?))),
                     _ => Err(TypecheckingErrors::ReadBackMismatch),
                 }
             }
@@ -77,7 +77,7 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
             Neutral::DBI(i) => {
                 Ok(Ident(DBI(*i)))
             },
-            Neutral::Hole(hol) => {
+            Neutral::Hole(hol, _) => {
                 if let Some(ty) = &*hol.borrow() {
                     // TODO: check the cost of this
                     self.readback_neutral(_ty, ty.clone())

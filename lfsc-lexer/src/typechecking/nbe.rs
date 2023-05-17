@@ -15,13 +15,13 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
     {
         use super::values::mk_closure;
 
-        // println!("eval: {:?}", term);
         match term {
             Number(Num::Z(p)) => Ok(Rc::new(Value::Z(*p))),
             Number(Num::Q(p,q)) => Ok(Rc::new(Value::Q(*p, *q))),
             Hole => {
-                // todo!("eval hole")
-                Ok(Rc::new(Value::Neutral(self.gctx.kind.clone(), Rc::new(Neutral::Hole(RefCell::new(None))))))
+                let c = self.hole_count.get();
+                // self.hole_count.set(c + 1);
+                Ok(Rc::new(Value::Neutral(self.gctx.kind.clone(), Rc::new(Neutral::Hole(RefCell::new(None), c)))))
             },
             Ident(Symbol(name)) => {
                 let res = self.gctx.get_value(name)?;
@@ -40,9 +40,11 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
                     let e2 = self.eval(a)?;
                     e1 = self.do_app(e1, e2)?;
                 };
-                println!("eval: {:?}", self.readback(self.gctx.kind.clone(), e1.clone()));
                 Ok(e1)
             },
+            Let(m,n) => {
+                self.insert_local(self.eval(m)?).eval(n)
+            }
             Pi(ty, body) => {
                 let dom =
                     if let SC(sc, term) = &**ty {
@@ -66,11 +68,11 @@ where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
     pub fn do_app(&self, f: RT<'ctx, T>, arg: RT<'ctx, T>) -> ResRT<'ctx, T>
     {
     match f.borrow() {
-        Value::Lam(closure) => closure(arg, self.gctx, self.allow_dbi),
+        Value::Lam(closure) => closure(arg, self.gctx, self.allow_dbi, self.hole_count.clone()),
         Value::Neutral(f, neu) => {
             if let Value::Pi(dom, ran) = f.borrow() {
                 Ok(Rc::new(Value::Neutral(
-                    ran(arg.clone(), self.gctx, self.allow_dbi)?,
+                    ran(arg.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?,
                     Rc::new(Neutral::App(neu.clone(), Normal(dom.clone(), arg))))))
             } else {
                 todo!("This should be an error")

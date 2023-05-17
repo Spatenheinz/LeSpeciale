@@ -11,7 +11,7 @@ use lfsc_syntax::ast::SideEffectSC::*;
 use crate::typechecking::values::{as_neutral, flatten, ref_compare};
 
 use super::EnvWrapper;
-use super::values::TypecheckingErrors::{NaN, DivByZero, ReachedFail, NoMatch, self};
+use super::errors::TypecheckingErrors::{NaN, DivByZero, ReachedFail, NoMatch};
 // use super::context::{RLCTX, RGCTX, set_mark, get_mark, LocalContext};
 use super::values::{ResRT, Value, as_symbolic, TResult};
 
@@ -28,7 +28,6 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             Ident(DBI(i)) => self.lctx.get_value(*i),
             Ident(Symbol(x)) => self.gctx.get_value(x),
             Let(m, n) => {
-              println!("Let {:?} {:?}", m, n);
                 let m = self.run_sc(m)?;
                 self.update_local(m).run_sc(n)
             },
@@ -39,14 +38,11 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                 args.push(self.run_sc(e)?);
               }
               if let Value::Prog(_, body) = fun.borrow() {
-                  println!("Running program {:?}\n with args {:?}", m, n);
                   let mut env = self.clone();
                   for e in args {
-                    println!("Inserting {:?}", env.readback(env.gctx.kind.clone(), e.clone()));
                     env = env.insert_local(e);
                   }
                   let res = env.run_sc(body)?;
-                  println!("Result {:?}", env.readback(env.gctx.kind.clone(), res.clone()));
                 return Ok(res);
               };
               for e in args {
@@ -98,7 +94,6 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             self.run_sc( if ref_compare(a, b) { tbranch } else { fbranch })
         }
         Match(scrut, cases) => {
-          println!("Match {:?}\ncases:{:?}", scrut, cases);
             let scrut = self.run_sc(scrut)?;
             let scrut1 = as_neutral(&scrut)?;
             let (c,xs) = flatten(&scrut1)?;
@@ -115,7 +110,6 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                     return env.run_sc(s);
                 }
             };
-          println!("No match for {:?} in {:?}", scrut, cases);
           Err(NoMatch)
         }
         }
@@ -146,7 +140,6 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             ZtoQ(z) => todo!(),
             ZBranch { n, tbranch, fbranch } | NegBranch { n, tbranch, fbranch } => {
                 let n = self.run_sc(n)?;
-              println!("n: {:?}", n);
                 let val = match n.borrow() {
                         Value::Z(x) => x,
                         Value::Q(q,_) => todo!("error on q"),

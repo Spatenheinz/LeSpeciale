@@ -83,7 +83,7 @@ pub fn alpha_normalize<'a>(term: StrTerm<'a>,
         // },
         Term::Binder {kind, var, ty, body } => {
             // only some binders contains type annotations.
-            let ty = ty.map(|x| alpha_normalize(*x, vars));
+            let ty = ty.map(|x| local(alpha_normalize, vars)(*x));
             vars.push(var);
             let body = alpha_normalize(*body, vars);
             match kind {
@@ -94,6 +94,9 @@ pub fn alpha_normalize<'a>(term: StrTerm<'a>,
                     } else {
                         Lam(Box::new(body))
                     }
+                },
+                BinderKind::Let => {
+                    Let(Box::new(ty.unwrap()), Box::new(body))
                 },
                 BinderKind::BigLam => todo!("Currently unsupported in the alpha normalized language")
             }
@@ -211,7 +214,8 @@ fn alpha_pattern<'a>(pat: Pattern<&'a str>, vars: &mut Vec<&'a str>)
     -> AlphaPattern<&'a str> {
     match pat {
         Pattern::Default => AlphaPattern::Default,
-        Pattern::Symbol(x) => AlphaPattern::Symbol(x),
+        Pattern::Symbol(Symbol(x)) => Lookup::lookup(vars, x),
+        Pattern::Symbol(DBI(x)) => AlphaPattern::Symbol(DBI(x)),
         Pattern::App(f, args) => {
             let mut args_checked = Vec::new();
             for i in args.iter() {

@@ -6,20 +6,22 @@ mod readback;
 mod infer;
 mod sc;
 mod tester;
+pub mod errors;
 
-use std::{rc::Rc, borrow::Borrow};
+use std::{rc::Rc, borrow::Borrow, cell::Cell};
 
 use lfsc_syntax::ast::{Command, StrAlphaCommand, Ident, BuiltIn};
-// use nbe::eval;
 
 use self::{context::{LocalContext, Rgctx, Rlctx, GlobalContext},
-           values::{TResult, RT, is_type_or_datatype, Value, TypecheckingErrors, Type, ResRT, ref_compare}};
+           values::{TResult, RT, is_type_or_datatype, Value,  Type, ResRT, ref_compare},
+           errors::TypecheckingErrors};
 
 #[derive(Clone)]
-struct EnvWrapper<'global, 'term, T: Copy + PartialEq> {
+struct EnvWrapper<'global, 'term, T: Copy + PartialEq + std::fmt::Debug> {
     pub lctx: Rlctx<'term, T>,
     pub gctx: Rgctx<'global, 'term, T>,
     pub allow_dbi: u32,
+    pub hole_count: Cell<u32>
 }
 
 impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
@@ -27,19 +29,31 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 {
     pub fn new(lctx: Rlctx<'term, T>,
                gctx: Rgctx<'global, 'term, T>,
-           allow_dbi: u32) -> Self {
-        Self { lctx, gctx, allow_dbi }
+           allow_dbi: u32,
+           hole_count: Cell<u32>) -> Self {
+        Self { lctx, gctx, allow_dbi, hole_count }
     }
 
     pub fn insert_local(&self, val: RT<'term, T>) -> Self {
         Self { lctx: LocalContext::insert(val, self.lctx.clone()),
                gctx: self.gctx,
-               allow_dbi: self.allow_dbi }
+               allow_dbi: self.allow_dbi,
+               hole_count: self.hole_count.clone()
+        }
+    }
+    pub fn define_local(&self, ty: RT<'term, T>, val: RT<'term, T>) -> Self {
+        Self { lctx: LocalContext::define(ty, val, self.lctx.clone()),
+               gctx: self.gctx,
+               allow_dbi: self.allow_dbi,
+               hole_count: self.hole_count.clone()
+        }
     }
     pub fn update_local(&self, val: RT<'term, T>) -> Self {
         Self { lctx: LocalContext::decl(val, self.lctx.clone()),
                gctx: self.gctx,
-               allow_dbi: self.allow_dbi }
+               allow_dbi: self.allow_dbi,
+               hole_count: self.hole_count.clone()
+        }
     }
     pub fn get_value(&self, key: &Ident<T>) -> ResRT<'term, T> {
         match key {
@@ -68,9 +82,9 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
                 tau: RT<'term, T>) -> TResult<(), T>
     {
         if ref_compare(t1.clone(), t2.clone()) { return Ok(()) }
-        println!("t1: {:?}\nt2: {:?}", t1.clone(), t2.clone());
         let e1 = self.readback(tau.clone(), t1)?;
         let e2 = self.readback(tau, t2)?;
+        // println!("convert:\n\t{:?}\n\t{:?}", e1, e2);
         if e1 == e2 {
             Ok(())
         } else {
@@ -81,45 +95,43 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 
 pub fn handle_command<'a, 'b>(com: &'b StrAlphaCommand<'a>,
                              gctx: &mut GlobalContext<'b, &'a str>) -> TResult<(), &'a str>
+where 'a: 'b
 {
     // let lctx = Rc::new(LocalContext::new());
-    let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx, 0);
+    let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx, 0, Cell::new(1));
     match com {
       Command::Declare(id, ty) => {
           // actually doing this for pi will check that it is a sort already,
+          // println!("declare: {}", id);
             if gctx.contains(id) {
                 return Err(TypecheckingErrors::SymbolAlreadyDefined(id))
             }
-            println!("Declare: {:?}\n\n\n", id);
             env.infer_sort(ty)?;
-            let val = env.eval(ty)?;
-            gctx.insert(id, val);
+            gctx.insert(id,  env.eval(ty)?);
             Ok(())
       },
         Command::Define(id, term) => {
+          // println!("define: {}", id);
             if gctx.contains(id) {
                 return Err(TypecheckingErrors::SymbolAlreadyDefined(id))
             }
-            println!("Define: {:?}\n", id);
             let ty = env.infer(term)?;
-            let val = env.eval(term)?;
             if Type::Box == *ty.borrow() {
                 return Err(TypecheckingErrors::KindLevelDefinition)
             }
-            println!("ty: {:?}\nval: {:?}\n\n\n", ty, val);
-            gctx.define(id, ty, val);
+            gctx.define(id, ty, env.eval(term)?);
             Ok(())
         },
         Command::Check(term) => {
-            println!("CHECKING");
+            // println!("check");
             env.infer(term)?;
             Ok(())
         },
         Command::Prog { cache: _chache, id, args, ty, body } => {
+            // println!("prog: {}", id);
             if gctx.contains(id) {
                 return Err(TypecheckingErrors::SymbolAlreadyDefined(id))
             }
-            println!("Prog: {:?}\n\n\n", id);
             // check that type of the program is type or a datatype
             let res_kind = env.infer(ty)?;
             is_type_or_datatype(res_kind.borrow())?;
@@ -137,15 +149,10 @@ pub fn handle_command<'a, 'b>(com: &'b StrAlphaCommand<'a>,
             let lctx = tmp_env.lctx.clone();
             drop(tmp_env);
             // order is important since it will allow us to introduce recursion for functions
-            println!("args: {:?}\n\n\n", args_ty);
             let typ = Rc::new(Value::Prog(args_ty.clone(), body));
             gctx.define(id, res_ty.clone(), typ);
 
-            let env = EnvWrapper::new(lctx, gctx, 0);
-            let body_ty = env.infer_sc(body)?;
-            println!("body type {:?}", body_ty);
-            println!("result type {:?}", res_ty);
-            env.same(body_ty, res_ty.clone())?;
+            EnvWrapper::new(lctx, gctx, 0, Cell::new(0)).check_sc(body, res_ty)?;
             Ok(())
         }
         Command::Run(..) => todo!(),

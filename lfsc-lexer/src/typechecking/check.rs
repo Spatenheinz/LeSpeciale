@@ -1,6 +1,7 @@
-use lfsc_syntax::ast::{AlphaTerm, BuiltIn};
+use lfsc_syntax::ast::{AlphaTerm, BuiltIn, AlphaTermSC};
 use super::EnvWrapper;
-use super::values::{Value, TResult, RT, TypecheckingErrors, mk_neutral_var_with_type};
+use super::errors::TypecheckingErrors;
+use super::values::{Value, TResult, RT, mk_neutral_var_with_type, ResRT};
 
 use std::borrow::Borrow;
 
@@ -13,18 +14,24 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
             AlphaTerm::Lam(body) => {
                 if let Value::Pi(a,b) = tau.borrow() {
                     let val = b(mk_neutral_var_with_type(a.clone()),
-                                self.gctx, self.allow_dbi)?;
-                    let env = self.update_local(val.clone());
+                                self.gctx, self.allow_dbi, self.hole_count.clone())?;
+                    let env = self.update_local(a.clone());
+                    // println!("val: {:?}", val);
                     return env.check(body, val)
                 }
                 Err(TypecheckingErrors::NotPi)
             },
             _ => {
                 let t = self.infer(term)?;
-                // println!("check: t = {:?}\n\n\n tau = {:?}", t, tau);
-                // println!("check: t = {:?}\n\n\n tau = {:?}", t, self.readback(self.gctx.kind.clone(), tau.clone()));
                 self.same(t, tau)
             }
         }
+    }
+
+    pub fn check_sc(&self, sc: &'ctx AlphaTermSC<T>, tau: RT<'ctx, T>) -> ResRT<'ctx, T>
+    {
+        let t = self.infer_sc(sc)?;
+        self.same(t.clone(), tau)?;
+        Ok(t)
     }
 }

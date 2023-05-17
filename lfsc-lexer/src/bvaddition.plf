@@ -1,0 +1,109 @@
+; WARNING: adding trust step for THEORY_REWRITE
+(define cvc.r1_1 (var 0 (BitVec 64)))
+(define cvc.r1_2 (var 1 (BitVec 64)))
+(define cvc.r1_3 (var 2 (BitVec 64)))
+(define cvc.r0_5 (var 3 (BitVec 64)))
+(define cvc.r1_4 (var 4 (BitVec 64)))
+(define cvc.post (var 5 (BitVec 1)))
+(check
+(@ t1 (= cvc.post cvc.post)
+(@ t2 (bvudiv cvc.r0_5 cvc.r1_4)
+(@ t3 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 (bvc b0 bvn))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+(@ t4 (bvc b0 (bvc b0 t3))
+(@ t5 (bvc b1 t4)
+(@ t6 (bv (bvc b0 t5))
+(@ t7 (= t6 t2)
+(@ t8 (bvc b0 t4)
+(@ t9 (bv (bvc b0 t8))
+(@ t10 (= cvc.r1_4 t9)
+(@ t11 (bv (bvc b0 (bvc b0 (bvc b1 (bvc b1 t3)))))
+(@ t12 (= cvc.r0_5 t11)
+(@ t13 (bvadd cvc.r1_3 (bvadd t6 t9))
+(@ t14 (= cvc.r1_4 t13)
+(@ t15 (bvadd cvc.r1_2 (bvadd (bv (bvc b1 t5)) t9))
+(@ t16 (= cvc.r1_3 t15)
+(@ t17 (bvadd cvc.r1_1 (bvadd (bv (bvc b1 t8)) t9))
+(@ t18 (= cvc.r1_2 t17)
+(@ t19 (= cvc.r1_1 t9)
+(@ t20 (= t9 cvc.r1_1)
+(@ t21 (= t17 cvc.r1_2)
+(@ t22 (= t15 cvc.r1_3)
+(@ t23 (= t13 cvc.r1_4)
+(@ t24 (= t11 cvc.r0_5)
+(@ t25 (= t9 cvc.r1_4)
+(@ t26 (= t2 t6)
+(# a0 (holds (not (=> t19 (=> t18 (=> t16 (=> t14 (=> t12 (=> (and (not t10) (and t7 true)) t1))))))))
+(: (holds false)
+
+(plet _  _ 
+
+(refl f_and)
+(\ p1
+
+
+(eq_resolve _  _  a0
+(trans _  _  _ 
+(cong _  _  _  _ 
+(refl f_not)
+(trans _  _  _ 
+(cong _  _  _  _ 
+(cong _  _  _  _ 
+(refl f_=>)
+(trust (= t19 t20)) ; from THEORY_REWRITE
+)
+(trans _  _  _ 
+(cong _  _  _  _ 
+(cong _  _  _  _ 
+(refl f_=>)
+(trust (= t18 t21)) ; from THEORY_REWRITE
+)
+(trans _  _  _ 
+(cong _  _  _  _ 
+(cong _  _  _  _ 
+(refl f_=>)
+(trust (= t16 t22)) ; from THEORY_REWRITE
+)
+(trans _  _  _ 
+(cong _  _  _  _ 
+(cong _  _  _  _ 
+(refl f_=>)
+(trust (= t14 t23)) ; from THEORY_REWRITE
+)
+(trans _  _  _ 
+(cong _  _  _  _ 
+(cong _  _  _  _ 
+(refl f_=>)
+(trust (= t12 t24)) ; from THEORY_REWRITE
+)
+(trans _  _  _ 
+(cong _  _  _  _ 
+(cong _  _  _  _ 
+(refl f_=>)
+(cong _  _  _  _ 
+(cong _  _  _  _  p1
+(cong _  _  _  _ 
+(refl f_not)
+(trust (= t10 t25)) ; from THEORY_REWRITE
+))
+(cong _  _  _  _ 
+(cong _  _  _  _  p1
+(trust (= t7 t26)) ; from THEORY_REWRITE
+)
+(refl true))))
+(trust (= t1 true)) ; from THEORY_REWRITE
+)
+(trust (= (=> (and (not t25) (and t26 true)) true) true)) ; from THEORY_REWRITE
+))
+(trust (= (=> t24 true) true)) ; from THEORY_REWRITE
+))
+(trust (= (=> t23 true) true)) ; from THEORY_REWRITE
+))
+(trust (= (=> t22 true) true)) ; from THEORY_REWRITE
+))
+(trust (= (=> t21 true) true)) ; from THEORY_REWRITE
+))
+(trust (= (=> t20 true) true)) ; from THEORY_REWRITE
+))
+(trust (= (not true) false)) ; from THEORY_REWRITE
+)))))))))))))))))))))))))))))))))
+

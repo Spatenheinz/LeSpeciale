@@ -1,3 +1,4 @@
+use lfsc_syntax::ast::AlphaPattern;
 use lfsc_syntax::ast::StrAlphaSC as ASC;
 use lfsc_syntax::ast::StrAlphaTerm;
 use lfsc_syntax::ast::AlphaTerm::*;
@@ -24,5 +25,11 @@ impl<'a> Lookup<'a> for ASC<'a> {
     fn lookup(vars: &[&'a str], var: &'a str) -> Self {
         lookup_(vars, var).map(|x| ASC::Ident(DBI(x)))
                           .unwrap_or(ASC::Ident(Symbol(var)))
+    }
+}
+impl<'a> Lookup<'a> for AlphaPattern<&'a str> {
+    fn lookup(vars: &[&'a str], var: &'a str) -> Self {
+        lookup_(vars, var).map(|x| AlphaPattern::Symbol(DBI(x)))
+                          .unwrap_or(AlphaPattern::Symbol(Symbol(var)))
     }
 }
