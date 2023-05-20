@@ -10,8 +10,10 @@ use super::values::{RT, Normal, Value, Type, Neutral, TResult};
 
 use super::EnvWrapper;
 
+use std::hash::Hash;
+
 impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
-where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
+where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
 {
     pub fn readback_normal(&self, normal: Normal<'ctx, T>)
                            -> TResult<AlphaTerm<T>, T>

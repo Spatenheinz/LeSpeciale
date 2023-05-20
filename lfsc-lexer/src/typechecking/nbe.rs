@@ -8,8 +8,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::borrow::Borrow;
 
+use std::hash::Hash;
+
 impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
-where T: PartialEq + std::fmt::Debug + BuiltIn + Copy
+where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
 {
     pub fn eval(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T>
     {

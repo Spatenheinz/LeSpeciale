@@ -7,6 +7,8 @@ use lfsc_syntax::ast::{AProgram, Program, StrCommand};
 use parser::parser::*;
 use typechecking::context::*;
 
+use std::env;
+
 use crate::typechecking::handle_command;
 
 macro_rules! insert_str {
@@ -69,10 +71,9 @@ fn main() -> Result<(), String> {
                 "../signatures/strings_rules.plf"
     );
     let mut normal = vec![];
-    // testfile here:
-    let s = std::fs::read_to_string("src/div.plf").unwrap();
-    // let s = std::fs::read_to_string("src/bvaddition.plf").unwrap();
-    // let s = std::fs::read_to_string("src/smol.plf").unwrap();
+    let args: Vec<String> = env::args().collect();
+    let file = &args[1];
+    let s = std::fs::read_to_string(file).unwrap();
     string_life.push(&s);
     for i in string_life.iter() {
         let a = parse_prog(i)?;

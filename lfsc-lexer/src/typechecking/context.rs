@@ -4,8 +4,12 @@ use super::errors::TypecheckingErrors;
 use super::values::{Neutral, Type, Value, RT, TResult, ResRT};
 use core::fmt;
 use std::borrow::Borrow;
+use std::collections::{HashMap, BTreeMap};
 use std::rc::Rc;
 use std::cell::RefCell;
+
+use std::hash::Hash;
+
 
 #[derive(Debug)]
 pub struct LookupErr {err: String}
@@ -15,18 +19,19 @@ pub type Rlctx<'term, T> = Rc<LocalContext<'term, T>>;
 pub type Rgctx<'own, 'term, T> = &'own GlobalContext<'term, T>;
 
 #[derive(Debug)]
-pub struct GlobalContext<'term, K: Copy + PartialEq + std::fmt::Debug> {
+pub struct GlobalContext<'term, K: Copy + Eq + Ord + Hash + std::fmt::Debug> {
     pub kind: RT<'term, K>,
-    keys: Vec<K>,
-    values: Vec<TypeEntry<'term, K>>,
+    kvs: HashMap<K, TypeEntry<'term, K>>
+    // keys: Vec<K>,
+    // values: Vec<TypeEntry<'term, K>>,
 }
 
-pub enum LocalContext<'a, K: Copy + PartialEq + std::fmt::Debug> {
+pub enum LocalContext<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug> {
     Nil,
     Cons(TypeEntry<'a, K>, Rlctx<'a, K>),
 }
 
-impl<'term, T: Copy + fmt::Debug + PartialEq + std::fmt::Debug> fmt::Debug for LocalContext<'term, T> {
+impl<'term, T: Copy + fmt::Debug + Eq + Ord + Hash + std::fmt::Debug> fmt::Debug for LocalContext<'term, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             LocalContext::Nil => write!(f, "Nil"),
@@ -43,7 +48,7 @@ pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
 }
 
 
-fn from_entry_to_value<'a, K: Copy + PartialEq + std::fmt::Debug>(entry: &TypeEntry<'a, K>, key: Ident<K>)
+fn from_entry_to_value<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug>(entry: &TypeEntry<'a, K>, key: Ident<K>)
                                      -> RT<'a, K> {
        match entry {
          TypeEntry::Def { val, .. } => val.clone(),
@@ -67,7 +72,7 @@ fn from_entry_to_value<'a, K: Copy + PartialEq + std::fmt::Debug>(entry: &TypeEn
          }
 }
 
-fn from_entry_to_type<'a, K: Copy + PartialEq + std::fmt::Debug>(entry: &TypeEntry<'a, K>)
+fn from_entry_to_type<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug>(entry: &TypeEntry<'a, K>)
                                     -> RT<'a, K> {
        match entry {
          TypeEntry::Def { ty, .. } => ty.clone(),
@@ -80,7 +85,7 @@ fn from_entry_to_type<'a, K: Copy + PartialEq + std::fmt::Debug>(entry: &TypeEnt
 //                        n: u32,
 //                        lctx: Rlctx<'a, K>,
 //                        gctx: Rgctx<'a, K>) -> LResult<u32, K>
-// where K: std::fmt::Debug + Clone + PartialEq + std::fmt::Debug
+// where K: std::fmt::Debug + Clone + Eq + Ord + Hash + std::fmt::Debug
 //     {
 //     match key {
 //        Ident::DBI(i) => lctx.get(i),
@@ -97,7 +102,7 @@ fn from_entry_to_type<'a, K: Copy + PartialEq + std::fmt::Debug>(entry: &TypeEnt
 //                        n: u32,
 //                        lctx: Rlctx<'a, K>,
 //                        gctx: Rgctx<'a, K>)
-// where K: PartialEq + std::fmt::Debug + Clone + std::fmt::Debug
+// where K: Eq + Ord + Hash + std::fmt::Debug + Clone + std::fmt::Debug
 // {
 //     let val = match key {
 //                 Ident::DBI(i) => lctx.get(i),
@@ -114,28 +119,32 @@ fn from_entry_to_type<'a, K: Copy + PartialEq + std::fmt::Debug>(entry: &TypeEnt
 // }
 
 impl<'a, K> GlobalContext<'a, K>
-where K: PartialEq + std::fmt::Debug + std::fmt::Debug + Copy
+where K: Eq + Ord + Hash + std::fmt::Debug + std::fmt::Debug + Copy
 {
     pub fn new() -> Self {
         Self {
             kind: Rc::new(Value::Box),
-            keys: Vec::new(),
-            values: Vec::new(),
+            kvs: HashMap::new(),
+            // keys: Vec::new(),
+            // values: Vec::new(),
         }
     }
 
     pub fn contains(&self, key: &K) -> bool {
-        self.keys.contains(key)
+        self.kvs.contains_key(key)
+        // self.keys.contains(key)
     }
 
     pub fn insert(&mut self, key: K, ty: RT<'a, K>) {
-       self.keys.push(key);
-       self.values.push(TypeEntry::IsA { ty, marks: RefCell::new(0)})
+        self.kvs.insert(key, TypeEntry::IsA { ty, marks: RefCell::new(0)});
+       // self.keys.push(key);
+       // self.values.push(TypeEntry::IsA { ty, marks: RefCell::new(0)})
     }
 
-    pub fn define(&mut self, name: K, ty: RT<'a, K>, val: RT<'a, K>) {
-      self.keys.push(name);
-      self.values.push(TypeEntry::Def { ty, val })
+    pub fn define(&mut self, key: K, ty: RT<'a, K>, val: RT<'a, K>) {
+        self.kvs.insert(key, TypeEntry::Def { ty, val });
+      // self.keys.push(name);
+      // self.values.push(TypeEntry::Def { ty, val })
     }
 
     // fn get(&self, key: &K) -> LResult<&TypeEntry<'a, K>, K>
@@ -153,24 +162,28 @@ where K: PartialEq + std::fmt::Debug + std::fmt::Debug + Copy
 
     pub fn get_value(&self, key: &K) -> ResRT<'a, K>
     where K: std::fmt::Debug {
-        self.keys
-            .iter()
-            .rev()
-            .zip(self.values.iter().rev())
-            .find(|(&n, _)| n == *key)
-            .map(|(_, v)| from_entry_to_value(v, Ident::Symbol(*key)))
+        self.kvs.get(key).map(|v| from_entry_to_value(v, Ident::Symbol(*key)))
             .ok_or(lookup_err(Ident::Symbol(key)))
+        // self.keys
+        //     .iter()
+        //     .rev()
+        //     .zip(self.values.iter().rev())
+        //     .find(|(&n, _)| n == *key)
+        //     .map(|(_, v)| from_entry_to_value(v, Ident::Symbol(*key)))
+        //     .ok_or(lookup_err(Ident::Symbol(key)))
     }
 
     pub fn get_type(&self, key: &K) -> ResRT<'a, K>
     where K: std::fmt::Debug {
-        self.keys
-            .iter()
-            .rev()
-            .zip(self.values.iter().rev())
-            .find(|(&n, _)| n == *key)
-            .map(|(_, v)| from_entry_to_type(v))
+        self.kvs.get(key).map(|v| from_entry_to_type(v))
             .ok_or(lookup_err(Ident::Symbol(key)))
+        // self.keys
+        //     .iter()
+        //     .rev()
+        //     .zip(self.values.iter().rev())
+        //     .find(|(&n, _)| n == *key)
+        //     .map(|(_, v)| from_entry_to_type(v))
+        //     .ok_or(lookup_err(Ident::Symbol(key)))
     }
 }
 
@@ -182,7 +195,7 @@ where K: std::fmt::Debug,
 }
 
 impl<'a, K> LocalContext<'a, K>
-where K: PartialEq + std::fmt::Debug + Copy
+where K: Eq + Ord + Hash + std::fmt::Debug + Copy
 {
     pub fn new() -> Self {
         Self::Nil
@@ -227,7 +240,7 @@ where K: PartialEq + std::fmt::Debug + Copy
 }
 
 #[derive(Debug)]
-pub enum TypeEntry<'a, Key: Copy + PartialEq + std::fmt::Debug>
+pub enum TypeEntry<'a, Key: Copy + Eq + Ord + Hash + std::fmt::Debug>
 // where Key: Clone
 {
     // Dec { ty: RT<'a, Key> },

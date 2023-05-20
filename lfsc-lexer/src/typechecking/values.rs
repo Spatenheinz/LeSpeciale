@@ -7,11 +7,13 @@ use lfsc_syntax::ast::{AlphaTerm, AlphaTermSC, Ident, BuiltIn};
 use super::errors::TypecheckingErrors;
 use super::{EnvWrapper, context::{LocalContext, GlobalContext}};
 
+use std::hash::Hash;
+
 pub type Closure<'term, T> =
     Box<dyn Fn(RT<'term, T>, &GlobalContext<'term, T>, u32, Cell<u32>) -> ResRT<'term, T> + 'term>;
 
 pub fn const_closure<T>(cons: RT<T>) -> Closure<T>
-where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
+where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 {
     Box::new(move |_,_,_,_| { Ok(cons.clone()) })
 }
@@ -19,7 +21,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
 pub fn mk_closure<'term, T>(body: &'term AlphaTerm<T>,
                          lctx: super::context::Rlctx<'term, T>,
                         ) -> Closure<'term, T>
-where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
+where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 {
     Box::new(move |v, gctx, allow_dbi, hole_count| {
              let lctx = LocalContext::insert(v, lctx.clone());
@@ -33,7 +35,7 @@ pub type RT<'term, T> = Rc<Type<'term, T>>;
 pub type ResRT<'term, T> = TResult<RT<'term, T>, T>;
 
 // #[derive(Clone)]
-pub enum Value<'term, T: Copy + PartialEq + std::fmt::Debug> {
+pub enum Value<'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug> {
     Pi(RT<'term, T>, Closure<'term, T>),
     Lam(Closure<'term, T>),
     Box, // Universe
@@ -47,7 +49,7 @@ pub enum Value<'term, T: Copy + PartialEq + std::fmt::Debug> {
     Prog(Vec<RT<'term, T>>, &'term AlphaTermSC<T>),
 }
 
-impl<'term, T: Copy + fmt::Debug + PartialEq> fmt::Debug for Value<'term, T> {
+impl<'term, T: Copy + fmt::Debug + Eq + Ord + Hash> fmt::Debug for Value<'term, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Value::Pi(a, _) => write!(f, "∏ {:?}", a),
@@ -75,7 +77,7 @@ impl<'term, T: Copy + fmt::Debug + PartialEq> fmt::Debug for Value<'term, T> {
 
 
 
-impl<'term, T: Copy + PartialEq+ std::fmt::Debug> PartialEq for Value<'term, T> {
+impl<'term, T: Copy + Eq + Ord + Hash+ std::fmt::Debug> PartialEq for Value<'term, T> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
@@ -104,7 +106,7 @@ impl<'term, T: Copy + PartialEq+ std::fmt::Debug> PartialEq for Value<'term, T> 
 }
 
 pub fn ref_compare<'term, T>(a: RT<'term, T>, b: RT<'term, T>) -> bool
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     match (&*a, &*b) {
         (Value::Box, Value::Box) => true,
@@ -122,7 +124,7 @@ where T: Copy + PartialEq + std::fmt::Debug
 }
 
 fn ref_compare_neutral<'term, T>(n: Rc<Neutral<'term, T>>, m: Rc<Neutral<'term, T>>) -> bool
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     match (&*n, &*m) {
         (Neutral::Var(i), Neutral::Var(j)) => i == j,
@@ -154,20 +156,20 @@ where T: Copy + PartialEq + std::fmt::Debug
     }
 }
 fn ref_compare_normal<'term, T>(n: &Normal<'term, T>, m: &Normal<'term, T>) -> bool
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     ref_compare(n.0.clone(), m.0.clone()) && ref_compare(n.1.clone(), m.1.clone())
 }
 
 #[inline(always)]
 pub fn mk_neutral_var_with_type<T>(typ: RT<T>) -> RT<T>
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     Rc::new(Value::Neutral(typ, Rc::new(Neutral::DBI(0))))
 }
 
 pub fn is_type_or_datatype<T>(v: &Value<T>) -> TResult<(),T>
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     if Type::Star == *v {
         return Ok(());
@@ -176,7 +178,7 @@ where T: Copy + PartialEq + std::fmt::Debug
 }
 
 pub fn is_Z_or_Q<T>(v: &Value<T>) -> TResult<(), T>
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     if let Ok(..) = as_Z(v) {
         return Ok(());
@@ -188,7 +190,7 @@ where T: Copy + PartialEq + std::fmt::Debug
 }
 
 pub fn is_datatype<T>(v: &Value<T>) -> TResult<(), T>
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     if let Ok(..) = as_Z(v) {
         return Ok(());
@@ -204,7 +206,7 @@ where T: Copy + PartialEq + std::fmt::Debug
 
 pub fn as_symbolic<T>(v: &Value<T>)
                           -> TResult<Ident<T>, T>
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     match v {
         Value::Neutral(_, n) => match &**n {
@@ -218,7 +220,7 @@ where T: Copy + PartialEq + std::fmt::Debug
 
 #[allow(non_snake_case)]
 pub fn as_Z<T>(v: &Value<T>) -> TResult<(), T>
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     match v {
         Value::ZT => Ok(()),
@@ -228,7 +230,7 @@ where T: Copy + PartialEq + std::fmt::Debug
 
 #[allow(non_snake_case)]
 pub fn as_Q<T>(v: & Value<T>) -> TResult<(), T>
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     match v {
         Value::QT => Ok(()),
@@ -237,7 +239,7 @@ where T: Copy + PartialEq + std::fmt::Debug
 }
 pub fn as_neutral<'term, T>(v: &Value<'term, T>)
                           -> TResult<Rc<Neutral<'term, T>>, T>
-where T: Copy + PartialEq + std::fmt::Debug
+where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 {
     match v {
         Value::Neutral(_, n) => Ok(n.clone()),
@@ -246,13 +248,13 @@ where T: Copy + PartialEq + std::fmt::Debug
 }
 
 // pub fn is_neutral<T>(v: &Value<T>) -> bool
-// where T: Copy + PartialEq + std::fmt::Debug
+// where T: Copy + Eq + Ord + Hash + std::fmt::Debug
 // {
 //     matches!(v, Value::Neutral(_, _))
 // }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Neutral<'term, T: Copy + PartialEq + std::fmt::Debug>
+pub enum Neutral<'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug>
 {
     Var(T),
     DBI(u32),
@@ -261,7 +263,7 @@ pub enum Neutral<'term, T: Copy + PartialEq + std::fmt::Debug>
     // SC
 }
 
-pub fn flatten<'term, T: Copy + PartialEq + std::fmt::Debug>(neu: &Neutral<'term, T>) -> TResult<(Ident<T>, Vec<RT<'term, T>>), T> {
+pub fn flatten<'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug>(neu: &Neutral<'term, T>) -> TResult<(Ident<T>, Vec<RT<'term, T>>), T> {
     use Neutral::*;
     match neu {
         Var(c) => Ok((Ident::Symbol(*c), vec![])),
@@ -282,9 +284,9 @@ pub fn flatten<'term, T: Copy + PartialEq + std::fmt::Debug>(neu: &Neutral<'term
 }
 
 #[derive(Clone, PartialEq)]
-pub struct Normal<'term, T: Copy + PartialEq + std::fmt::Debug>(pub Rc<Type<'term, T>>, pub Rc<Value<'term, T>>);
+pub struct Normal<'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug>(pub Rc<Type<'term, T>>, pub Rc<Value<'term, T>>);
 
-impl<'term, T: Copy + fmt::Debug + PartialEq> fmt::Debug for Normal<'term, T> {
+impl<'term, T: Copy + fmt::Debug + Eq + Ord + Hash> fmt::Debug for Normal<'term, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.1)
     }

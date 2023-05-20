@@ -14,9 +14,10 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::borrow::Borrow;
 
+use std::hash::Hash;
 
 impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
-where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
+where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 {
     pub fn infer(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
         match term {
@@ -224,7 +225,7 @@ where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
     }
 
     fn infer_num(&self, sc: &'ctx AlphaNumericSC<T>) -> ResRT<'ctx, T>
-        where T: Clone + PartialEq + std::fmt::Debug + BuiltIn
+        where T: Clone + Eq + Ord + Hash + std::fmt::Debug + BuiltIn
     {
         match sc {
             Sum(x, y) | Prod(x, y) | Div(x, y) => {

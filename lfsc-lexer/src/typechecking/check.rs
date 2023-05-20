@@ -5,8 +5,10 @@ use super::values::{Value, TResult, RT, mk_neutral_var_with_type, ResRT};
 
 use std::borrow::Borrow;
 
+use std::hash::Hash;
+
 impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
-where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
+where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 {
     pub fn check(&self, term: &'ctx AlphaTerm<T>, tau: RT<'ctx, T>) -> TResult<(), T>
     {

@@ -5,7 +5,6 @@ mod nbe;
 mod readback;
 mod infer;
 mod sc;
-mod tester;
 pub mod errors;
 
 use std::{rc::Rc, borrow::Borrow, cell::Cell};
@@ -15,9 +14,10 @@ use lfsc_syntax::ast::{Command, StrAlphaCommand, Ident, BuiltIn};
 use self::{context::{LocalContext, Rgctx, Rlctx, GlobalContext},
            values::{TResult, RT, is_type_or_datatype, Value,  Type, ResRT, ref_compare},
            errors::TypecheckingErrors};
+use std::hash::Hash;
 
 #[derive(Clone)]
-struct EnvWrapper<'global, 'term, T: Copy + PartialEq + std::fmt::Debug> {
+struct EnvWrapper<'global, 'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug> {
     pub lctx: Rlctx<'term, T>,
     pub gctx: Rgctx<'global, 'term, T>,
     pub allow_dbi: u32,
@@ -25,7 +25,7 @@ struct EnvWrapper<'global, 'term, T: Copy + PartialEq + std::fmt::Debug> {
 }
 
 impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
-where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
+where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 {
     pub fn new(lctx: Rlctx<'term, T>,
                gctx: Rgctx<'global, 'term, T>,

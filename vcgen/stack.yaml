@@ -1,0 +1,8 @@
+resolver: lts-18.25
+packages:
+- .
+#
+extra-deps:
+  - github: kfl/ebpf-tools
+    commit: 86792ae47319e3daf6dd5a4c3d0473abd9c16cf3
+

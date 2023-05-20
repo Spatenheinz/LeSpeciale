@@ -15,9 +15,10 @@ use super::errors::TypecheckingErrors::{NaN, DivByZero, ReachedFail, NoMatch};
 // use super::context::{RLCTX, RGCTX, set_mark, get_mark, LocalContext};
 use super::values::{ResRT, Value, as_symbolic, TResult};
 
+use std::hash::Hash;
 
 impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
-where T: PartialEq + std::fmt::Debug + Copy + BuiltIn
+where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 {
     pub fn run_sc(&self, sc: &'term AlphaTermSC<T>) -> ResRT<'term, T>
     {
