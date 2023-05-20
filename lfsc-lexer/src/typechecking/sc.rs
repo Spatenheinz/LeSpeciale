@@ -20,7 +20,7 @@ use std::hash::Hash;
 impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
 where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 {
-    pub fn run_sc(&self, sc: &'term AlphaTermSC<T>) -> ResRT<'term, T>
+    pub fn run_sc(&mut self, sc: &'term AlphaTermSC<T>) -> ResRT<'term, T>
     {
         match sc {
             Number(Num::Z(p)) => Ok(Rc::new(Value::Z(*p))),
@@ -30,7 +30,8 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
             Ident(Symbol(x)) => self.gctx.get_value(x),
             Let(m, n) => {
                 let m = self.run_sc(m)?;
-                self.update_local(m).run_sc(n)
+                self.update_local(m);
+                self.run_sc(n)
             },
             App(m, n) => {
               let mut fun = self.get_value(m)?;
@@ -39,12 +40,11 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
                 args.push(self.run_sc(e)?);
               }
               if let Value::Prog(_, body) = fun.borrow() {
-                  let mut env = self.clone();
                   for e in args {
-                    env = env.insert_local(e);
+                    self.insert_local(e);
                   }
-                  let res = env.run_sc(body)?;
-                return Ok(res);
+                  let res = self.run_sc(body)?;
+                  return Ok(res);
               };
               for e in args {
                 fun = self.do_app(fun, e)?
@@ -57,7 +57,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    fn run_sideeffect(&self, sc: &'term AlphaSideEffectSC<T>) -> ResRT<'term, T>
+    fn run_sideeffect(&mut self, sc: &'term AlphaSideEffectSC<T>) -> ResRT<'term, T>
     {
         match sc {
         Do(a, b) => { self.run_sc(a)?; self.run_sc(b) },
@@ -84,7 +84,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    fn run_compound(&self, sc: &'term AlphaCompoundSC<T>) -> ResRT<'term, T>
+    fn run_compound(&mut self, sc: &'term AlphaCompoundSC<T>) -> ResRT<'term, T>
     {
         match sc {
         Fail(_) => Err(ReachedFail),
@@ -99,16 +99,16 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
             let scrut1 = as_neutral(&scrut)?;
             let (c,xs) = flatten(&scrut1)?;
             for (p,s) in cases {
-                let mut env = self.clone();
-                let (ci, si) = env.match_pattern(p)?;
+              // local scope
+                let (ci, si) = self.match_pattern(p)?;
                 if c == ci && xs.len() == (si as usize) {
                    for x in xs.iter() {
-                       env = env.insert_local(x.clone());
+                       self.insert_local(x.clone());
                    }
-                   return env.run_sc(s);
+                   return self.run_sc(s);
                 }
                 if Symbol(T::_default()) == ci {
-                    return env.run_sc(s);
+                    return self.run_sc(s);
                 }
             };
           Err(NoMatch)
@@ -117,7 +117,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
     }
 
     #[inline(always)]
-    fn match_pattern(&self, p: &'term AlphaPattern<T>)
+    fn match_pattern(&mut self, p: &'term AlphaPattern<T>)
                      -> TResult<(Ident<T>, u32), T>
     {
       match p {
@@ -127,7 +127,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
       }
     }
 
-    fn run_num(&self, sc: &'term AlphaNumericSC<T>) -> ResRT<'term, T>
+    fn run_num(&mut self, sc: &'term AlphaNumericSC<T>) -> ResRT<'term, T>
     {
         match sc {
             Sum(..) | Prod(..) | Div(..) => self.binop(sc),
@@ -156,7 +156,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    fn binop(&self, sc: &'term AlphaNumericSC<T>) -> ResRT<'term, T>
+    fn binop(&mut self, sc: &'term AlphaNumericSC<T>) -> ResRT<'term, T>
     {
         match sc {
         Sum(x, y) | Prod(x, y) | Div(x, y) => {

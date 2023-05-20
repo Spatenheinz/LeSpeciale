@@ -10,10 +10,10 @@ use std::borrow::Borrow;
 
 use std::hash::Hash;
 
-impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
+impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
 where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
 {
-    pub fn eval(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T>
+    pub fn eval(&mut self, term: &'term AlphaTerm<T>) -> ResRT<'term, T>
     {
         use super::values::mk_closure;
 
@@ -45,7 +45,9 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
                 Ok(e1)
             },
             Let(m,n) => {
-                self.insert_local(self.eval(m)?).eval(n)
+                let m = self.eval(m)?;
+                self.insert_local(m);
+                self.eval(n)
             }
             Pi(ty, body) => {
                 let dom =
@@ -67,7 +69,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
         }
     }
 
-    pub fn do_app(&self, f: RT<'ctx, T>, arg: RT<'ctx, T>) -> ResRT<'ctx, T>
+    pub fn do_app(&mut self, f: RT<'term, T>, arg: RT<'term, T>) -> ResRT<'term, T>
     {
     match f.borrow() {
         Value::Lam(closure) => closure(arg, self.gctx, self.allow_dbi, self.hole_count.clone()),

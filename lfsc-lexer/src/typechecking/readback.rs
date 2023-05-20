@@ -12,40 +12,40 @@ use super::EnvWrapper;
 
 use std::hash::Hash;
 
-impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
+impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
 where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
 {
-    pub fn readback_normal(&self, normal: Normal<'ctx, T>)
+    pub fn readback_normal(&mut self, normal: Normal<'term, T>)
                            -> TResult<AlphaTerm<T>, T>
     {
         self.readback(normal.0, normal.1)
     }
 
-    pub fn readback(&self,
-                    ty: RT<'ctx, T>,
-                    val: RT<'ctx, T>) -> TResult<AlphaTerm<T>, T>
+    pub fn readback(&mut self,
+                    ty: RT<'term, T>,
+                    val: RT<'term, T>) -> TResult<AlphaTerm<T>, T>
     {
         // neutral values can be readback without a type
         if let Value::Neutral(_, a) = val.borrow() {
             return self.readback_neutral(ty, a.clone())
         }
         match ty.borrow() {
-            Type::Pi(dom, ran) => {
-                let env = self.update_local(dom.clone());
-                let var = mk_neutral_var_with_type(dom.clone());
-                let ran_ = ran(var.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?;
+            Type::Pi(a, b) => {
+                let var = mk_neutral_var_with_type(a.clone());
+                let ran_ = b(var.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?;
                 let app = self.do_app(val, var)?;
-                Ok(abinder!(lam, env.readback(ran_, app)?))
+                self.update_local(a.clone());
+                Ok(abinder!(lam, self.readback(ran_, app)?))
             }
             Type::Box => {
                 match val.borrow() {
                     Value::Pi(at, bt) => {
-                        let dom = self.readback(ty.clone(), at.clone())?;
-                        let env = self.update_local(at.clone());
+                        let a = self.readback(ty.clone(), at.clone())?;
                         let cls_res = bt(mk_neutral_var_with_type(at.clone()),
                                          self.gctx, self.allow_dbi, self.hole_count.clone())?;
-                        let ran = env.readback(ty, cls_res)?;
-                        Ok(abinder!(pi, dom, ran))
+                        self.update_local(at.clone());
+                        let b = self.readback(ty, cls_res)?;
+                        Ok(abinder!(pi, a, b))
                     },
                     Value::Star => Ok(Ident(Symbol(T::_type()))),
                     Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
@@ -70,9 +70,9 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
         }
     }
 
-    fn readback_neutral(&self,
-                        _ty: RT<'ctx, T>,
-                        neu: Rc<Neutral<'ctx, T>>,
+    fn readback_neutral(&mut self,
+                        _ty: RT<'term, T>,
+                        neu: Rc<Neutral<'term, T>>,
                        ) -> TResult<AlphaTerm<T>, T>
     {
         match neu.borrow() {

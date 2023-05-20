@@ -16,9 +16,9 @@ use self::{context::{LocalContext, Rgctx, Rlctx, GlobalContext},
            errors::TypecheckingErrors};
 use std::hash::Hash;
 
-#[derive(Clone)]
+// #[derive(Clone)]
 struct EnvWrapper<'global, 'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug> {
-    pub lctx: Rlctx<'term, T>,
+    pub lctx: LocalContext<'term, T>,
     pub gctx: Rgctx<'global, 'term, T>,
     pub allow_dbi: u32,
     pub hole_count: Cell<u32>
@@ -27,33 +27,22 @@ struct EnvWrapper<'global, 'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug> {
 impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
 where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 {
-    pub fn new(lctx: Rlctx<'term, T>,
+    pub fn new(lctx: LocalContext<'term, T>,
                gctx: Rgctx<'global, 'term, T>,
            allow_dbi: u32,
            hole_count: Cell<u32>) -> Self {
         Self { lctx, gctx, allow_dbi, hole_count }
     }
 
-    pub fn insert_local(&self, val: RT<'term, T>) -> Self {
-        Self { lctx: LocalContext::insert(val, self.lctx.clone()),
-               gctx: self.gctx,
-               allow_dbi: self.allow_dbi,
-               hole_count: self.hole_count.clone()
-        }
+    pub fn insert_local(&mut self, val: RT<'term, T>) {
+        self.lctx.insert(val)
+
     }
-    pub fn define_local(&self, ty: RT<'term, T>, val: RT<'term, T>) -> Self {
-        Self { lctx: LocalContext::define(ty, val, self.lctx.clone()),
-               gctx: self.gctx,
-               allow_dbi: self.allow_dbi,
-               hole_count: self.hole_count.clone()
-        }
+    pub fn define_local(&mut self, ty: RT<'term, T>, val: RT<'term, T>) {
+        self.lctx.define(ty, val)
     }
-    pub fn update_local(&self, val: RT<'term, T>) -> Self {
-        Self { lctx: LocalContext::decl(val, self.lctx.clone()),
-               gctx: self.gctx,
-               allow_dbi: self.allow_dbi,
-               hole_count: self.hole_count.clone()
-        }
+    pub fn update_local(&mut self, val: RT<'term, T>) {
+        self.lctx.decl(val)
     }
     pub fn get_value(&self, key: &Ident<T>) -> ResRT<'term, T> {
         match key {
@@ -69,14 +58,14 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
             Ident::Symbol(name) => self.gctx.get_type(name),
         }
     }
-    pub fn same(&self,
+    pub fn same(&mut self,
                 t1: RT<'term, T>,
                 t2: RT<'term, T>) -> TResult<(), T>
     {
         self.convert(t1, t2, self.gctx.kind.clone())
     }
 
-    pub fn convert(&self,
+    pub fn convert(&mut self,
                 t1: RT<'term, T>,
                 t2: RT<'term, T>,
                 tau: RT<'term, T>) -> TResult<(), T>
@@ -98,7 +87,7 @@ pub fn handle_command<'a, 'b>(com: &'b StrAlphaCommand<'a>,
 where 'a: 'b
 {
     // let lctx = Rc::new(LocalContext::new());
-    let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx, 0, Cell::new(1));
+    let mut env = EnvWrapper::new(LocalContext::new(), gctx, 0, Cell::new(1));
     match com {
       Command::Declare(id, ty) => {
           // actually doing this for pi will check that it is a sort already,
@@ -138,21 +127,20 @@ where 'a: 'b
             let res_ty = env.eval(ty)?;
             // check all arguments, they must also be either type or datatypes
             let mut args_ty = Vec::new();
-            let mut tmp_env = env.clone();
+            // local context
+            let mut tmp_env = LocalContext::new();
             for arg in args.iter() {
                 let arg_ty = env.infer(arg)?;
                 is_type_or_datatype(arg_ty.borrow())?;
                 let ty = env.eval(arg)?;
-                tmp_env = tmp_env.update_local(ty.clone());
+                tmp_env.decl(ty.clone());
                 args_ty.push(ty);
             }
-            let lctx = tmp_env.lctx.clone();
-            drop(tmp_env);
             // order is important since it will allow us to introduce recursion for functions
             let typ = Rc::new(Value::Prog(args_ty.clone(), body));
             gctx.define(id, res_ty.clone(), typ);
 
-            EnvWrapper::new(lctx, gctx, 0, Cell::new(0)).check_sc(body, res_ty)?;
+            EnvWrapper::new(tmp_env, gctx, 0, Cell::new(0)).check_sc(body, res_ty)?;
             Ok(())
         }
         Command::Run(..) => todo!(),

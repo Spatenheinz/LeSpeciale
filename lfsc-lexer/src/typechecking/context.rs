@@ -8,13 +8,15 @@ use std::collections::{HashMap, BTreeMap};
 use std::rc::Rc;
 use std::cell::RefCell;
 
+use imbl::Vector;
+
 use std::hash::Hash;
 
 
 #[derive(Debug)]
 pub struct LookupErr {err: String}
 
-pub type Rlctx<'term, T> = Rc<LocalContext<'term, T>>;
+pub type Rlctx<'own, 'term, T> = &'own mut LocalContext<'term, T>;
 
 pub type Rgctx<'own, 'term, T> = &'own GlobalContext<'term, T>;
 
@@ -26,22 +28,28 @@ pub struct GlobalContext<'term, K: Copy + Eq + Ord + Hash + std::fmt::Debug> {
     // values: Vec<TypeEntry<'term, K>>,
 }
 
-pub enum LocalContext<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug> {
-    Nil,
-    Cons(TypeEntry<'a, K>, Rlctx<'a, K>),
+#[derive(Debug, Clone)]
+pub struct LocalContext<'term, K: Copy + Eq + Ord + Hash + std::fmt::Debug> {
+    values: Vec<TypeEntry<'term, K>>
+    // keys: Vec<K>,
+    // values: Vec<TypeEntry<'term, K>>,
 }
+// pub enum LocalContext<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug> {
+//     Nil,
+//     Cons(TypeEntry<'a, K>, Rlctx<'a, K>),
+// }
 
-impl<'term, T: Copy + fmt::Debug + Eq + Ord + Hash + std::fmt::Debug> fmt::Debug for LocalContext<'term, T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            LocalContext::Nil => write!(f, "Nil"),
-            LocalContext::Cons(a, b) => write!(f, ":- {:?}\n{:?})", a, b),
-        }
-    }
-}
+// impl<'term, T: Copy + fmt::Debug + Eq + Ord + Hash + std::fmt::Debug> fmt::Debug for LocalContext<'term, T> {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         match self {
+//             LocalContext::Nil => write!(f, "Nil"),
+//             LocalContext::Cons(a, b) => write!(f, ":- {:?}\n{:?})", a, b),
+//         }
+//     }
+// }
 pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
     let mut ctx = GlobalContext::new();
-    ctx.define("type", Rc::new(Type::Box),  Rc::new(Type::Star));
+    ctx.define("type", ctx.kind.clone(),  Rc::new(Type::Star));
     ctx.define("mpz",  Rc::new(Type::Star), Rc::new(Type::ZT));
     ctx.define("mpq",  Rc::new(Type::Star), Rc::new(Type::QT));
     ctx
@@ -52,7 +60,7 @@ fn from_entry_to_value<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug>(entry: &
                                      -> RT<'a, K> {
        match entry {
          TypeEntry::Def { val, .. } => val.clone(),
-         TypeEntry::IsA { ty, .. } => {
+         TypeEntry::IsA { ty, val } => {
              if let Value::Neutral(_, hol) = ty.borrow() {
                  if let Neutral::Hole(hol,_) = hol.borrow() {
                      // if let Some(inner) = &*hol.borrow() {
@@ -61,11 +69,12 @@ fn from_entry_to_value<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug>(entry: &
                      return ty.clone();
                  }
              }
-               Rc::new(Value::Neutral(ty.clone(),
-                          Rc::new( match key {
-                                     Ident::Symbol(key) => Neutral::Var(key),
-                                     Ident::DBI(dbi) => Neutral::DBI(dbi)
-                                   })))
+             val.clone()
+               // Rc::new(Value::Neutral(ty.clone(),
+               //            Rc::new( match key {
+               //                       Ident::Symbol(key) => Neutral::Var(key),
+               //                       Ident::DBI(dbi) => Neutral::DBI(dbi)
+               //                     })))
             },
          TypeEntry::Val { val } => val.clone(),
 
@@ -124,7 +133,7 @@ where K: Eq + Ord + Hash + std::fmt::Debug + std::fmt::Debug + Copy
     pub fn new() -> Self {
         Self {
             kind: Rc::new(Value::Box),
-            kvs: HashMap::new(),
+            kvs: HashMap::with_capacity(512),
             // keys: Vec::new(),
             // values: Vec::new(),
         }
@@ -136,7 +145,9 @@ where K: Eq + Ord + Hash + std::fmt::Debug + std::fmt::Debug + Copy
     }
 
     pub fn insert(&mut self, key: K, ty: RT<'a, K>) {
-        self.kvs.insert(key, TypeEntry::IsA { ty, marks: RefCell::new(0)});
+        self.kvs.insert(key, TypeEntry::IsA { ty: ty.clone(), val:
+               Rc::new(Value::Neutral(ty,
+                          Rc::new(Neutral::Var(key))))});
        // self.keys.push(key);
        // self.values.push(TypeEntry::IsA { ty, marks: RefCell::new(0)})
     }
@@ -198,36 +209,38 @@ impl<'a, K> LocalContext<'a, K>
 where K: Eq + Ord + Hash + std::fmt::Debug + Copy
 {
     pub fn new() -> Self {
-        Self::Nil
+        Self { values: Vec::new() }
+        // Self::Nil
     }
 
-    pub fn insert(ty: RT<'a, K>, ctx: Rlctx<'a, K>) -> Rlctx<'a, K> {
-        Rc::new(LocalContext::Cons(
-            TypeEntry::Val { val : ty }, ctx))
+    pub fn insert(&mut self, ty: RT<'a, K>) {
+            self.values.push(TypeEntry::Val { val : ty })
             // TypeEntry::IsA { ty, marks: RefCell::new(0)}, ctx))
     }
 
-    pub fn decl(ty: RT<'a, K>, ctx: Rlctx<'a, K>) -> Rlctx<'a, K> {
-        Rc::new(LocalContext::Cons(
-            // TypeEntry::Val { val : ty }, ctx))
-            TypeEntry::IsA { ty, marks: RefCell::new(0)}, ctx))
+    pub fn decl(&mut self, ty: RT<'a, K>) {
+            self.values.push(TypeEntry::IsA { ty: ty.clone(), val:
+               Rc::new(Value::Neutral(ty,
+                          Rc::new(Neutral::DBI(0))))})
     }
-    pub fn define(ty: RT<'a, K>, val:RT<'a,K>, ctx: Rlctx<'a, K>) -> Rlctx<'a, K> {
-        Rc::new(LocalContext::Cons(
-            TypeEntry::Def { ty, val }, ctx))
+    pub fn define(&mut self, ty: RT<'a, K>, val:RT<'a,K>) {
+           self.values.push(TypeEntry::Def { ty, val })
     }
 
     pub fn get(&self, key: u32) -> TResult<&TypeEntry<'a, K>, K> {
-        match self {
-            LocalContext::Nil => Err(lookup_err(Ident::<K>::DBI(key))),
-            LocalContext::Cons(ty, ctx) => {
-                if key == 0 {
-                    Ok(ty)
-                } else {
-                    ctx.get(key - 1)
-                }
-            }
-        }
+        self.values
+            .iter()
+            .rev()
+            .nth(key as usize)
+            .ok_or(lookup_err(Ident::<K>::DBI(key)))
+    }
+
+    pub fn truncate(&mut self, len: usize) {
+        self.values.truncate(len)
+    }
+
+    pub fn len(&self) -> usize {
+        self.values.len()
     }
 
     pub fn get_value(&self, key: u32) -> ResRT<'a, K> {
@@ -239,7 +252,7 @@ where K: Eq + Ord + Hash + std::fmt::Debug + Copy
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TypeEntry<'a, Key: Copy + Eq + Ord + Hash + std::fmt::Debug>
 // where Key: Clone
 {
@@ -247,7 +260,7 @@ pub enum TypeEntry<'a, Key: Copy + Eq + Ord + Hash + std::fmt::Debug>
     Def { ty: RT<'a, Key>, val: RT<'a, Key> },
     // the val of IsA is the neutral term Neutral t
     // Symbolics can only ever be a IsA.
-    IsA { ty: RT<'a, Key>, marks: RefCell<u32> },
+    IsA { ty: RT<'a, Key>, val: RT<'a, Key> },
     Val { val: RT<'a, Key> },
 }
 

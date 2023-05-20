@@ -8,6 +8,7 @@ lfsc_syntax = { path = "lfsc_syntax" }
 lfsc_anorm = { path = "lfsc_anorm" }
 # num-bigint = { version = "0.4", default-features = false }
 nom = "7.1.3"
+imbl = "2.0.0"
 
 [profile.dev]
 panic = "abort"

@@ -147,15 +147,9 @@ test n prog = do
       if proof == [] then putStrLn "cvc5: No proof"
       else do
         writeFile (filename ++ ".plf") $ unlines $ tail proof
-        -- (_, _, _, ph) <-
-        --   createProcess (proc "cargo" ["build", "--release", "--quiet"])
-        --   { cwd = Just "../lfsc-lexer/"}
-        -- exitCode <- waitForProcess ph
         (_exitcode, stdout, stderr) <-
           readProcessWithExitCode hyperfine (hyperfineArgs (filename <> ".plf") <> ["--show-output"]) ""
         putStrLn stdout
-        -- removeFile $ filename <> ".smt2"
-        -- hyperfine --runs 10 --warmup 5 'target/release/lfsc-lexer' --export-markdown /tmp/hf.md && cat /tmp/hf.md"
     ExitFailure _ -> do
       putStr "cvc5: Failure\n\t" >> putStr stdout >> putStr stderr >> exitFailure
 

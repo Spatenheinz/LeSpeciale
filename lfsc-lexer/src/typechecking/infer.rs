@@ -16,15 +16,16 @@ use std::borrow::Borrow;
 
 use std::hash::Hash;
 
-impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
+impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
 where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 {
-    pub fn infer(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
+    pub fn infer(&mut self, term: &'term AlphaTerm<T>) -> ResRT<'term, T> {
         match term {
             Number(Num::Z(_))  => self.gctx.get_value(&T::_mpz()),
             Number(Num::Q(..)) => self.gctx.get_value(&T::_mpq()),
             Ident(x)   => self.get_type(x),
             AlphaTerm::Pi(a, b) => {
+                let cut = self.lctx.len();
                 let val =
                     if let SC(t1, t2) = &**a {
                         let t1_ty = self.infer_sc(t1)?;
@@ -41,21 +42,27 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
                         self.infer_as_type(a)?;
                         self.eval(a)?
                     };
-                // println!("a: {:?}\n{:?}", a, self.lctx);
-                let env = self.update_local(val);
-                env.infer_sort(b)
+                self.lctx.truncate(cut); // domain can mess up the environment
+                self.update_local(val);
+                self.infer_sort(b)
             },
             Let(m, n) => {
-                // let m_ty = self.infer(m)?;
-                self.define_local(self.infer(m)?, self.eval(m)?).infer(n)
+                let m_ty = self.infer(m)?;
+                // again we can insert because it is straight
+                let m = self.eval(m)?;
+                self.define_local(m_ty, m);
+                self.infer(n)
             },
             AnnLam(a, m) => {
                 self.infer_as_type(a)?;
                 let val = self.eval(a)?;
-                let closure = const_closure(self.update_local(val.clone()).infer(m)?);
+                self.update_local(val.clone());
+                let closure = const_closure(self.infer(m)?);
                 Ok(Rc::new(Type::Pi(val, closure)))
             }
             App(f, args) => {
+                // pi types have their own environment so we dont need to worry about
+                // truncating
                 let mut f_ty = self.infer(f)?;
                 for n in args {
                     f_ty = if let Type::Pi(a,b) = f_ty.borrow() {
@@ -63,7 +70,8 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
                          let c = self.hole_count.get();
                          self.hole_count.set(c + 1);
                          let hole = Rc::new(Neutral::Hole(RefCell::new(None), c));
-                         b(Rc::new(Type::Neutral(a.clone(), hole)), self.gctx, self.allow_dbi, self.hole_count.clone())?
+                         b(Rc::new(Type::Neutral(a.clone(), hole)),
+                           self.gctx, self.allow_dbi, self.hole_count.clone())?
                      } else {
                         self.check(n, a.clone())?;
                         b(self.eval(n)?, self.gctx, self.allow_dbi, self.hole_count.clone())?
@@ -74,7 +82,8 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
                 };
                 if let Type::Pi(a, b) = f_ty.borrow() {
                     if let Type::Run(sc, t, lctx) = a.borrow() {
-                        let env = EnvWrapper::new(lctx.clone(), self.gctx, self.allow_dbi, self.hole_count.clone());
+                        // not the best
+                        let mut env = EnvWrapper::new(lctx.clone(), self.gctx, self.allow_dbi, self.hole_count.clone());
                         let sc = env.run_sc(sc)?;
                         env.same(sc, t.clone())?;
                         return b(t.clone(), env.gctx, env.allow_dbi, env.hole_count.clone());
@@ -94,14 +103,14 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    pub fn infer_as_type(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
+    pub fn infer_as_type(&mut self, term: &'term AlphaTerm<T>) -> ResRT<'term, T> {
         let x = self.infer(term)?;
         match x.borrow() {
             Type::Star => Ok(x),
             _ => Err(TypecheckingErrors::ExpectedSort)
         }
     }
-    pub fn infer_sort(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
+    pub fn infer_sort(&mut self, term: &'term AlphaTerm<T>) -> ResRT<'term, T> {
         let x = self.infer(term)?;
         match x.borrow() {
             Type::Box | Type::Star => Ok(x),
@@ -109,17 +118,18 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    pub fn infer_sc(&self, sc: &'ctx AlphaTermSC<T>) -> ResRT<'ctx, T> {
+    pub fn infer_sc(&mut self, sc: &'term AlphaTermSC<T>) -> ResRT<'term, T> {
         match sc {
         AlphaTermSC::Number(Num::Z(_)) => self.gctx.get_value(&T::_mpz()),
         AlphaTermSC::Number(Num::Q(..)) => self.gctx.get_value(&T::_mpq()),
         AlphaTermSC::Ident(x) => self.get_type(x),
         AlphaTermSC::Let(m, n) => {
-            self.update_local(self.infer_sc(m)?).infer_sc(n)
+            let m_ty = self.infer_sc(m)?;
+            self.update_local(m_ty);
+            self.infer_sc(n)
         },
         AlphaTermSC::App(f, args) => {
             let mut f_ty = self.get_type(f)?;
-            let mut env = self.clone();
             if let Type::Prog(params, _) = self.get_value(f)?.borrow() {
                 if args.len() != args.len() {
                     return Err(TypecheckingErrors::WrongNumberOfArguments);
@@ -130,19 +140,21 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
                 return Ok(f_ty)
             }
             // The case for PI
+            let dbi = self.allow_dbi;
             for arg in args.iter() {
                  if let Type::Pi(a,b) = f_ty.borrow() {
                      // 1. check arg matches type of function
                     // let arg_ty = env.infer_sc(arg)?;
-                    env.check_sc(arg, a.clone())?;
+                    self.check_sc(arg, a.clone())?;
                      // 2. We dont allow x in the
-                    env.allow_dbi += 1;
+                    self.allow_dbi += 1;
                      // hacky way to force evaluation
-                    f_ty = b(env.gctx.kind.clone(), env.gctx, env.allow_dbi, env.hole_count.clone())?;
+                    f_ty = b(self.gctx.kind.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?;
                  } else {
                     return Err(TypecheckingErrors::NotPi);
                  }
             }
+            self.allow_dbi = dbi;
             Ok(f_ty)
         },
         AlphaTermSC::Numeric(num) => self.infer_num(num),
@@ -151,42 +163,49 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    fn infer_sideeffect(&self, sc: &'ctx AlphaSideEffectSC<T>) -> ResRT<'ctx, T>
+    fn infer_sideeffect(&mut self, sc: &'term AlphaSideEffectSC<T>) -> ResRT<'term, T>
     {
         match sc {
             Do(a, b) => { self.infer_sc(a)?; self.infer_sc(b) },
             MarkVar(_, var) => self.infer_sc(var),
             IfMarked{n: _n, c, tbranch, fbranch} => {
                 self.infer_sc(c)?;
-                self.check_sc(fbranch, self.infer_sc(tbranch)?)
+                let tbranch = self.infer_sc(tbranch)?;
+                self.check_sc(fbranch, tbranch)
             }
         }
     }
 
-    fn infer_compound(&self, sc: &'ctx AlphaCompoundSC<T>) -> ResRT<'ctx, T>
+    fn infer_compound(&mut self, sc: &'term AlphaCompoundSC<T>) -> ResRT<'term, T>
     {
         match sc {
             Fail(x) => { self.infer_as_type(x)?; Ok(self.eval(x)?) },
             IfEq { a, b, tbranch, fbranch } => {
-                self.check_sc(b, self.infer_sc(a)?)?;
-                self.check_sc(fbranch, self.infer_sc(tbranch)?)
+                let a = self.infer_sc(a)?;
+                self.check_sc(b, a)?;
+                let tbranch = self.infer_sc(tbranch)?;
+                self.check_sc(fbranch, tbranch)
             }
             Match(scrut, cases) => {
                 let scrut_ty = self.infer_sc(scrut)?;
                 let mut t_ty : Option<RT<_>> = None;
+                let lctx_cut = self.lctx.len();
                 for i in cases.iter() {
                     let (p, t) = i;
-                    let (pat_ty, local_env) = self.infer_pattern(p)?;
+                    // local scope
+                    let pat_ty = self.infer_pattern(p)?;
                     if let Some(p_ty) = pat_ty {
                         self.same(p_ty, scrut_ty.clone())?;
                     };
-                    let cur_ty = local_env.infer_sc(t)?;
+                    let cur_ty = self.infer_sc(t)?;
                     if let Some(t) = t_ty {
                         self.same(t.clone(), cur_ty.clone())?;
                         t_ty = Some(t);
                     } else {
                         t_ty = Some(cur_ty);
                     }
+                    //reset local scope
+                    self.lctx.truncate(lctx_cut);
                 }
                 // // safe to unwrap since there is always atleast 1 case by construction
                 Ok(t_ty.unwrap())
@@ -194,37 +213,37 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    fn infer_pattern(&self,
-                     p: &'ctx AlphaPattern<T>,
-                    ) -> TResult<(Option<RT<'ctx, T>>, Self), T>
+    fn infer_pattern(&mut self,
+                     p: &'term AlphaPattern<T>,
+                    ) -> TResult<Option<RT<'term, T>>, T>
     {
         match p {
-            AlphaPattern::Default => Ok((None, self.clone())),
-            AlphaPattern::Symbol(x) => Ok((Some(self.get_type(x)?), self.clone())),
+            AlphaPattern::Default => Ok(None),
+            AlphaPattern::Symbol(x) => Ok(Some(self.get_type(x)?)),
             AlphaPattern::App(id, args) => {
                 let mut head = self.get_type(id)?;
-                let mut env = self.clone();
                 for _i in 0..*args {
-                    (head, env) = env.force_pi(head)?;
+                    head = self.force_pi(head)?;
                 }
                 if let Type::Pi(..) = head.borrow() {
                     return Err(TypecheckingErrors::NotFullyApplied)
                 }
-                Ok((Some(head), env))
+                Ok(Some(head))
             }
         }
     }
 
     // indirection to since we might now assign to a borrow...
-    fn force_pi(&self, ty: RT<'ctx, T>) -> TResult<(RT<'ctx, T>, Self), T> {
+    fn force_pi(&mut self, ty: RT<'term, T>) -> TResult<RT<'term, T>, T> {
         if let Type::Pi(dom, ran) = ty.borrow() {
-            Ok((ran(dom.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?, self.update_local(dom.clone())))
+            self.update_local(dom.clone());
+            Ok(ran(dom.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?)
         } else {
             Err(TypecheckingErrors::NotPi)
         }
     }
 
-    fn infer_num(&self, sc: &'ctx AlphaNumericSC<T>) -> ResRT<'ctx, T>
+    fn infer_num(&mut self, sc: &'term AlphaNumericSC<T>) -> ResRT<'term, T>
         where T: Clone + Eq + Ord + Hash + std::fmt::Debug + BuiltIn
     {
         match sc {
@@ -250,7 +269,8 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
             | NegBranch { n, tbranch, fbranch } => {
                 let n_ty = self.infer_sc(n)?;
                 is_Z_or_Q(n_ty.borrow())?;
-                self.check_sc(fbranch, self.infer_sc(tbranch)?)
+                let tb_ty = self.infer_sc(tbranch)?;
+                self.check_sc(fbranch, tb_ty)
             }
         }
     }

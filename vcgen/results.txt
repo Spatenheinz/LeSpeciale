@@ -38,3 +38,82 @@ Summary
   138.60 ± 15.45 times faster than '../lfsc-lexer/target/release/lfsc-lexer benchmark_100.plf'
 
 hyperfine for 1000
+
+################## USING IMBL
+hyperfine for 1
+Benchmark 1: ../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_1.plf >& /dev/null
+  Time (mean ± σ):      18.9 ms ±   1.0 ms    [User: 16.3 ms, System: 2.7 ms]
+  Range (min … max):    14.1 ms …  22.5 ms    123 runs
+
+Benchmark 2: ../lfsc-lexer/target/release/lfsc-lexer benchmark_1.plf
+  Time (mean ± σ):      79.3 ms ±   4.1 ms    [User: 78.3 ms, System: 1.6 ms]
+  Range (min … max):    57.2 ms …  84.3 ms    35 runs
+
+Summary
+  '../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_1.plf >& /dev/null' ran
+    4.20 ± 0.31 times faster than '../lfsc-lexer/target/release/lfsc-lexer benchmark_1.plf'
+
+hyperfine for 10
+Benchmark 1: ../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_10.plf >& /dev/null
+  Time (mean ± σ):      24.3 ms ±   3.6 ms    [User: 21.9 ms, System: 2.6 ms]
+  Range (min … max):    10.7 ms …  28.1 ms    101 runs
+
+Benchmark 2: ../lfsc-lexer/target/release/lfsc-lexer benchmark_10.plf
+  Time (mean ± σ):     284.1 ms ±   1.5 ms    [User: 282.5 ms, System: 2.0 ms]
+  Range (min … max):   282.4 ms … 287.1 ms    10 runs
+
+Summary
+  '../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_10.plf >& /dev/null' ran
+   11.70 ± 1.75 times faster than '../lfsc-lexer/target/release/lfsc-lexer benchmark_10.plf'
+
+Benchmark 1: ../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_100.plf >& /dev/null
+  Time (mean ± σ):      76.8 ms ±  11.7 ms    [User: 73.7 ms, System: 3.3 ms]
+  Range (min … max):    60.8 ms …  90.8 ms    44 runs
+
+Benchmark 2: ../lfsc-lexer/target/release/lfsc-lexer benchmark_100.plf
+  Time (mean ± σ):     13.439 s ±  0.151 s    [User: 13.409 s, System: 0.015 s]
+  Range (min … max):   13.276 s … 13.690 s    10 runs
+
+Summary
+  '../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_100.plf >& /dev/null' ran
+  174.94 ± 26.72 times faster than '../lfsc-lexer/target/release/lfsc-lexer benchmark_100.plf'
+
+with Vec:
+hyperfine for 1
+Benchmark 1: ../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_1.plf >& /dev/null
+  Time (mean ± σ):      17.2 ms ±   2.0 ms    [User: 14.1 ms, System: 3.1 ms]
+  Range (min … max):     7.0 ms …  20.4 ms    151 runs
+
+Benchmark 2: ../lfsc-lexer/target/release/lfsc-lexer benchmark_1.plf
+  Time (mean ± σ):      34.8 ms ±   3.2 ms    [User: 33.3 ms, System: 1.9 ms]
+  Range (min … max):    23.7 ms …  40.0 ms    67 runs
+
+Summary
+  '../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_1.plf >& /dev/null' ran
+    2.03 ± 0.30 times faster than '../lfsc-lexer/target/release/lfsc-lexer benchmark_1.plf'
+
+hyperfine for 10
+Benchmark 1: ../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_10.plf >& /dev/null
+  Time (mean ± σ):      19.8 ms ±   0.9 ms    [User: 17.6 ms, System: 2.4 ms]
+  Range (min … max):    15.5 ms …  22.0 ms    125 runs
+
+Benchmark 2: ../lfsc-lexer/target/release/lfsc-lexer benchmark_10.plf
+  Time (mean ± σ):      99.1 ms ±   3.8 ms    [User: 97.9 ms, System: 1.4 ms]
+  Range (min … max):    96.2 ms … 117.6 ms    28 runs
+
+Summary
+  '../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_10.plf >& /dev/null' ran
+    5.00 ± 0.29 times faster than '../lfsc-lexer/target/release/lfsc-lexer benchmark_10.plf'
+
+hyperfine for 100
+Benchmark 1: ../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_100.plf >& /dev/null
+  Time (mean ± σ):     102.5 ms ±  10.0 ms    [User: 96.9 ms, System: 5.1 ms]
+  Range (min … max):    82.2 ms … 111.2 ms    33 runs
+
+Benchmark 2: ../lfsc-lexer/target/release/lfsc-lexer benchmark_100.plf
+  Time (mean ± σ):     12.306 s ±  0.246 s    [User: 12.254 s, System: 0.017 s]
+  Range (min … max):   12.092 s … 12.885 s    10 runs
+
+Summary
+  '../deps/bin/lfscc ../deps/share/lfsc/signatures/core_defs.plf ../deps/share/lfsc/signatures/util_defs.plf ../deps/share/lfsc/signatures/theory_def.plf ../deps/share/lfsc/signatures/nary_programs.plf ../deps/share/lfsc/signatures/boolean_programs.plf ../deps/share/lfsc/signatures/boolean_rules.plf ../deps/share/lfsc/signatures/cnf_rules.plf ../deps/share/lfsc/signatures/equality_rules.plf ../deps/share/lfsc/signatures/arith_programs.plf ../deps/share/lfsc/signatures/arith_rules.plf ../deps/share/lfsc/signatures/strings_programs.plf ../deps/share/lfsc/signatures/strings_rules.plf ../deps/share/lfsc/signatures/quantifiers_rules.plf benchmark_100.plf >& /dev/null' ran
+  120.06 ± 12.00 times faster than '../lfsc-lexer/target/release/lfsc-lexer benchmark_100.plf'

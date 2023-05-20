@@ -19,13 +19,14 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 }
 
 pub fn mk_closure<'term, T>(body: &'term AlphaTerm<T>,
-                         lctx: super::context::Rlctx<'term, T>,
+                           lctx: LocalContext<'term, T>,
                         ) -> Closure<'term, T>
 where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 {
     Box::new(move |v, gctx, allow_dbi, hole_count| {
-             let lctx = LocalContext::insert(v, lctx.clone());
-             let env = EnvWrapper::new(lctx, gctx, allow_dbi, hole_count);
+             let mut clo = lctx.clone();
+             clo.insert(v);
+             let mut env = EnvWrapper::new(clo, gctx, allow_dbi, hole_count);
              env.eval(body)})
 }
 
@@ -35,6 +36,10 @@ pub type RT<'term, T> = Rc<Type<'term, T>>;
 pub type ResRT<'term, T> = TResult<RT<'term, T>, T>;
 
 // #[derive(Clone)]
+// pub struct Value {
+//     pub tag: ValueTag,
+//     pub inner: ValueInner,
+// }
 pub enum Value<'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug> {
     Pi(RT<'term, T>, Closure<'term, T>),
     Lam(Closure<'term, T>),
@@ -45,7 +50,7 @@ pub enum Value<'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug> {
     QT,
     Q(i32, i32), // TODO: should in fact be unbounded
     Neutral(RT<'term, T>, Rc<Neutral<'term, T>>),
-    Run(&'term AlphaTermSC<T>, RT<'term, T>, Rc<LocalContext<'term, T>>),
+    Run(&'term AlphaTermSC<T>, RT<'term, T>, LocalContext<'term, T>),
     Prog(Vec<RT<'term, T>>, &'term AlphaTermSC<T>),
 }
 
