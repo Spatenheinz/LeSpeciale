@@ -17,7 +17,7 @@ use self::{context::{LocalContext, Rgctx, Rlctx, GlobalContext},
 use std::hash::Hash;
 
 #[derive(Clone)]
-struct EnvWrapper<'global, 'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug> {
+struct EnvWrapper<'global, 'term, T: BuiltIn> {
     pub lctx: Rlctx<'term, T>,
     pub gctx: Rgctx<'global, 'term, T>,
     pub allow_dbi: u32,
@@ -25,7 +25,7 @@ struct EnvWrapper<'global, 'term, T: Copy + Eq + Ord + Hash + std::fmt::Debug> {
 }
 
 impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
-where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
+where T: BuiltIn
 {
     pub fn new(lctx: Rlctx<'term, T>,
                gctx: Rgctx<'global, 'term, T>,

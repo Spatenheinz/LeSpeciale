@@ -1,4 +1,4 @@
-use lfsc_syntax::ast::Ident;
+use lfsc_syntax::ast::{Ident, BuiltIn};
 
 use super::errors::TypecheckingErrors;
 use super::values::{Neutral, Type, Value, RT, TResult, ResRT};
@@ -19,19 +19,19 @@ pub type Rlctx<'term, T> = Rc<LocalContext<'term, T>>;
 pub type Rgctx<'own, 'term, T> = &'own GlobalContext<'term, T>;
 
 #[derive(Debug)]
-pub struct GlobalContext<'term, K: Copy + Eq + Ord + Hash + std::fmt::Debug> {
+pub struct GlobalContext<'term, K: BuiltIn> {
     pub kind: RT<'term, K>,
     kvs: HashMap<K, TypeEntry<'term, K>>
     // keys: Vec<K>,
     // values: Vec<TypeEntry<'term, K>>,
 }
 
-pub enum LocalContext<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug> {
+pub enum LocalContext<'a, K: BuiltIn> {
     Nil,
     Cons(TypeEntry<'a, K>, Rlctx<'a, K>),
 }
 
-impl<'term, T: Copy + fmt::Debug + Eq + Ord + Hash + std::fmt::Debug> fmt::Debug for LocalContext<'term, T> {
+impl<'term, T: BuiltIn> fmt::Debug for LocalContext<'term, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             LocalContext::Nil => write!(f, "Nil"),
@@ -48,7 +48,7 @@ pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
 }
 
 
-fn from_entry_to_value<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug>(entry: &TypeEntry<'a, K>, key: Ident<K>)
+fn from_entry_to_value<'a, K: BuiltIn>(entry: &TypeEntry<'a, K>, key: Ident<K>)
                                      -> RT<'a, K> {
        match entry {
          TypeEntry::Def { val, .. } => val.clone(),
@@ -72,7 +72,7 @@ fn from_entry_to_value<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug>(entry: &
          }
 }
 
-fn from_entry_to_type<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug>(entry: &TypeEntry<'a, K>)
+fn from_entry_to_type<'a, K: BuiltIn>(entry: &TypeEntry<'a, K>)
                                     -> RT<'a, K> {
        match entry {
          TypeEntry::Def { ty, .. } => ty.clone(),
@@ -119,7 +119,7 @@ fn from_entry_to_type<'a, K: Copy + Eq + Ord + Hash + std::fmt::Debug>(entry: &T
 // }
 
 impl<'a, K> GlobalContext<'a, K>
-where K: Eq + Ord + Hash + std::fmt::Debug + std::fmt::Debug + Copy
+where K: BuiltIn
 {
     pub fn new() -> Self {
         Self {
@@ -195,7 +195,7 @@ where K: std::fmt::Debug,
 }
 
 impl<'a, K> LocalContext<'a, K>
-where K: Eq + Ord + Hash + std::fmt::Debug + Copy
+where K: BuiltIn
 {
     pub fn new() -> Self {
         Self::Nil
@@ -240,7 +240,7 @@ where K: Eq + Ord + Hash + std::fmt::Debug + Copy
 }
 
 #[derive(Debug)]
-pub enum TypeEntry<'a, Key: Copy + Eq + Ord + Hash + std::fmt::Debug>
+pub enum TypeEntry<'a, Key: BuiltIn>
 // where Key: Clone
 {
     // Dec { ty: RT<'a, Key> },

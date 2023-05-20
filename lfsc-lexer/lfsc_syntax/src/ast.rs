@@ -4,7 +4,9 @@ pub enum Num {
     Q(i32, i32)
 }
 
-pub trait BuiltIn {
+use std::hash::Hash;
+
+pub trait BuiltIn: Eq + Ord + Hash + Copy + std::fmt::Debug {
     fn _mpz() -> Self;
     fn _mpq() -> Self;
     fn _type() -> Self;
