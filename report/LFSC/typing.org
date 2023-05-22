@@ -1,3 +1,6 @@
+Figure \ref{fig:tylookup} describes type inference with respect to the signatures and contexts.
+Given that \Gamma and \Sigma is valid, we can infer the build in types *type* and *type^c* to be *kind*.
+Notice here that *type* and *type^c* are kinds which describes types often denoted as * in the literature, whereas *kind* describes kinds. constants can be inferred either as a kind or a type respcetively if they appear in the signature, whereas object level variables must occur in the context.
 #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
@@ -21,9 +24,19 @@
 {\context \synth{c}{A} }
 \end{equation*}
 \caption{Typing rules for looking up types.}
+\label{fig:tylookup}
 \end{figure}
 #+end_export
 
+Figure \ref{fig:tylfsc} describes the bidirectional typing of LFSC.
+For brevity we simply use \vdash instead of \vdash_\Sigma as it is assumed \Sigma is valid.
+/ANN/ states that given object /M/ can be checked to have type /A/ then the annotation can be inferred to type /A/.
+
+Both /TYPE-APP/ and /APP/ states that the rator (left construct) must be a function type and that the operand (right construct) can be checked to be the type of domain of the function type, then an application can be inferred as the substitution of the operand with the /x/ in the construct describing the range of the function.
+/APP-SC/
+/LAMANN/ states that a bound variable /x/ has type /A/ in /M/ can be inferred as a \(\Pi x : A. B\) given that /A/ is a *type* and that /M/ can be inferred as /B/ with \(x : A\) added to the environment.
+Lambda abstractions is the only type that we cannot directly infer but instead must be checked to be a function type. A lambda is valid function type if the body /M/ can be inferred as /B/ with \(x : A\) added to the context.
+concrete integers and rationals must trivially be their respective types.
 #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
@@ -66,10 +79,10 @@
 {\context \tycheck{\lambda x. \ M}{\Pi x : A. \ B} }
 \end{equation*}
 \caption{Bidirectional typing rules for LFSC}
+\label{fig:tylfsc}
 \end{figure}
 #+end_export
 
-For brevity we simply use \vdash instead of \vdash_\Sigma when its meaning is obvious.\footnote{what is the right word here?}
 #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
