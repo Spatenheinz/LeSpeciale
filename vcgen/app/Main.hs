@@ -126,7 +126,7 @@ sigs = unwords $ map (sigDir <>) signatures
 
 hyperfineArgs prog = ["--warmup", "5", "--min-runs", "10"]
   -- <> [lfscc <> " " <> sigs <> " " <> prog]
-  <> [unwords [lfscc, sigs, prog, ">& /dev/null"], unwords [lfsc_rust, prog]]
+  <> [unwords [lfscc, sigs, prog, "--no-tail-calls >& /dev/null"], unwords [lfsc_rust, prog]]
 
 hyperfine = "hyperfine"
 
@@ -143,7 +143,7 @@ test n prog = do
   case exitcode of
     ExitSuccess -> do
       let (sat:proof) = lines stdout
-      when (sat /= "unsat") (putStrLn ("cvc5: Failure at " <> show n) >> mkprog n >>= test n >> exitSuccess)
+      when (sat /= "unsat") (putStrLn ("cvc5: Failure at " <> show n) >> mkprog n >>= test n)
       if proof == [] then putStrLn "cvc5: No proof"
       else do
         writeFile (filename ++ ".plf") $ unlines $ tail proof

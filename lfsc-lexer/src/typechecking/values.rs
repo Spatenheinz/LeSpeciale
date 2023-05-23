@@ -7,8 +7,6 @@ use lfsc_syntax::ast::{AlphaTerm, AlphaTermSC, Ident, BuiltIn};
 use super::errors::TypecheckingErrors;
 use super::{EnvWrapper, context::{LocalContext, GlobalContext}};
 
-use std::hash::Hash;
-
 pub type Closure<'term, T> =
     Box<dyn Fn(RT<'term, T>, &GlobalContext<'term, T>, u32, Cell<u32>) -> ResRT<'term, T> + 'term>;
 
@@ -29,6 +27,20 @@ where T: BuiltIn
              env.eval(body)})
 }
 
+// pub fn sc_closure<'term, T>(t_ty: RT<'term, T>,
+//                             sc: &'term AlphaTermSC<T>,
+//                             body: &'term AlphaTerm<T>,
+//                             lctx: super::context::Rlctx<'term, T>,
+//                         ) -> Closure<'term, T>
+// where T: BuiltIn
+// {
+//     Box::new(move |_, gctx, allow_dbi, hole_count| {
+//              let env = EnvWrapper::new(lctx.clone(), gctx, allow_dbi, hole_count);
+//              let sc = env.run_sc(sc)?;
+//              env.same(sc, t_ty.clone())?;
+//              env.insert_local(t_ty.clone()).eval(body)})
+// }
+
 pub type TResult<T, K> = Result<T, TypecheckingErrors<K>>;
 pub type Type<'term, T> = Value<'term, T>;
 pub type RT<'term, T> = Rc<Type<'term, T>>;
@@ -36,7 +48,7 @@ pub type ResRT<'term, T> = TResult<RT<'term, T>, T>;
 
 // #[derive(Clone)]
 pub enum Value<'term, T: BuiltIn> {
-    Pi(RT<'term, T>, Closure<'term, T>),
+    Pi(bool, RT<'term, T>, Closure<'term, T>),
     Lam(Closure<'term, T>),
     Box, // Universe
     Star,
@@ -52,7 +64,7 @@ pub enum Value<'term, T: BuiltIn> {
 impl<'term, T: BuiltIn> fmt::Debug for Value<'term, T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Value::Pi(a, _) => write!(f, "∏ {:?}", a),
+            Value::Pi(_, a, _) => write!(f, "∏ {:?}", a),
             Value::Lam(_) => write!(f, "Lam"),
             Value::Box => write!(f, "Box"),
             Value::Star => write!(f, "Star"),
@@ -152,7 +164,7 @@ where T: BuiltIn
                 hol.replace(Some(n));
                 true
         },
-        _ => {println!("false");false},
+        _ => false,
     }
 }
 fn ref_compare_normal<'term, T>(n: &Normal<'term, T>, m: &Normal<'term, T>) -> bool
@@ -166,6 +178,15 @@ pub fn mk_neutral_var_with_type<T>(typ: RT<T>) -> RT<T>
 where T: BuiltIn
 {
     Rc::new(Value::Neutral(typ, Rc::new(Neutral::DBI(0))))
+}
+
+pub fn as_type<T>(v: &Value<T>) -> TResult<(), T>
+where T: BuiltIn
+{
+    match v {
+        Value::Star => Ok(()),
+        _ => Err(TypecheckingErrors::ExpectedType),
+    }
 }
 
 pub fn is_type_or_datatype<T>(v: &Value<T>) -> TResult<(),T>
@@ -274,6 +295,7 @@ pub fn flatten<'term, T: BuiltIn>(neu: &Neutral<'term, T>) -> TResult<(Ident<T>,
             Ok((f, args))
         },
         Hole(inner,_) => {
+            println!("flatten hole");
             if let Some(n) = &*inner.borrow() {
                 flatten(n)
             } else {

@@ -1,0 +1,125 @@
+To show a that the formula \(P \wedge \neg P \) is not satisfiable, we
+get the following program.
+#+begin_src
+(define cvc.p (var 0 Bool))
+(check
+(# a0 (holds (and cvc.p (and (not cvc.p) true)))
+(: (holds false)
+(resolution _  _  _
+(and_elim _  _  1 a0)
+(and_elim _  _  0 a0) ff cvc.p))))
+#+end_src
+The program first defines a variable ~cvc.p~ which is defined by ~var~ which is used to define free constants, ~cvc.p~ describes the /P/ in the formula described above.
+Then for the actual proof we have the check,
+which consist of an annotated lambda, stating that
+~a0~ should bind with the type that \(P \wedge (\neg P \wedge \top)\) holds.
+The reason ~true~ is also included, is because considers applications as n-ary functions and these will be represented as
+a null-terminated curried form of higher order application.
+the body of the lambda is then an annotation stating that
+line 5-7 should have the type holds false.
+We notice that there are quite a number of holes. these will get filled out as we go.
+~resolution~ and ~and_elim~ look as follows:
+#+begin_src
+(declare resolution (! c1 term
+                    (! c2 term
+                    (! c term
+                    (! p1 (holds c1)
+                    (! p2 (holds c2)
+                    (! pol flag
+                    (! l term
+                    (! r (^ (sc_resolution c1 c2 pol l) c) (holds c))))))))))
+(declare and_elim (! f1 term
+                  (! f2 term
+                  (! n mpz
+                  (! p (holds f1)
+                  (! r (^ (nary_extract f_and f1 n) f2)  (holds f2)))))))
+
+#+end_src
+We can from these declarations see that the 3 first holes should match parameters ~c1, c2, c~, these occur later in the type and can therefore be "derived" from these.
+similarly for ~and_elim~ the hole used for argument ~f1~ will be filled by argument ~p~ because the types must match.
+Since the fourth argument of the ~and_elim~ applications are ~a0~, we can syntactically compare ~a0~ and ~(holds f1)~, letting ~f1~ = ~(and cvc.p (and (not cvc.p) true))~.
+Notice here that both applications of ~and_elim~ is provided with 4 arguments. However, from rules /APP/ and /PI-SIDE/ the inner pi,
+will be run after application is checked.
+Hence when all types are checked ~nary_extract~ is run.
+~nary_extract~ looks like:
+#+begin_src
+(function nary_extract ((f term) (t term) (n mpz)) term
+  (match t
+    ((apply t1 t2)
+      (mp_ifzero n
+        (getarg f t1)
+        (nary_extract f t2 (mp_add n (mp_neg 1))))))
+)
+#+end_src
+It will extract the ~n~-th element of an ~f~ application in ~t~. specifically ~and~ is defined as follows:
+#+begin_src
+(declare f_and term)
+(define and (# t1 term (# t2 term (apply (apply f_and t1) t2))))
+#+end_src
+so when nary_extract is called with ~f_and~, ~f1~ = ~(and cvc.p (and (not cvc.p) true))~ and ~1~, then by beta reduction we have:
+~f1~ = ~(apply (apply f_and cvc.p) (and (not cvc.p) true))~.
+The only branch matches this scrutinee and we check if n is 0.
+Since it is not we recursively call extract.
+In the next iteration we get:
+~t~ = ~(apply (apply f_and (not cvc.p)) true))~,
+now ~n~ is also 0 and we call ~getarg~ defined as follows:
+#+begin_src
+(function getarg ((f term) (t term)) term
+  (match t ((apply t1 t2) (ifequal t1 f t2 (fail term)))))
+#+end_src
+~t~ now is ~(apply f_and (not cvc.p))~.
+Since ~t1~ and ~f~ is both ~f_and~ we therefore get ~(not cvc.p)~ back.
+This is then checked agains ~f2~ (in the run case of ~and_elim~) and the body ~(holds f2)~ is then checked.
+Similarly happens for the other application of ~and_elim~.
+By now we have established all the arguments to ~resolution~,
+~c1~ = ~(not cvc.p)~, ~c2~ = ~cvc.p~, ~c~ is still a hole and ~p1~ and ~p2~ is ~(holds (not cvc.p))~ and ~(holds cvc.p)~ respectively.
+~sc_resolution~ is a little more complicated.
+#+begin_src
+(function sc_resolution
+    ((c1 term) (c2 term) (pol flag) (l term)) term
+  (nary_elim f_or
+    (nary_concat f_or
+      (nary_rm_first_or_self f_or
+         (nary_intro f_or c1 false)
+         (ifequal pol tt l (apply f_not l))
+          false)
+      (nary_rm_first_or_self f_or
+          (nary_intro f_or c2 false)
+          (ifequal pol tt (apply f_not l) l)
+           false)
+    false)
+  false))
+#+end_src
+at the inner most applications we have calls to ~nary_intro~ which lifts a value into ~n~-ary form, specifically the two calls will turn
+~c1~ into ~(or c1 false)~ and vice versa.
+~nary_rm_first_or_self~ will then check if the result of ~nary_intro~ is equivalent to the ~ifequal~ call. and return the fourth argument ~false~ if that is the case otherwise it will remove the first occurence of ~f_or~.
+Specifically, the application in line 4, will be (or (not cvc.p) false) (apply f_not cvc.p) false and the result will then be ~false~.
+For line 5 we equally get false. ~nary_concat~ will then also return ~false~, and we then clearly cannot eliminate any ~f_or~ from the expression thus the result becomes ~false~ and we match hole ~f_2~ in ~resolution~ with the result and get ~holds false~ which is equivlaent to the annotated type.
+Hence the check is done and valid.
+
+This is a small formula, however already here we see that programs can become pretty complicated however the sideconditions can be useful in more complicated.\footnote{I cannot come up with a smart example}
+We will not dwell much at the sideconditions as the empirical experiments does not contain any. This is explained in Section \ref{}.
+
+
+# apply (apply f_or (not cvc.p)) false
+# apply (apply f_or (apply f_not cvc.p)) false
+# ...
+# let t12 = getarg f t1 => apply f_not cvc.p
+# false
+
+# line 5 ===
+# (or cvc.p false) cvc.p false
+# apply (apply f_or cvc.p) false
+# let t12 = getarg f t1 => cvc.p => false
+
+# nary_concat : false
+# nanry elim f_or false false = default => null
+
+
+
+
+
+# and argument for line 5 (or cvc.p false) (cvc.p). Here the two cases are equivalent to
+
+
+# Although typechecking should be fast, the proofs ma

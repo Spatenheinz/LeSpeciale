@@ -14,7 +14,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
     {
         match term {
             AlphaTerm::Lam(body) => {
-                if let Value::Pi(a,b) = tau.borrow() {
+                if let Value::Pi(_, a,b) = tau.borrow() {
                     let val = b(mk_neutral_var_with_type(a.clone()),
                                 self.gctx, self.allow_dbi, self.hole_count.clone())?;
                     let env = self.update_local(a.clone());

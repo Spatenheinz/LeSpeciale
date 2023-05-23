@@ -16,3 +16,6 @@ I will in the following section describe the calculus and its typing along with 
 
 ** Concrete Syntax
 #+include: grammar.org
+
+** A Small Example
+#+include: example.org

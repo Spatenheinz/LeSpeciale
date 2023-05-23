@@ -22,8 +22,6 @@ pub type Rgctx<'own, 'term, T> = &'own GlobalContext<'term, T>;
 pub struct GlobalContext<'term, K: BuiltIn> {
     pub kind: RT<'term, K>,
     kvs: HashMap<K, TypeEntry<'term, K>>
-    // keys: Vec<K>,
-    // values: Vec<TypeEntry<'term, K>>,
 }
 
 pub enum LocalContext<'a, K: BuiltIn> {
@@ -241,9 +239,7 @@ where K: BuiltIn
 
 #[derive(Debug)]
 pub enum TypeEntry<'a, Key: BuiltIn>
-// where Key: Clone
 {
-    // Dec { ty: RT<'a, Key> },
     Def { ty: RT<'a, Key>, val: RT<'a, Key> },
     // the val of IsA is the neutral term Neutral t
     // Symbolics can only ever be a IsA.

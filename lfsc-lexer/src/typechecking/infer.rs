@@ -4,11 +4,12 @@ use lfsc_syntax::ast::AlphaTerm::*;
 use lfsc_syntax::ast::NumericSC::*;
 use lfsc_syntax::ast::CompoundSC::*;
 use lfsc_syntax::ast::SideEffectSC::*;
+use lfsc_syntax::free::FreeVar;
 use crate::typechecking::values::{const_closure, Neutral};
 
 use super::EnvWrapper;
 use super::errors::TypecheckingErrors;
-use super::values::{ResRT, Type, RT, TResult, is_Z_or_Q};
+use super::values::{ResRT, Type, RT, TResult, is_Z_or_Q, as_type};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -27,54 +28,54 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
             AlphaTerm::Pi(a, b) => {
                 let val =
                     if let SC(t1, t2) = &**a {
+                        // TODO fix this should return type...
                         let t1_ty = self.infer_sc(t1)?;
-                        match &**t2 {
-                            Ident(Ident::Symbol(_name)) => {
-                                Rc::new(Type::Run(t1, t1_ty, self.lctx.clone()))
-                            },
-                            _ => {
-                            self.check(t2, t1_ty.clone())?;
-                            Rc::new(Type::Run(t1, t1_ty, self.lctx.clone()))
-                            }
-                        }
+                        // as_type(&t1_ty)?;
+                        self.check(t2, t1_ty.clone())?;
+                        Rc::new(Type::Run(t1, t1_ty, self.lctx.clone()))
                     } else {
                         self.infer_as_type(a)?;
                         self.eval(a)?
                     };
-                // println!("a: {:?}\n{:?}", a, self.lctx);
                 let env = self.update_local(val);
                 env.infer_sort(b)
             },
             Let(m, n) => {
-                // let m_ty = self.infer(m)?;
                 self.define_local(self.infer(m)?, self.eval(m)?).infer(n)
             },
             AnnLam(a, m) => {
                 self.infer_as_type(a)?;
                 let val = self.eval(a)?;
                 let closure = const_closure(self.update_local(val.clone()).infer(m)?);
-                Ok(Rc::new(Type::Pi(val, closure)))
+                Ok(Rc::new(Type::Pi(m.free_in(0), val, closure)))
             }
             App(f, args) => {
                 let mut f_ty = self.infer(f)?;
                 for n in args {
-                    f_ty = if let Type::Pi(a,b) = f_ty.borrow() {
+                    f_ty = if let Type::Pi(free,a,b) = f_ty.borrow() {
                      if Hole == *n {
                          let c = self.hole_count.get();
                          self.hole_count.set(c + 1);
                          let hole = Rc::new(Neutral::Hole(RefCell::new(None), c));
+                         // println!("hole: {:?}", hole);
                          b(Rc::new(Type::Neutral(a.clone(), hole)), self.gctx, self.allow_dbi, self.hole_count.clone())?
                      } else {
                         self.check(n, a.clone())?;
-                        b(self.eval(n)?, self.gctx, self.allow_dbi, self.hole_count.clone())?
+                        // println!("n: {:?}", n);
+                         let x = if *free { self.eval(n)? } else { a.clone() };
+                        // println!("x: {:?}", x);
+                        b(x, self.gctx, self.allow_dbi, self.hole_count.clone())?
                      }
                     } else {
                         return Err(TypecheckingErrors::NotPi)
                     }
                 };
-                if let Type::Pi(a, b) = f_ty.borrow() {
+                // println!("f_ty: {:?}", f_ty);
+                if let Type::Pi(_,a, b) = f_ty.borrow() {
                     if let Type::Run(sc, t, lctx) = a.borrow() {
                         let env = EnvWrapper::new(lctx.clone(), self.gctx, self.allow_dbi, self.hole_count.clone());
+                        // println!("self lctx: {:?}", self.lctx);
+                        // println!("lc: {:?}", lctx);
                         let sc = env.run_sc(sc)?;
                         env.same(sc, t.clone())?;
                         return b(t.clone(), env.gctx, env.allow_dbi, env.hole_count.clone());
@@ -131,7 +132,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
             }
             // The case for PI
             for arg in args.iter() {
-                 if let Type::Pi(a,b) = f_ty.borrow() {
+                 if let Type::Pi(_,a,b) = f_ty.borrow() {
                      // 1. check arg matches type of function
                     // let arg_ty = env.infer_sc(arg)?;
                     env.check_sc(arg, a.clone())?;
@@ -217,7 +218,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
 
     // indirection to since we might now assign to a borrow...
     fn force_pi(&self, ty: RT<'ctx, T>) -> TResult<(RT<'ctx, T>, Self), T> {
-        if let Type::Pi(dom, ran) = ty.borrow() {
+        if let Type::Pi(_, dom, ran) = ty.borrow() {
             Ok((ran(dom.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?, self.update_local(dom.clone())))
         } else {
             Err(TypecheckingErrors::NotPi)

@@ -27,6 +27,7 @@ where T: Copy
 
     NotDatatype,
     ExpectedSort,
+    ExpectedType,
     // ExpectedSort(Value<T>),
     // we have these errors in Side-conditions.
     ExpectedNum,

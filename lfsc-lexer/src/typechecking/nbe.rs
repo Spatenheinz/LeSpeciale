@@ -1,8 +1,11 @@
+// use crate::typechecking::values::sc_closure;
+
 use super::EnvWrapper;
 use super::values::{Neutral, Normal, Value, RT, ResRT};
 use lfsc_syntax::ast::{AlphaTerm, Num, BuiltIn};
 use lfsc_syntax::ast::Ident::*;
 use lfsc_syntax::ast::AlphaTerm::*;
+use lfsc_syntax::free::FreeVar;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -21,6 +24,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
             Number(Num::Z(p)) => Ok(Rc::new(Value::Z(*p))),
             Number(Num::Q(p,q)) => Ok(Rc::new(Value::Q(*p, *q))),
             Hole => {
+                todo!("eval hole");
                 let c = self.hole_count.get();
                 // self.hole_count.set(c + 1);
                 Ok(Rc::new(Value::Neutral(self.gctx.kind.clone(), Rc::new(Neutral::Hole(RefCell::new(None), c)))))
@@ -51,12 +55,18 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
                 let dom =
                     if let SC(sc, term) = &**ty {
                         let t_ty = self.eval(term)?;
+                        // println!("t_ty: {:?}\n\tlctx: {:?}", t_ty, self.lctx);
+                        // let sc = self.run_sc(sc)?;
+                        // self.same(sc, t_ty.clone())?;
+                        // println!("sc: {:?}", t_ty);
+                        // return self.eval(body)
+                        // let clo = sc_closure(t_ty, sc, body, lctx);
                         Rc::new(Value::Run(sc, t_ty, self.lctx.clone()))
                 } else {
                     self.eval(ty)?
                 };
                 let ran = mk_closure(body, self.lctx.clone());
-                return Ok(Rc::new(Value::Pi(dom, ran)));
+                return Ok(Rc::new(Value::Pi(body.free_in(0), dom, ran)));
             },
             Lam(body) | AnnLam(_, body) => {
                 let closure = mk_closure(body, self.lctx.clone());
@@ -72,7 +82,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
     match f.borrow() {
         Value::Lam(closure) => closure(arg, self.gctx, self.allow_dbi, self.hole_count.clone()),
         Value::Neutral(f, neu) => {
-            if let Value::Pi(dom, ran) = f.borrow() {
+            if let Value::Pi(_,dom, ran) = f.borrow() {
                 Ok(Rc::new(Value::Neutral(
                     ran(arg.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?,
                     Rc::new(Neutral::App(neu.clone(), Normal(dom.clone(), arg))))))

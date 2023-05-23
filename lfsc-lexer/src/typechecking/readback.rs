@@ -30,7 +30,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
             return self.readback_neutral(ty, a.clone())
         }
         match ty.borrow() {
-            Type::Pi(dom, ran) => {
+            Type::Pi(_,dom, ran) => {
                 let env = self.update_local(dom.clone());
                 let var = mk_neutral_var_with_type(dom.clone());
                 let ran_ = ran(var.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?;
@@ -39,7 +39,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
             }
             Type::Box => {
                 match val.borrow() {
-                    Value::Pi(at, bt) => {
+                    Value::Pi(_,at, bt) => {
                         let dom = self.readback(ty.clone(), at.clone())?;
                         let env = self.update_local(at.clone());
                         let cls_res = bt(mk_neutral_var_with_type(at.clone()),

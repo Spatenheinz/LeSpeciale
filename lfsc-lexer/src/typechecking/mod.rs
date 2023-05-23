@@ -102,7 +102,7 @@ where 'a: 'b
     match com {
       Command::Declare(id, ty) => {
           // actually doing this for pi will check that it is a sort already,
-          // println!("declare: {}", id);
+            // println!("declare: {}", id);
             if gctx.contains(id) {
                 return Err(TypecheckingErrors::SymbolAlreadyDefined(id))
             }
@@ -125,6 +125,7 @@ where 'a: 'b
         Command::Check(term) => {
             // println!("check");
             env.infer(term)?;
+            // println!("ok");
             Ok(())
         },
         Command::Prog { cache: _chache, id, args, ty, body } => {

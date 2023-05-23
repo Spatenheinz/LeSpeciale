@@ -1,37 +1,19 @@
-** Concrete syntax of LFSC
-In this section I present the concrete syntax of LFSC.
-#+begin_export latex
-\begin{grammar}
-<commands> ::= ('('<command> ')')*
+Although the concrete syntax of LFSC is not terribly important we give a brief introduction to make the understanding of the examples presented later easier to understand.
+LFSC implements the core language and sideconditions as S-expressions.
 
-<command> ::= 'declare' <ident> <type>
-\alt define <ident> <term>
-\alt check <term>
-\alt program <args> <type> <sidecondition>
-\alt function <args> <type> <sidecondition>
-\alt run <sidecondition>
+At the toplevel lfsc allows the following commands, and derivatives thereof. They all take a single argument.
+- define: Defines a term.
+- declare: Declare a type.
+- program/function: is used to define sideconditions.
+- check: check will simply check a the type of the provided argument.
+For the term language the following symbols are used:
+| Abstract Syntax | Concrete Syntax |
+|-----------------+-----------------|
+| \Pi x : A . B     | ! x A B         |
+| A : M           | : M N           |
+| \lam x : M N    | # x M N         |
+| \lam x N        | \ x N           |
+| let x M N       | @ x M N         |
+| { S T }         | ^ S T           |
 
-<term> ::= <literals>
-\alt '(' <compound_term> ')'
-
-<literals> ::= <integer>
-\alt <rational>
-\alt <ident>
-\alt <_>
-
-<compound_term> ::= '@' <ident> <term> <term>
-\alt ('!' | 'forall') <ident> <type> <term>
-\alt ':' <type> <term>
-\alt '#' <ident> <type> <term>
-\alt ('\' | 'lam') <ident> <term>
-\alt '^' <sidecondition> <sidecondition>
-\alt '(' <term> ')'
-
-<sidecondition> ::= <literals>
-\alt '(' compound_sidecondition ')'
-\alt '(' numeric ')'
-\alt '(' sideeffect ')'
-\alt '(' 'let' <ident> <sidecondition> <sidecondition> ')'
-
-\end{grammar}
-#+end_export
+The sidecondition language directly uses the keywords marked with bold in the previous sections.
