@@ -68,7 +68,8 @@ switching to ~Vec~ gave a marginal improvement. being a couple of seconds faster
 | Cons list    | 12.7 \pm 0.7 ms  | 36.6 \pm 1.3 ms | 8.3 \pm 0.9 s |
 | Vec          | 18.2 \pm 1.7  ms | 51.8 \pm 1.9 ms | 6.4 \pm 0.1 s |
 
-This was still early in the development and the current implementation still uses cons lists, as they provide a higher level of confidence in correctness. And although the speedup is good it was not the massive boost we need.
+This was still early in the development and the current implementation still uses cons lists, as they provide a higher level of confidence in correctness.
+Although the speedup is good it was not the massive boost we need. But with a working faster cons list solution it might be worth revisiting the a ~Vec~ implementation.
 
 *** Massive speedup
 Analysing the code with perf, it got clear that most of the time was used in evaluating applications, namely about 60 percent of the time spend was in ~eval~ and ~do_app~. There is nothing inherently wrong in that proofs are mainly just applications and terms might get big. By analysing the /lfscc/ implementation it got clear that my implementation did unecessary complications.
@@ -153,12 +154,40 @@ In its current state, the LFSC proofs discharged from cvc5. always contains the 
 here ~x~ is the formula that unsatisfied by cvc5.
 Given that an in kernel verification condition generator outputs ~Value~ types, then all the functionality for normalizing both and comparing them for equality is already implemented.
 
-The experiment has not only
+The experiment has not only provided useful insight into the performance of the implementation but it also establishes confidence that the proof checker works as expected and follow the semantics presented in Section \ref{}.
+Checking the signatures along with the generated proofs suggests that mostly all parts of the typechecker is correct. All matters of the term language is covered, and most of the side condition language is also checked.
+At the moment my implementation also typecheck the functions ~markvar~ and ~if_marked~, but the evaluate of these are still left undone.
+The main reason for this is that there is currently no signatures distributed by cvc5 that includes their use and they might in fact be uneccesary.
+The sideconditions could be tested more thoroughly as only a single larger tests has been conducted, in the \(P \wedge \neg P\) unsatisfiability proof from \ref{}.
+Despite, the example test a large part of the sidecondition language, both constant and program application, match constructs, branching and numerical functions.
+One point where the implementation is inherently wrong is the usage of i32's for the representation of integers and rationals, in fact these should be unbounded integers.
+This is not a problem for bitvector proofs, but only for arithmetic logics. I have however left the representation as is for now, as i have not been able to find a library that
+efficiently implements ubounded integers and rationals.
+Even though the implementation does not run in the kernel, the implementation only uses the ~core~ and ~alloc~ crate along with ~nom~, which I have been succesful in compiling and running a simple example of
+in a kernel module.
+Hence there is nothing theoretical stopping from compiling into the kernel.
+The major work in this should be make every allocation fallible by using the ~try_new~ counter parts to ~new~ allocations, and implementation a simple from trait to easily converting allocation errors into
+typechecking errors.
+Hereby the ~?~ shortcut can be used, and no types should changes as they already implement Result types.
 
+* Is PCC a good idea?
+Even with a Rust implementation that shows okay performance, promises memory safety and no unexpected errors that can crash the program, the answer is not definite.
+It might still not be feasible to use LFSC for an in kernel proof checker as part of a larger proof carrying code architecture, since a lot of questions are still unanswered.
+The eBPF verifier does a lot more than just validating instructions of a bytecode format. It check validity in memory alignment, user-rights, does simple program optimizations, such as deadcode elimination and much more.
+Although some of these can be embedded into a proof, code optimizations is inherent to the bytecode not the proof and user-rights should be checked seperately anyway.
+None of this discards the use of PCC but merely accept it as an alternative to some of responsibility of the verifier.
 
-  - Videnskabsteori: Hypothesis etc.
-    - Correctness
-    - Expressiveness
-    - Performance
-    - Ease of use?
-    - maybe more???
+The more pressing matter is that of execution time.
+Although typechecking LFSC is decidable, it is still a dependent language in which typechecking can invoke evaluation and having this in the kernel essentially means
+that untrusted sources may execute code inside the kernel.
+LFSC has no recursion (if we regard the fact that sideconditions are, but these must be trusted to terminate) and hence typechecking will be decidable and terminate.
+However there is no mechanism stopping a malicious user to construct complex proofs that can block the kernel, not indefinitely, but for a long time, a good old school denial of services.
+The verifier solves the matter by only allowing a certain amount of instructions.
+This is much easier for eBPF as instructions are atomic, but for applications,
+they may be arbitrarily nested and specifying a limit will require deeper analysis.
+For instance the LFSC proof for the validity of a 100 line eBPF program has a nesting dept 1850, and this could potentially appear in many let bindings.
+If we can reach performance similar to that of /lfscc/ then this problem does not seem to be as big of an issue.
+But the performance of the implementation presented here can be problematic.
+
+Despite all this the implementation is rather small and consist of only 2400 lines of code compared to 19000 in the verifier.
+Bugs are hence less likely to appear.
