@@ -28,9 +28,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
             AlphaTerm::Pi(a, b) => {
                 let val =
                     if let SC(t1, t2) = &**a {
-                        // TODO fix this should return type...
                         let t1_ty = self.infer_sc(t1)?;
-                        // as_type(&t1_ty)?;
                         self.check(t2, t1_ty.clone())?;
                         Rc::new(Type::Run(t1, t1_ty, self.lctx.clone()))
                     } else {
@@ -54,33 +52,17 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
                 for n in args {
                     f_ty = if let Type::Pi(free,a,b) = f_ty.borrow() {
                      if Hole == *n {
-                         let c = self.hole_count.get();
-                         self.hole_count.set(c + 1);
-                         let hole = Rc::new(Neutral::Hole(RefCell::new(None), c));
-                         // println!("hole: {:?}", hole);
-                         b(Rc::new(Type::Neutral(a.clone(), hole)), self.gctx, self.allow_dbi, self.hole_count.clone())?
+                         let hole = Rc::new(Neutral::Hole(RefCell::new(None)));
+                         b(Rc::new(Type::Neutral(a.clone(), hole)), self.gctx)?
                      } else {
                         self.check(n, a.clone())?;
-                        // println!("n: {:?}", n);
                          let x = if *free { self.eval(n)? } else { a.clone() };
-                        // println!("x: {:?}", x);
-                        b(x, self.gctx, self.allow_dbi, self.hole_count.clone())?
+                        b(x, self.gctx)?
                      }
                     } else {
                         return Err(TypecheckingErrors::NotPi)
                     }
                 };
-                // println!("f_ty: {:?}", f_ty);
-                if let Type::Pi(_,a, b) = f_ty.borrow() {
-                    if let Type::Run(sc, t, lctx) = a.borrow() {
-                        let env = EnvWrapper::new(lctx.clone(), self.gctx, self.allow_dbi, self.hole_count.clone());
-                        // println!("self lctx: {:?}", self.lctx);
-                        // println!("lc: {:?}", lctx);
-                        let sc = env.run_sc(sc)?;
-                        env.same(sc, t.clone())?;
-                        return b(t.clone(), env.gctx, env.allow_dbi, env.hole_count.clone());
-                    }
-                }
                 Ok(f_ty)
             },
             Asc(a, m) => {
@@ -120,7 +102,6 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         },
         AlphaTermSC::App(f, args) => {
             let mut f_ty = self.get_type(f)?;
-            let mut env = self.clone();
             if let Type::Prog(params, _) = self.get_value(f)?.borrow() {
                 if args.len() != args.len() {
                     return Err(TypecheckingErrors::WrongNumberOfArguments);
@@ -133,13 +114,8 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
             // The case for PI
             for arg in args.iter() {
                  if let Type::Pi(_,a,b) = f_ty.borrow() {
-                     // 1. check arg matches type of function
-                    // let arg_ty = env.infer_sc(arg)?;
-                    env.check_sc(arg, a.clone())?;
-                     // 2. We dont allow x in the
-                    env.allow_dbi += 1;
-                     // hacky way to force evaluation
-                    f_ty = b(env.gctx.kind.clone(), env.gctx, env.allow_dbi, env.hole_count.clone())?;
+                    self.check_sc(arg, a.clone())?;
+                    f_ty = b(self.gctx.kind.clone(), self.gctx)?;
                  } else {
                     return Err(TypecheckingErrors::NotPi);
                  }
@@ -219,7 +195,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
     // indirection to since we might now assign to a borrow...
     fn force_pi(&self, ty: RT<'ctx, T>) -> TResult<(RT<'ctx, T>, Self), T> {
         if let Type::Pi(_, dom, ran) = ty.borrow() {
-            Ok((ran(dom.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?, self.update_local(dom.clone())))
+            Ok((ran(dom.clone(), self.gctx)?, self.update_local(dom.clone())))
         } else {
             Err(TypecheckingErrors::NotPi)
         }

@@ -20,45 +20,34 @@ use std::hash::Hash;
 struct EnvWrapper<'global, 'term, T: BuiltIn> {
     pub lctx: Rlctx<'term, T>,
     pub gctx: Rgctx<'global, 'term, T>,
-    pub allow_dbi: u32,
-    pub hole_count: Cell<u32>
 }
 
 impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
 where T: BuiltIn
 {
     pub fn new(lctx: Rlctx<'term, T>,
-               gctx: Rgctx<'global, 'term, T>,
-           allow_dbi: u32,
-           hole_count: Cell<u32>) -> Self {
-        Self { lctx, gctx, allow_dbi, hole_count }
+               gctx: Rgctx<'global, 'term, T>) -> Self {
+        Self { lctx, gctx }
     }
 
     pub fn insert_local(&self, val: RT<'term, T>) -> Self {
         Self { lctx: LocalContext::insert(val, self.lctx.clone()),
                gctx: self.gctx,
-               allow_dbi: self.allow_dbi,
-               hole_count: self.hole_count.clone()
         }
     }
     pub fn define_local(&self, ty: RT<'term, T>, val: RT<'term, T>) -> Self {
         Self { lctx: LocalContext::define(ty, val, self.lctx.clone()),
                gctx: self.gctx,
-               allow_dbi: self.allow_dbi,
-               hole_count: self.hole_count.clone()
         }
     }
     pub fn update_local(&self, val: RT<'term, T>) -> Self {
         Self { lctx: LocalContext::decl(val, self.lctx.clone()),
                gctx: self.gctx,
-               allow_dbi: self.allow_dbi,
-               hole_count: self.hole_count.clone()
         }
     }
     pub fn get_value(&self, key: &Ident<T>) -> ResRT<'term, T> {
         match key {
-            Ident::DBI(i) if self.allow_dbi >= *i => self.lctx.get_value(*i),
-            Ident::DBI(_) => Err(TypecheckingErrors::DependentTypeNotAllowed),
+            Ident::DBI(i) => self.lctx.get_value(*i),
             Ident::Symbol(name) => self.gctx.get_value(name),
         }
     }
@@ -84,10 +73,10 @@ where T: BuiltIn
         if ref_compare(t1.clone(), t2.clone()) { return Ok(()) }
         let e1 = self.readback(tau.clone(), t1)?;
         let e2 = self.readback(tau, t2)?;
-        // println!("convert:\n\t{:?}\n\t{:?}", e1, e2);
         if e1 == e2 {
             Ok(())
         } else {
+            // Err(TypecheckingErrors::Mismatch)
             Err(TypecheckingErrors::Mismatch(e1, e2))
         }
     }
@@ -98,7 +87,7 @@ pub fn handle_command<'a, 'b>(com: &'b StrAlphaCommand<'a>,
 where 'a: 'b
 {
     // let lctx = Rc::new(LocalContext::new());
-    let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx, 0, Cell::new(1));
+    let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx);
     match com {
       Command::Declare(id, ty) => {
           // actually doing this for pi will check that it is a sort already,
@@ -153,7 +142,7 @@ where 'a: 'b
             let typ = Rc::new(Value::Prog(args_ty.clone(), body));
             gctx.define(id, res_ty.clone(), typ);
 
-            EnvWrapper::new(lctx, gctx, 0, Cell::new(0)).check_sc(body, res_ty)?;
+            EnvWrapper::new(lctx, gctx).check_sc(body, res_ty)?;
             Ok(())
         }
         Command::Run(..) => todo!(),

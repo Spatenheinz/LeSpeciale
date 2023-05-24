@@ -52,7 +52,7 @@ fn from_entry_to_value<'a, K: BuiltIn>(entry: &TypeEntry<'a, K>, key: Ident<K>)
          TypeEntry::Def { val, .. } => val.clone(),
          TypeEntry::IsA { ty, .. } => {
              if let Value::Neutral(_, hol) = ty.borrow() {
-                 if let Neutral::Hole(hol,_) = hol.borrow() {
+                 if let Neutral::Hole(_) = hol.borrow() {
                      // if let Some(inner) = &*hol.borrow() {
                      //     return inner.clone()
                      // }

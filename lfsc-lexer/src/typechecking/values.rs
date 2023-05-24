@@ -8,12 +8,12 @@ use super::errors::TypecheckingErrors;
 use super::{EnvWrapper, context::{LocalContext, GlobalContext}};
 
 pub type Closure<'term, T> =
-    Box<dyn Fn(RT<'term, T>, &GlobalContext<'term, T>, u32, Cell<u32>) -> ResRT<'term, T> + 'term>;
+    Box<dyn Fn(RT<'term, T>, &GlobalContext<'term, T>) -> ResRT<'term, T> + 'term>;
 
 pub fn const_closure<T>(cons: RT<T>) -> Closure<T>
 where T: BuiltIn
 {
-    Box::new(move |_,_,_,_| { Ok(cons.clone()) })
+    Box::new(move |_,_| { Ok(cons.clone()) })
 }
 
 pub fn mk_closure<'term, T>(body: &'term AlphaTerm<T>,
@@ -21,32 +21,17 @@ pub fn mk_closure<'term, T>(body: &'term AlphaTerm<T>,
                         ) -> Closure<'term, T>
 where T: BuiltIn
 {
-    Box::new(move |v, gctx, allow_dbi, hole_count| {
+    Box::new(move |v, gctx| {
              let lctx = LocalContext::insert(v, lctx.clone());
-             let env = EnvWrapper::new(lctx, gctx, allow_dbi, hole_count);
+             let env = EnvWrapper::new(lctx, gctx);
              env.eval(body)})
 }
-
-// pub fn sc_closure<'term, T>(t_ty: RT<'term, T>,
-//                             sc: &'term AlphaTermSC<T>,
-//                             body: &'term AlphaTerm<T>,
-//                             lctx: super::context::Rlctx<'term, T>,
-//                         ) -> Closure<'term, T>
-// where T: BuiltIn
-// {
-//     Box::new(move |_, gctx, allow_dbi, hole_count| {
-//              let env = EnvWrapper::new(lctx.clone(), gctx, allow_dbi, hole_count);
-//              let sc = env.run_sc(sc)?;
-//              env.same(sc, t_ty.clone())?;
-//              env.insert_local(t_ty.clone()).eval(body)})
-// }
 
 pub type TResult<T, K> = Result<T, TypecheckingErrors<K>>;
 pub type Type<'term, T> = Value<'term, T>;
 pub type RT<'term, T> = Rc<Type<'term, T>>;
 pub type ResRT<'term, T> = TResult<RT<'term, T>, T>;
 
-// #[derive(Clone)]
 pub enum Value<'term, T: BuiltIn> {
     Pi(bool, RT<'term, T>, Closure<'term, T>),
     Lam(Closure<'term, T>),
@@ -73,14 +58,6 @@ impl<'term, T: BuiltIn> fmt::Debug for Value<'term, T> {
             Value::QT => write!(f, "QT"),
             Value::Q(i, j) => write!(f, "Q: {}/{}", i, j),
             Value::Neutral(_ty, n) => write!(f, "{:?}", n),
-            // Value::Neutral(ty, n) => write!(f, "Neutral:\n\tty:  {:?}\n\tvar: {:?}", ty, n),
-            // Value::Hole(hole) => {
-            //     let hole = hole.borrow();
-            //     match &*hole {
-            //         Some(t) => fmt::Debug::fmt(t, f),
-            //         None => write!(f, "_"),
-            //     }
-            // }
             Value::Run(ty, t, _) => write!(f, "^ {:?} {:?}", ty, t),
             Value::Prog(vars, t) => write!(f, "Prog: {:?}\n\t{:?}\n\t", vars, t),
         }
@@ -94,8 +71,6 @@ impl<'term, T: BuiltIn> PartialEq for Value<'term, T> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             // TODO incomplete
-            // (Value::Pi(a, _), Value::Pi(b, _)) => a == b,
-            // (Value::Lam(_), Value::Lam(_)) => true,
             (Value::Box, Value::Box) => true,
             (Value::Star, Value::Star) => true,
             (Value::ZT, Value::ZT) => true,
@@ -103,12 +78,6 @@ impl<'term, T: BuiltIn> PartialEq for Value<'term, T> {
             (Value::Z(i), Value::Z(j)) => i == j,
             (Value::Q(i, j), Value::Q(k, l)) => i == k && j == l,
             (Value::Neutral(a, n), Value::Neutral(b, m)) => {
-                if let Neutral::Hole(n,_) = &**n {
-                    println!("Hole 1: {:?}", n);
-                }
-                if let Neutral::Hole(m,_) = &**m {
-                    println!("Hole 2: {:?}", m);
-                }
                 **n == **m && a == b
             }
             (Value::Run(a, t,_), Value::Run(b, u,_)) => a == b && t == u,
@@ -129,7 +98,6 @@ where T: BuiltIn
         (Value::Q(i, j), Value::Q(k, l)) => i == k && j == l,
         (Value::Neutral(a, n), Value::Neutral(b, m)) => {
             ref_compare_neutral(n.clone(), m.clone()) && ref_compare(a.clone(), b.clone())
-            // ref_compare_neutral(n.clone(), m.clone()) && a == b
         },
         _ => false,
     }
@@ -144,23 +112,17 @@ where T: BuiltIn
         (Neutral::App(a, b), Neutral::App(c, d)) => {
             ref_compare_neutral(a.clone(), c.clone()) && ref_compare_normal(b, d)
         },
-        (Neutral::Hole(hol,xx), a) => {
+        (Neutral::Hole(hol), a) => {
             if let Some(t) = &*hol.borrow() {
-                // println!("check hole 1 - {}\n\t{:?}\n\t{:?}", xx, t, a);
                 return ref_compare_neutral(t.clone(), m)
-                // return a == &**t
             }
-            // println!("filling hole 1 with {} - {:?}", xx, m);
                 hol.replace(Some(m));
                 true
         },
-        (a, Neutral::Hole(hol,xx)) => {
+        (a, Neutral::Hole(hol)) => {
             if let Some(t) = &*hol.borrow() {
-                // println!("check hole 2 - {}\n\t{:?}\n\t{:?}", xx, t, a);
                 return ref_compare_neutral(t.clone(), n)
-                // return a == &**t
             }
-            // println!("filling hole 2 with {}\n\t{:?}", xx, n);
                 hol.replace(Some(n));
                 true
         },
@@ -268,20 +230,13 @@ where T: BuiltIn
     }
 }
 
-// pub fn is_neutral<T>(v: &Value<T>) -> bool
-// where T: BuiltIn
-// {
-//     matches!(v, Value::Neutral(_, _))
-// }
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Neutral<'term, T: BuiltIn>
 {
     Var(T),
     DBI(u32),
     App(Rc<Neutral<'term, T>>, Normal<'term, T>),
-    Hole(RefCell<Option<Rc<Neutral<'term, T>>>>, u32),
-    // SC
+    Hole(RefCell<Option<Rc<Neutral<'term, T>>>>),
 }
 
 pub fn flatten<'term, T: BuiltIn>(neu: &Neutral<'term, T>) -> TResult<(Ident<T>, Vec<RT<'term, T>>), T> {
@@ -294,8 +249,7 @@ pub fn flatten<'term, T: BuiltIn>(neu: &Neutral<'term, T>) -> TResult<(Ident<T>,
             args.push(a.1.clone());
             Ok((f, args))
         },
-        Hole(inner,_) => {
-            println!("flatten hole");
+        Hole(inner) => {
             if let Some(n) = &*inner.borrow() {
                 flatten(n)
             } else {

@@ -1,5 +1,5 @@
 use lfsc_syntax::{ast::{Num, Term, Command, TermSC, SideEffectSC,
-                        NumericSC, CompoundSC, Pattern, Ident, StrCommand}, binder, var};
+                        NumericSC, CompoundSC, Pattern, Ident, StrCommand}, binder};
 
 extern crate nom;
 
@@ -9,7 +9,7 @@ use nom::{
     character::complete::{ char, digit1, satisfy},
     combinator::{map, recognize, value, opt, eof},
     error::{ParseError, VerboseError, Error},
-    multi::{many0, many1, fold_many_m_n, fold_many0},
+    multi::{many0, many1, fold_many_m_n},
     sequence::{delimited, pair, preceded, terminated, tuple},
     IResult, Parser,
 };
@@ -105,17 +105,13 @@ fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
             |(ty, val)| Term::Ascription { ty: Box::new(ty), val: Box::new(val)},
         ),
         map(
-            preceded((reserved("#")), tuple((parse_ident, parse_term, parse_term))),
+            preceded(reserved("#"), tuple((parse_ident, parse_term, parse_term))),
             |(var, typ, body)| binder!(lam, var : typ, body),
         ),
         map(
             preceded(alt((reserved("lam"),reserved("\\"))), tuple((parse_ident, parse_term))),
             |(var, body)| binder!(lam, var, body),
         ),
-        // map(
-        //     preceded((tag("#"), tuple((parse_ident, parse_term, parse_term))),
-        //     |(var, ty, body)| binder!(biglam, var : ty, body),
-        // ),
         map(preceded(alt((reserved("provided"), reserved("^"))),
                      pair(parse_sc, parse_term)),
             |(x,y)| Term::SC(x, Box::new(y))),

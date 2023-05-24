@@ -1,5 +1,4 @@
 pub mod ast;
-pub mod sexp;
 pub mod pretty;
 pub mod free;
 

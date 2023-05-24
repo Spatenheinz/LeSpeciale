@@ -84,7 +84,7 @@ fn main() -> Result<(), String> {
     }
     let mut gctx = init_with_str();
     for i in normal.iter() {
-        handle_command(i, &mut gctx)?
+        handle_command(i, &mut gctx)?;
         // if let Err(e) = handle_command(i, &mut gctx) {
         //     // println!("{:?}", e);
         //     return Err(format!("Error: {:?}", e))

@@ -27,13 +27,13 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
     {
         // neutral values can be readback without a type
         if let Value::Neutral(_, a) = val.borrow() {
-            return self.readback_neutral(ty, a.clone())
+            return self.readback_neutral(a.clone())
         }
         match ty.borrow() {
             Type::Pi(_,dom, ran) => {
                 let env = self.update_local(dom.clone());
                 let var = mk_neutral_var_with_type(dom.clone());
-                let ran_ = ran(var.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?;
+                let ran_ = ran(var.clone(), self.gctx)?;
                 let app = self.do_app(val, var)?;
                 Ok(abinder!(lam, env.readback(ran_, app)?))
             }
@@ -43,14 +43,14 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
                         let dom = self.readback(ty.clone(), at.clone())?;
                         let env = self.update_local(at.clone());
                         let cls_res = bt(mk_neutral_var_with_type(at.clone()),
-                                         self.gctx, self.allow_dbi, self.hole_count.clone())?;
+                                         self.gctx)?;
                         let ran = env.readback(ty, cls_res)?;
                         Ok(abinder!(pi, dom, ran))
                     },
                     Value::Star => Ok(Ident(Symbol(T::_type()))),
                     Value::ZT => Ok(Ident(Symbol(T::_mpz()))),
                     Value::QT => Ok(Ident(Symbol(T::_mpq()))),
-                    Value::Run(t1,t2,_) => self.readback(ty, t2.clone()),
+                    Value::Run(t1,t2,_) => Ok(SC((*t1).clone(), Box::new(self.readback(ty, t2.clone())?))),
                     _ => Err(TypecheckingErrors::ReadBackMismatch),
                 }
             }
@@ -71,7 +71,6 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
     }
 
     fn readback_neutral(&self,
-                        _ty: RT<'ctx, T>,
                         neu: Rc<Neutral<'ctx, T>>,
                        ) -> TResult<AlphaTerm<T>, T>
     {
@@ -79,17 +78,17 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
             Neutral::DBI(i) => {
                 Ok(Ident(DBI(*i)))
             },
-            Neutral::Hole(hol, _) => {
+            Neutral::Hole(hol) => {
                 if let Some(ty) = &*hol.borrow() {
                     // TODO: check the cost of this
-                    self.readback_neutral(_ty, ty.clone())
+                    self.readback_neutral(ty.clone())
                 } else {
                     Ok(Hole)
                 }
             },
             Neutral::Var(name) => Ok(Ident(Symbol(*name))),
             Neutral::App(f, a) => {
-                let f = self.readback_neutral(_ty, f.clone())?;
+                let f = self.readback_neutral(f.clone())?;
                 let a = self.readback_normal(a.clone())?;
                 Ok(App(Box::new(f), vec![a]))
                 //TODO fix this to make sense

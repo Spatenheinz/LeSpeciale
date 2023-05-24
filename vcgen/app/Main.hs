@@ -126,7 +126,7 @@ sigs = unwords $ map (sigDir <>) signatures
 
 hyperfineArgs prog = ["--warmup", "5", "--min-runs", "10"]
   -- <> [lfscc <> " " <> sigs <> " " <> prog]
-  <> [unwords [lfscc, sigs, prog, "--no-tail-calls >& /dev/null"], unwords [lfsc_rust, prog]]
+  <> [unwords [lfscc, sigs, prog, " >& /dev/null"], unwords [lfsc_rust, prog]]
 
 hyperfine = "hyperfine"
 
@@ -147,10 +147,6 @@ test n prog = do
       if proof == [] then putStrLn "cvc5: No proof"
       else do
         writeFile (filename ++ ".plf") $ unlines $ tail proof
-        -- (_, _, _, ph) <-
-        --   createProcess (proc "cargo" ["build", "--release", "--quiet"])
-        --   { cwd = Just "../lfsc-lexer/"}
-        -- exitCode <- waitForProcess ph
         (_exitcode, stdout, stderr) <-
           readProcessWithExitCode hyperfine (hyperfineArgs (filename <> ".plf") <> ["--show-output"]) ""
         putStrLn stdout
@@ -172,6 +168,10 @@ mkprog n = do
 
 main :: IO ()
 main = do
+  (_, _, _, ph) <-
+    createProcess (proc "cargo" ["build", "--release", "--quiet"])
+    { cwd = Just "../lfsc-lexer/"}
+  exitCode <- waitForProcess ph
   forM_ (take 4 tens) $ \n -> do
     prog <- mkprog n
     test n prog

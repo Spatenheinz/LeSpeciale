@@ -473,7 +473,7 @@ struct EnvWrapper<'global, 'term, T: Copy> {
     pub allow_dbi: u32,
 }
 #+end_src
-The Rlctx is a typesynonym for a reference counted \Gamma. Whereas Rgctx is a standard reference to \Sigma.
+The Rlctx is a type synonym for a reference counted \Gamma. Whereas Rgctx is a standard reference to \Sigma.
 
 *** Commands
 We define a single function to handle a specific command and then apply this on an iterator of all commands.
@@ -540,9 +540,7 @@ We can then update the local environment stating that DBI 0 in the localcontext 
 AlphaTerm::Pi(a, b) => {
     let val =
         if let SC(t1, t2) = &**a {
-            // TODO fix this should return type...
             let t1_ty = self.infer_sc(t1)?;
-            // as_type(&t1_ty)?;
             self.check(t2, t1_ty.clone())?;
             Rc::new(Type::Run(t1, t1_ty, self.lctx.clone()))
         } else {
@@ -553,19 +551,125 @@ AlphaTerm::Pi(a, b) => {
 },
 #+end_src
 
-The most compliated rule comes
+The most compliated rule Application. Instead of interpreting multiple continious application as curried form we use a flat approach in which we evaluate each argument in a loop.
+First we evaluate the function point, this is saved in a mutable variable updated each iteration of the loop.
+Each argument is checked against the domain of the \Pi type, if the variable bound by the \Pi is free, then we evaluate it or we return an arbitrary value.
+Lastly the body is evaluated, with either the new value or default added to the local environment. the result is bound to ~f_ty~. This happens for each iteration and lastly we return the bound value.
+In case the argument is a Hole, we do not check it, as it is trivially the correct type at this point. We add it to the environment and evaluate the body.
+#+begin_src rust
+App(f, args) => {
+    let mut f_ty = self.infer(f)?;
+    for n in args {
+        f_ty = if let Type::Pi(free,a,b) = f_ty.borrow() {
+         if Hole == *n {
+             let hole = Rc::new(Neutral::Hole(RefCell::new(None)));
+             b(Rc::new(Type::Neutral(a.clone(), hole)), self.gctx)?
+         } else {
+            self.check(n, a.clone())?;
+             let x = if *free { self.eval(n)? } else { a.clone() };
+            b(x, self.gctx)?
+         }
+        } else {
+            return Err(TypecheckingErrors::NotPi)
+        }
+    };
+    Ok(f_ty)
+#+end_src
 
+similar inference is done for the sidecondition language.
 
 *** Checking types
-We only define a single function for typechecking. It takes a term and a value/type \tau' and check against it.
-We match on term and if it an annonymous lambda then we check follow rule: LAM of Figure ref{}, otherwise
-we infer the type of the term to \tau and convert \tau and \tau to their canonical form using reification as decribed in \ref{} and check for equality.
+We define two functions for typechecking. One takes a term and a value/type t2 and check against it.
+The other takes a sideconditions as first argument, but essentially does the same.
+We match on term and if it an anonymous lambda then we check /LAM/-rule of Figure \ref{},
+otherwise we infer the type of the term to t1 and check t2 and t1 for "sameness".
+This process is two-fold. Firstly we do a value comparison between t1 and t2.
+to their canonical form using reification as decribed in \ref{} and check for equality.
+Generally we cannot compare values, as functions such as \Pi is implemented using Closures, which cannot easily be compared.
+The main reason for the ~ref_compare~ call, is to fill in holes.
+The function return a boolean of the equality between the two values, and as long as the values are one of the simple types or
+syntactically the same neutrals. If one of the arguments is a hole it is filled with the other value.
+This is done using the interior mutability of Refcells.
+We cannot fill the holes after reading back values as a hole might occur in multiple places and we must ensure
+that it is filled with the same value.
+However empirically, the ref_compare will return ~true~ most of the time.
+In case it returns 0. We readback (a more idimatic term than reification) the values into their normal form and compare them.
 
-*** Reification
-TODO: read and explain before I look at the code so i am sure it works correctly.
+#+begin_src rust
+pub fn convert(&self,
+            t1: RT<'term, T>,
+            t2: RT<'term, T>,
+            tau: RT<'term, T>) -> TResult<(), T>
+{
+    if ref_compare(t1.clone(), t2.clone()) { return Ok(()) }
+    let e1 = self.readback(tau.clone(), t1)?;
+    let e2 = self.readback(tau, t2)?;
+    if e1 == e2 {
+        Ok(())
+    } else {
+        Err(TypecheckingErrors::Mismatch(e1, e2))
+    }
+}
+#+end_src
+
+
+*** Readback (Reification)
+As mentioned previously, reading back semantical objects into the term language is type directed.
+~read_back~ takes a type and a value as arguments. The we first check if the value is neutral.
+Is it the case, then we call ~read_back~ neutral.
+
+Neutral values have enough information to be read back without a type.
+Variables can be read back directly, holes either get read back as its inner value or as a term language hole.
+Application will read back the function point and then argument point. And construct an application from it.
+Be aware here that the argument point is a ~Normal~ type. It will thus call ~read_back~ with its type and val.
+
+If the value of ~read_back~ is not neutral, we patternmatch on the type.
+If the type is \mathcal{Z} or \mathcal{Q} then we can read back integers and rationals respectively.
+All built in types can be readback to the built in terms.
+Pi types can be read back by reading back the domain, then evaluate the body and read the body back.
+Run commands can be read_back as the second argument and constructing and ~SC~ type by cloining the actual
+sidecondition call.
 
 *** evaluation
 We define evaluation on two levels, both on terms and on the functional sidecondition language.
-Evaluation of the term language... TODO.
+Evaluation of the term language is straightforward.
+Sideconditions and holes cannot be evaluated.
+Application have a similar structure to ~infer~.
+We consider applications in applicative order evaluation with a loop over the arguments.
+The function ~do_app~ is then called with the function and the argument evaluated
+#+begin_src rust
+pub fn do_app(&self, f: RT<'ctx, T>, arg: RT<'ctx, T>) -> ResRT<'ctx, T>
+{
+match f.borrow() {
+    Value::Lam(closure) => closure(arg, self.gctx),
+    Value::Neutral(f, neu) => {
+        if let Value::Pi(_,dom, ran) = f.borrow() {
+            Ok(Rc::new(Value::Neutral(
+                ran(arg.clone(), self.gctx)?,
+                Rc::new(Neutral::App(neu.clone(), Normal(dom.clone(), arg))))))
+        } else {
+            todo!("This should be an error")
+        }
+    }
+    _ => todo!("This should be an error"),
+}
+}
+#+end_src
+Functions can be either a concrete lambda abstraction in which we simply evaluate the closure.
+A Function can also be unknown, in which case, we check that the type of the neutral value is a function type.
+We construct a new neutral value, where the type of the neutral value is range of the \Pi and the value is an application of the
+unknown value onto the normal expression (dom, arg). stating that arg has type dom.
+For instance if we consider the application (f x y), where f :: a -> b -> c,
+then we construct:
+Neu( b -> c, f (x : a))
+by the first applcation and
+Neu(c, (f (x : a)) (y : b))
+If we then want to read back, we will get (f x y) back since it is already in normal form.
 
-Evaluation of the sideconditions follow the operational sematics. TODO..
+Evaluation of \Pi terms are also interesting. For standard \Pi constructs,
+we simply evaluate the domain, construct a closure around the body, check if the bound variable is free in the range
+and construct a Pi value. However if the domain of a \Pi is a sidecondition, we evaluate the sidecondition, the target and check for equivalence.
+Lastly the result is inserted in the local context and the body is evaluated.
+This is what enables execution of sideconditions in the typechecking.
+
+\footnote{should i mention anything about evaluation of sideconditions?}

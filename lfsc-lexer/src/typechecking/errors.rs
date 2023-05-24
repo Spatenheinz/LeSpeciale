@@ -32,6 +32,7 @@ where T: Copy
     // we have these errors in Side-conditions.
     ExpectedNum,
     ExpectedSameNum,
+    // Mismatch,
     Mismatch(AlphaTerm<T>, AlphaTerm<T>),
     DivByZero,
     NaN,

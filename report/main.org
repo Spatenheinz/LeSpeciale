@@ -1,6 +1,6 @@
 #+SETUPFILE: Preamble/latex-setup.org
 
-#+TITLE: *Verifiying eBPF programs in the Linux Kernel*
+#+TITLE: *Verifying eBPF programs in the Linux Kernel*
 #+AUTHOR: Jacob Herbst (mwr148)
 #+DATE: 2023-05-31
 #+LATEX_HEADER_EXTRA: \assignment{Msc. Thesis}

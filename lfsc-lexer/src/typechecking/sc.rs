@@ -12,7 +12,6 @@ use crate::typechecking::values::{as_neutral, flatten, ref_compare};
 
 use super::EnvWrapper;
 use super::errors::TypecheckingErrors::{NaN, DivByZero, ReachedFail, NoMatch};
-// use super::context::{RLCTX, RGCTX, set_mark, get_mark, LocalContext};
 use super::values::{ResRT, Value, as_symbolic, TResult};
 
 use std::hash::Hash;
@@ -25,7 +24,6 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         match sc {
             Number(Num::Z(p)) => Ok(Rc::new(Value::Z(*p))),
             Number(Num::Q(p,q)) => Ok(Rc::new(Value::Q(*p, *q))),
-            // Little unsure about value vs type.
             Ident(DBI(i)) => self.lctx.get_value(*i),
             Ident(Symbol(x)) => self.gctx.get_value(x),
             Let(m, n) => {
@@ -91,7 +89,6 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         IfEq { a, b, tbranch, fbranch } => {
             let a = self.run_sc(a)?;
             let b = self.run_sc(b)?;
-          // TODO not good to use ref_compare. In case where holes are not filled we dont want to fill them.
             self.run_sc( if ref_compare(a, b) { tbranch } else { fbranch })
         }
         Match(scrut, cases) => {
@@ -192,5 +189,3 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 }
-// // NOTE: SymS is bound in PI, ANNLAM, BigLam, Lam, Let and in toplevel.
-// // Seams like it is simply a variable.

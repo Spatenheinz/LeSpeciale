@@ -1,20 +1,14 @@
-// use crate::typechecking::values::sc_closure;
-
 use super::EnvWrapper;
 use super::values::{Neutral, Normal, Value, RT, ResRT};
 use lfsc_syntax::ast::{AlphaTerm, Num, BuiltIn};
-use lfsc_syntax::ast::Ident::*;
 use lfsc_syntax::ast::AlphaTerm::*;
 use lfsc_syntax::free::FreeVar;
 
-use std::cell::RefCell;
 use std::rc::Rc;
 use std::borrow::Borrow;
 
-use std::hash::Hash;
-
 impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
-where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
+where T: BuiltIn
 {
     pub fn eval(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T>
     {
@@ -23,23 +17,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
         match term {
             Number(Num::Z(p)) => Ok(Rc::new(Value::Z(*p))),
             Number(Num::Q(p,q)) => Ok(Rc::new(Value::Q(*p, *q))),
-            Hole => {
-                todo!("eval hole");
-                let c = self.hole_count.get();
-                // self.hole_count.set(c + 1);
-                Ok(Rc::new(Value::Neutral(self.gctx.kind.clone(), Rc::new(Neutral::Hole(RefCell::new(None), c)))))
-            },
-            Ident(Symbol(name)) => {
-                let res = self.gctx.get_value(name)?;
-                Ok(res)
-            },
-            Ident(DBI(i)) => {
-                if self.allow_dbi <= *i {
-                    return self.lctx.get_value(*i);
-                }
-                // TODO fix panic
-                panic!("dbi: {} is not allowed", i)
-            }
+            Ident(ident) => self.get_value(ident),
             App(fun, arg) => {
                 let mut e1 = self.eval(fun)?;
                 for a in arg.iter() {
@@ -55,13 +33,9 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
                 let dom =
                     if let SC(sc, term) = &**ty {
                         let t_ty = self.eval(term)?;
-                        // println!("t_ty: {:?}\n\tlctx: {:?}", t_ty, self.lctx);
-                        // let sc = self.run_sc(sc)?;
-                        // self.same(sc, t_ty.clone())?;
-                        // println!("sc: {:?}", t_ty);
-                        // return self.eval(body)
-                        // let clo = sc_closure(t_ty, sc, body, lctx);
-                        Rc::new(Value::Run(sc, t_ty, self.lctx.clone()))
+                        let sc = self.run_sc(sc)?;
+                        self.same(sc.clone(), t_ty.clone())?;
+                        return self.insert_local(t_ty).eval(body)
                 } else {
                     self.eval(ty)?
                 };
@@ -74,23 +48,24 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
             },
             Asc(_, val) => self.eval(val),
             SC(..) => todo!("eval SC"),
+            Hole => todo!("eval Hole"),
         }
     }
 
     pub fn do_app(&self, f: RT<'ctx, T>, arg: RT<'ctx, T>) -> ResRT<'ctx, T>
     {
     match f.borrow() {
-        Value::Lam(closure) => closure(arg, self.gctx, self.allow_dbi, self.hole_count.clone()),
+        Value::Lam(closure) => closure(arg, self.gctx),
         Value::Neutral(f, neu) => {
             if let Value::Pi(_,dom, ran) = f.borrow() {
                 Ok(Rc::new(Value::Neutral(
-                    ran(arg.clone(), self.gctx, self.allow_dbi, self.hole_count.clone())?,
+                    ran(arg.clone(), self.gctx)?,
                     Rc::new(Neutral::App(neu.clone(), Normal(dom.clone(), arg))))))
             } else {
-                todo!("This should be an error")
+                Err(super::errors::TypecheckingErrors::NotPi)
             }
         }
-        _ => todo!("This should be an error"),
+        _ => Err(super::errors::TypecheckingErrors::NotPi)
     }
     }
 }
