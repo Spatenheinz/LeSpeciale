@@ -28,6 +28,7 @@ dependencies:
 - mtl
 - process
 - directory
+- criterion
 
 ghc-options:
 - -Wall

@@ -17,6 +17,14 @@ import System.Exit
 import System.Directory
 import Control.Monad (guard, forM_, when)
 
+import Criterion.Main
+
+import qualified Data.ByteString as B
+import Ebpf.Encode
+import Transpile
+import EbpfFFI
+
+
 imm32bMax = (2^31) - 1
 imm64bMax = maxBound :: Int64
 
@@ -132,8 +140,9 @@ hyperfine = "hyperfine"
 
 tens = 1 : [10 * x | x <- tens]
 
-test :: Int -> String -> IO ()
-test n prog = do
+test :: Int -> (String, B.ByteString) -> IO ()
+test n (prog, ebpf) = do
+  defaultMainWith defaultConfig $ [bench "ebpf" $ whnfIO $ cLoadProgVerbose ebpf]
   putStrLn $ "hyperfine for " <> show n
   let filename = "benchmark_" <> show n
   let smt2 = filename <> ".smt2"
@@ -159,12 +168,13 @@ r0InRange = Rel (RLE (RPrim $ C 0) (RPrim $ V "0")) ./\. Rel (RLT (RPrim $ V "0"
 
 initRegisters = foldr (\e a -> I.Seq (I.Mov I.B64 e (I.Const 0)) a)
 
-mkprog :: Int -> IO String
+mkprog :: Int -> IO (String, B.ByteString)
 mkprog n = do
   (MkIB prog) <- generate (resize n (arbitrary :: Gen InBound))
   let prog' = initRegisters prog [6,7]
   let wp' = wp prog' r0InRange
-  return $ prettyProg wp'
+  let tran = encodeProgram $ transpile prog'
+  return $ (prettyProg wp', tran)
 
 main :: IO ()
 main = do

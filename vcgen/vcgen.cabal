@@ -42,6 +42,7 @@ library
     , base >=4.7 && <5
     , bytestring
     , containers
+    , criterion
     , directory
     , ebpf-tools
     , mtl
@@ -60,6 +61,7 @@ executable vcgen-exe
     , base >=4.7 && <5
     , bytestring
     , containers
+    , criterion
     , directory
     , ebpf-tools
     , mtl
@@ -81,6 +83,7 @@ test-suite vcgen-test
     , base >=4.7 && <5
     , bytestring
     , containers
+    , criterion
     , directory
     , ebpf-tools
     , mtl
