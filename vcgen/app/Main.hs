@@ -142,7 +142,8 @@ tens = 1 : [10 * x | x <- tens]
 
 test :: Int -> (String, B.ByteString) -> IO ()
 test n (prog, ebpf) = do
-  defaultMainWith defaultConfig $ [bench "ebpf" $ whnfIO $ cLoadProgVerbose ebpf]
+  putStrLn $ "bench for " <> show n
+  defaultMainWith defaultConfig $ [bench "ebpf" $ whnfIO $ (do p <- cLoadProgVerbose ebpf; if p < 0 then error "error" else return p)]
   putStrLn $ "hyperfine for " <> show n
   let filename = "benchmark_" <> show n
   let smt2 = filename <> ".smt2"
@@ -171,9 +172,10 @@ initRegisters = foldr (\e a -> I.Seq (I.Mov I.B64 e (I.Const 0)) a)
 mkprog :: Int -> IO (String, B.ByteString)
 mkprog n = do
   (MkIB prog) <- generate (resize n (arbitrary :: Gen InBound))
-  let prog' = initRegisters prog [6,7]
+  let prog' = initRegisters prog [0,6,7]
   let wp' = wp prog' r0InRange
   let tran = encodeProgram $ transpile prog'
+  print $ transpile prog'
   return $ (prettyProg wp', tran)
 
 main :: IO ()
@@ -183,5 +185,6 @@ main = do
     { cwd = Just "../lfsc-lexer/"}
   exitCode <- waitForProcess ph
   forM_ (take 4 tens) $ \n -> do
+    putStrLn "=========================="
     prog <- mkprog n
     test n prog

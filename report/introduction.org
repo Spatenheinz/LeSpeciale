@@ -14,12 +14,12 @@ Furthermore it can be used as system monitoring by access to kernel probes etc.
 eBPF allows untrusted users to run arbitrary code in the kernel, which in itself is no problem if the
 program is non-malicious, but can be detremental if not.
 Programs that run in the Linux kernel must therefore be both safe and secure.
-an usafe program in the linux kernel might break the system alltogether,
+An unsafe program in the linux kernel might break the system alltogether,
 whilst a malicious users could get access to secrets.
 To prevent this the eBPF subsystem will perform an abstract interpretation of a program
 and then reject unsafe programs, before they are loaded into the kernel.
 This process is called the verifier.
-The verifier has been subject to multiple bugs in the past, which can lead to priveledge escalation\cite{TODO: ebpf priveledge}.
+The verifier has been subject to multiple bugs in the past, which can lead to priveledge escalation\cite{manfred}.
 Furthermore the verifier will outright reject programs with loops,
 since the domain of the abstract interpretation have no way to tell if the program will terminate (and this ofcourse is not possible in general).
 

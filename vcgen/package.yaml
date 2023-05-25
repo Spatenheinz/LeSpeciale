@@ -54,6 +54,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - vcgen
+    c-sources: src/lib_ebpf_qc.c
 
 tests:
   vcgen-test:

@@ -11,12 +11,18 @@
 #+OPTIONS: toc:nil
 
 #+BEGIN_abstract
-This project investigates the possibility of using Proof Carrying Code (PCC) for the EBPF Linux subsystem.
-More specifically I focus on the validation of proofs in the context of PCC.
-I do so by considering the dependently typed language Logical Framework with Side Conditions (LFSC), how it can be used for proof-checking
-and an implementation in Rust.
-In doing so this project investigates both how suitable Rust is for implementing a PCC architecture that can run in the Linux kernel,
-aswell as considering if LFSC is at all useful when under the constraint of the Linux kernel.
+eBPF (extended Berkley Package Filter) is a Linux functionality that allow users to
+run code of a limited assembly like language inside the Linux kernel.
+This can potentially be dangerous in the hands of a malicious or even uncareful users.
+To combat this, the Linux kernel provides a static analysis of eBPF programs to reject harmful programs.
+This static analysis have in the past shown to be unsound, meaning harmful programs have been rejected.
+In this project we investigate the feasibility of making a logical proof checker that runs inside the kernel, implemented in Rust.
+We do so by considering the Logical Framework with Side Conditions (LFSC) language.
+The motivation behind such a proof checker is to be able to formally prove the correctness of eBPF programs.
+We consider the feasibility not only as a standalone tool but as a hypothetical part of a larger Proof Carrying Code (PCC) architecture.
+By this we provide an analysis of how eBPF programs are loaded and what the static analysis consists of
+and hereby describe a vision for a PCC architecture.
+The main focus of the report is to describe and evaluate the implementation of LFSC with respect to eBPF, PCC and Rust in the Linux kernel.
 #+END_abstract
 
 \newpage
@@ -38,3 +44,6 @@ aswell as considering if LFSC is at all useful when under the constraint of the 
 #+include: Results/results.org
 
 #+include: conclusion.org
+
+
+\printbibliography

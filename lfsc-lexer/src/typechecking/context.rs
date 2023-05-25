@@ -37,7 +37,7 @@ impl<'term, T: BuiltIn> fmt::Debug for LocalContext<'term, T> {
         }
     }
 }
-pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
+pub fn init_with_str<'term>() -> GlobalContext<'term, &'term str> {
     let mut ctx = GlobalContext::new();
     ctx.define("type", Rc::new(Type::Box),  Rc::new(Type::Star));
     ctx.define("mpz",  Rc::new(Type::Star), Rc::new(Type::ZT));
@@ -46,8 +46,8 @@ pub fn init_with_str<'a>() -> GlobalContext<'a, &'a str> {
 }
 
 
-fn from_entry_to_value<'a, K: BuiltIn>(entry: &TypeEntry<'a, K>, key: Ident<K>)
-                                     -> RT<'a, K> {
+fn from_entry_to_value<'term, K: BuiltIn>(entry: &TypeEntry<'term, K>, key: Ident<K>)
+                                     -> RT<'term, K> {
        match entry {
          TypeEntry::Def { val, .. } => val.clone(),
          TypeEntry::IsA { ty, .. } => {
@@ -70,8 +70,8 @@ fn from_entry_to_value<'a, K: BuiltIn>(entry: &TypeEntry<'a, K>, key: Ident<K>)
          }
 }
 
-fn from_entry_to_type<'a, K: BuiltIn>(entry: &TypeEntry<'a, K>)
-                                    -> RT<'a, K> {
+fn from_entry_to_type<'term, K: BuiltIn>(entry: &TypeEntry<'term, K>)
+                                    -> RT<'term, K> {
        match entry {
          TypeEntry::Def { ty, .. } => ty.clone(),
          TypeEntry::IsA { ty, .. } => ty.clone(),
@@ -79,44 +79,7 @@ fn from_entry_to_type<'a, K: BuiltIn>(entry: &TypeEntry<'a, K>)
        }
 }
 
-// pub fn get_mark<'a, K>(key: Ident<K>,
-//                        n: u32,
-//                        lctx: Rlctx<'a, K>,
-//                        gctx: Rgctx<'a, K>) -> LResult<u32, K>
-// where K: std::fmt::Debug + Clone + Eq + Ord + Hash + std::fmt::Debug
-//     {
-//     match key {
-//        Ident::DBI(i) => lctx.get(i),
-//        Ident::Symbol(name) => {
-//            gctx.get(&name)
-//        }
-//        }?;
-//      match val {
-//             TypeEntry::IsA { marks, .. } => Ok((*marks.borrow() >> n) & 1),
-//             TypeEntry::Def { .. } => return Err(TypecheckingErrors::Mark),
-//         }
-//     }
-// pub fn set_mark<'a, K>(key: Ident<K>,
-//                        n: u32,
-//                        lctx: Rlctx<'a, K>,
-//                        gctx: Rgctx<'a, K>)
-// where K: Eq + Ord + Hash + std::fmt::Debug + Clone + std::fmt::Debug
-// {
-//     let val = match key {
-//                 Ident::DBI(i) => lctx.get(i),
-//                 Ident::Symbol(name) => gctx.get(&name)
-//              };
-//     if let Ok(TypeEntry::IsA { marks, .. }) = val {
-//        let mut marks = marks.borrow_mut();
-//        if (*marks >> n) & 1 == 1 {
-//            *marks |= 1 << n;
-//        } else {
-//            *marks &= !(1 << n);
-//        }
-//     }
-// }
-
-impl<'a, K> GlobalContext<'a, K>
+impl<'term, K> GlobalContext<'term, K>
 where K: BuiltIn
 {
     pub fn new() -> Self {
@@ -133,19 +96,19 @@ where K: BuiltIn
         // self.keys.contains(key)
     }
 
-    pub fn insert(&mut self, key: K, ty: RT<'a, K>) {
+    pub fn insert(&mut self, key: K, ty: RT<'term, K>) {
         self.kvs.insert(key, TypeEntry::IsA { ty, marks: RefCell::new(0)});
        // self.keys.push(key);
        // self.values.push(TypeEntry::IsA { ty, marks: RefCell::new(0)})
     }
 
-    pub fn define(&mut self, key: K, ty: RT<'a, K>, val: RT<'a, K>) {
+    pub fn define(&mut self, key: K, ty: RT<'term, K>, val: RT<'term, K>) {
         self.kvs.insert(key, TypeEntry::Def { ty, val });
       // self.keys.push(name);
       // self.values.push(TypeEntry::Def { ty, val })
     }
 
-    // fn get(&self, key: &K) -> LResult<&TypeEntry<'a, K>, K>
+    // fn get(&self, key: &K) -> LResult<&TypeEntry<'term, K>, K>
     // where K: std::fmt::Debug
     // {
     //       self.keys
@@ -158,7 +121,7 @@ where K: BuiltIn
     // }
 
 
-    pub fn get_value(&self, key: &K) -> ResRT<'a, K>
+    pub fn get_value(&self, key: &K) -> ResRT<'term, K>
     where K: std::fmt::Debug {
         self.kvs.get(key).map(|v| from_entry_to_value(v, Ident::Symbol(*key)))
             .ok_or(lookup_err(Ident::Symbol(key)))
@@ -171,7 +134,7 @@ where K: BuiltIn
         //     .ok_or(lookup_err(Ident::Symbol(key)))
     }
 
-    pub fn get_type(&self, key: &K) -> ResRT<'a, K>
+    pub fn get_type(&self, key: &K) -> ResRT<'term, K>
     where K: std::fmt::Debug {
         self.kvs.get(key).map(|v| from_entry_to_type(v))
             .ok_or(lookup_err(Ident::Symbol(key)))
@@ -192,30 +155,30 @@ where K: std::fmt::Debug,
     TypecheckingErrors::LookupFailed(LookupErr { err: format!("{:?} not found", key) })
 }
 
-impl<'a, K> LocalContext<'a, K>
+impl<'term, K> LocalContext<'term, K>
 where K: BuiltIn
 {
     pub fn new() -> Self {
         Self::Nil
     }
 
-    pub fn insert(ty: RT<'a, K>, ctx: Rlctx<'a, K>) -> Rlctx<'a, K> {
+    pub fn insert(ty: RT<'term, K>, ctx: Rlctx<'term, K>) -> Rlctx<'term, K> {
         Rc::new(LocalContext::Cons(
             TypeEntry::Val { val : ty }, ctx))
             // TypeEntry::IsA { ty, marks: RefCell::new(0)}, ctx))
     }
 
-    pub fn decl(ty: RT<'a, K>, ctx: Rlctx<'a, K>) -> Rlctx<'a, K> {
+    pub fn decl(ty: RT<'term, K>, ctx: Rlctx<'term, K>) -> Rlctx<'term, K> {
         Rc::new(LocalContext::Cons(
             // TypeEntry::Val { val : ty }, ctx))
             TypeEntry::IsA { ty, marks: RefCell::new(0)}, ctx))
     }
-    pub fn define(ty: RT<'a, K>, val:RT<'a,K>, ctx: Rlctx<'a, K>) -> Rlctx<'a, K> {
+    pub fn define(ty: RT<'term, K>, val:RT<'term,K>, ctx: Rlctx<'term, K>) -> Rlctx<'term, K> {
         Rc::new(LocalContext::Cons(
             TypeEntry::Def { ty, val }, ctx))
     }
 
-    pub fn get(&self, key: u32) -> TResult<&TypeEntry<'a, K>, K> {
+    pub fn get(&self, key: u32) -> TResult<&TypeEntry<'term, K>, K> {
         match self {
             LocalContext::Nil => Err(lookup_err(Ident::<K>::DBI(key))),
             LocalContext::Cons(ty, ctx) => {
@@ -228,23 +191,23 @@ where K: BuiltIn
         }
     }
 
-    pub fn get_value(&self, key: u32) -> ResRT<'a, K> {
+    pub fn get_value(&self, key: u32) -> ResRT<'term, K> {
         self.get(key).map(|v| from_entry_to_value(v, Ident::<K>::DBI(key)))
     }
 
-    pub fn get_type(&self, key: u32) -> ResRT<'a, K> {
+    pub fn get_type(&self, key: u32) -> ResRT<'term, K> {
         self.get(key).map(|v| from_entry_to_type(v))
     }
 }
 
 #[derive(Debug)]
-pub enum TypeEntry<'a, Key: BuiltIn>
+pub enum TypeEntry<'term, Key: BuiltIn>
 {
-    Def { ty: RT<'a, Key>, val: RT<'a, Key> },
+    Def { ty: RT<'term, Key>, val: RT<'term, Key> },
     // the val of IsA is the neutral term Neutral t
-    // Symbolics can only ever be a IsA.
-    IsA { ty: RT<'a, Key>, marks: RefCell<u32> },
-    Val { val: RT<'a, Key> },
+    // Symbolics can only ever be term IsA.
+    IsA { ty: RT<'term, Key>, marks: RefCell<u32> },
+    Val { val: RT<'term, Key> },
 }
 
 #[cfg(test)]
