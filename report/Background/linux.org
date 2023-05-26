@@ -1,15 +1,22 @@
-
-** TODO Linux
+* Background
+** Linux and the eBPF subsystem
+:PROPERTIES:
+:CUSTOM_ID: sec:linux
+:END:
 #+include: kernel.org
 
-** TODO eBPF
-#+include: ebpf.org
-
-** TODO Proof Carrying Code
+** Proof Carrying Code
+:PROPERTIES:
+:CUSTOM_ID: pcc
+:END:
 #+include: pcc.org
 
-** TODO Rust - In the kernel?
+** Rust
 #+include: rust.org
 
 ** TODO Curry Howard Isomorphism
 #+include: curryhoward.org
+
+
+** eBPF
+#+include: ebpf.org

@@ -19,26 +19,32 @@ whilst a malicious users could get access to secrets.
 To prevent this the eBPF subsystem will perform an abstract interpretation of a program
 and then reject unsafe programs, before they are loaded into the kernel.
 This process is called the verifier.
-The verifier has been subject to multiple bugs in the past, which can lead to priveledge escalation\cite{manfred}.
-Furthermore the verifier will outright reject programs with loops,
-since the domain of the abstract interpretation have no way to tell if the program will terminate (and this ofcourse is not possible in general).
+The verifier has been subject to multiple bugs in the past, which can lead to priveledge escalation\cite{manfred}\cite{scanell}.
+On the other hand the verifier also limits the capabilities of eBPF programs, by outright rejecting programs with loops.
+This is a design choice, since non-halting programs should not live in the kernel, and there is no way to tell if a program will halt using static analysis, as per the halting problem.
+The result is a security mechanism that is both overly conservative in some cases and unsound.
 
-An alternative to verifying the safety of programs in general is to do a formal proof of safety.
+An alternative to static analysis is to verify the safety of programs using formal logic.
 An automatic way to do this is to reduce the problem of program verification to satisfiability of programs.
-This is done by generating a formula that describe the properties of a program, a so called verification condition, and then checking the satisfiability of the negated formula.
-The process of generating a verification condition is the fairly cheap,
-however checking the validity of the formula can be quite a heavy task.
-Proof Carrying Code is an architecture and security mechanism first introduced by Necula\cite{necula} in 1998
-which moves the responsibility of proving that a certain program follows a set of security parameters to the user and then have the kernel check that this proof along with some additional checking. The general concept is described more in detail in\ref{}. All in all these tasks are far cheaper task than producing a proof.
+This is done by generating a logical formula that describe the properties of a program, a so-called verification condition, and then checking the satisfiability of the negated formula.
+The process of generating a verification condition is cheap,
+however checking the validity of the formula can be a computationally heavy task.
+Proof Carrying Code is an architecture and security mechanism first introduced by Necula\cite{pcc} in 1998,
+which moves the responsibility of proving that a certain program follows a set of security parameters to the user and then the kernel only have to check this proof.
+The general concept is described in detail in Section \ref{pcc}.
+All in all these tasks are far cheaper task than producing a proof.
 
-In this project I investigate the feasibility of a proofchecker that can run inside the Linux kernel written in Rust.
-The proof checker leverages the Curry-howard correspondence and amounts to typechecking a dependently typed language, Logical Framework with Side Conditions (LFSC).
+In this project we investigate the feasibility of a proofchecker that can run inside the Linux kernel.
+The implementation not only tests this subcomponent of proof carrying code, but also test if the Rust programming language, introduced in the Linux kernel 6.1 and forward, is a good tool for the job.
+The proof checker leverages the Curry-howard correspondence and thus
+checking a proof amounts to typechecking.
+We specifically consider the dependently typed meta framework, Logical Framework with Side Conditions (LFSC)\cite{lfsc}.
+We describe the semantics of the typecheking and present an implementation.
 
-\ref{} explains the necessary understanding PCC
-\ref{} explains how we enables the feature of a proof checker that can run in hte Linux Kernel.
-\ref{} gives a formal defintion of the LFSC language
-\ref{} describes the concrete syntax and gives an example
-\ref{} presents the overall design of the proof checker, whilst the concrete implementation is covered in \ref{}.
-Lastly I evaluate the performance of the proof checker and analyze the feasibility comparative to the verifier.
-
-Enjoy.
+The report is structured as follows. Section \ref{sec:linux} gives a brief introduction to the linux kernel
+and how the eBPF subsystem works. In this presentation we elaborate on how the kernel code for loading an eBPF program is
+structured to get an overview of what parts of the verifier is still necessary given a proof carrying code architecture and what parts that can be removed.
+We then describe proof carrying code and describe how this can replace parts of the verifier.
+Lastly, as preliminary analysis, we present a vision for a full PCC code system and argues for the proof checkers place in this
+setup and argue for the highlevel design decisions, before we introduce LFSC and its typing semantics.
+Lastly we evaluate on the implementation and discuss if the prototype can be used in a PCC system down the line.

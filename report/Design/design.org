@@ -1,2 +1,14 @@
+* Proof Carrying Code
 ** Deciding on a format
 #+include: proof_comparison.org
+
+** eBPF and PCC
+From the description of PCC in \ref{} and the description of the eBPF subsystem above, it is straightforward to see responsibility differences.
+We can compare the two pipelines as follows:
+
+1. *Compilation and Cetification*: For PCC the untrusted program is both compiled and a certificate
+   for safety policy compliance is generated. eBPF does not really "do" anything at this stage as source code is passed directly to the kernel using the syscall.
+2. *Verification of certificate*: In PCC the consumer will check the validity of the certification wrt. the safety policy and the source program (possibly in native format), while eBPF will have to do a similar check but directly on the eBPF program. As mentioned the current eBPF verifier uses a abstract interpretation model with a tristate number domain, which is roughly equivalent in complexity.\footnote{is this even true? LOOK at verifier source code.}
+3. In both structures, once a certificate is checked the program is free to use possibly many times.
+
+So why would we want to swap out the current structure vs eBPF?

@@ -5,3 +5,53 @@
   url = {https://www.zerodayinitiative.com/blog/2020/4/8/cve-2020-8835-linux-kernel-privilege-escalation-via-improper-ebpf-program-verification},
   urldate = {2023-05-25}
 }
+@online{scanell,
+  author = {Simon Scanell},
+  title = {Fuzzing for eBPF JIT bugs in the Linux kernel},
+  year = 2021,
+  url = {https://scannell.io/posts/ebpf-fuzzing/},
+  urldate = {2023-05-23}
+}
+@inproceedings{pcc,
+author = {Necula, George C.},
+title = {Proof-Carrying Code},
+year = {1997},
+isbn = {0897918533},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://doi.org/10.1145/263699.263712},
+doi = {10.1145/263699.263712},
+abstract = {This paper describes proof-carrying code (PCC), a mechanism by which a host system can determine with certainty that it is safe to execute a program supplied (possibly in binary form) by an untrusted source. For this to be possible, the untrusted code producer must supply with the code a safety proof that attests to the code's adherence to a previously defined safety policy. The host can then easily and quickly validate the proof without using cryptography and without consulting any external agents.In order to gain preliminary experience with PCC, we have performed several case studies. We show in this paper how proof-carrying code might be used to develop safe assembly-language extensions of ML programs. In the context of this case study, we present and prove the adequacy of concrete representations for the safety policy, the safety proofs, and the proof validation. Finally, we briefly discuss how we use proof-carrying code to develop network packet filters that are faster than similar filters developed using other techniques and are formally guaranteed to be safe with respect to a given operating system safety policy.},
+booktitle = {Proceedings of the 24th ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages},
+pages = {106–119},
+numpages = {14},
+location = {Paris, France},
+series = {POPL '97}
+}
+@article{lfsc,
+author = {Stump, Aaron and Oe, Duckki and Reynolds, Andrew and Hadarean, Liana and Tinelli, Cesare},
+year = {2013},
+month = {02},
+pages = {},
+title = {SMT Proof Checking Using a Logical Framework},
+volume = {42},
+journal = {Formal Methods in System Design},
+doi = {10.1007/s10703-012-0163-3}
+}
+@online{BCC,
+  title = {BPF Compiler Collection (BCC)},
+  url = {https://github.com/iovisor/bcc},
+  urldate = {2023-05-26}}
+
+@online{libbpf,
+  title = {libbpf},
+  url = {https://github.com/libbpf/libbpf},
+  urldate = {2023-05-26}}
+@online{loader,
+  title = {Loading process of ePBF programs},
+  url = {https://ebpf.io/static/7eec5ccd8f6fbaf055256da4910acd5a/b5f15/loader.png},
+  urldate = {2023-05-26}}
+@online{helpers,
+  title = {eBPF Helper calls},
+  url = {https://ebpf.io/what-is-ebpf/#helper-calls},
+  urldate = {2023-05-26}}
