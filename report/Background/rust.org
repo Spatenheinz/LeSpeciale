@@ -21,7 +21,7 @@ If we for instance consider:
 
 #+begin_src rust
 fn main() {
-let x : i32 = 42;
+    let x : i32 = 42;
 }
 #+end_src
 
@@ -29,7 +29,7 @@ Then the value 42 has an owner ~x~. When the ~main()~ function ends then the own
 This specific type of ~x~ is ~i32~ and will thus reside on the stack, however if we needed something that was heap allocated then we could create a value using a Box:
 #+begin_src rust
 fn main() {
-let y : Box<i32> = Box::new(42);
+    let y : Box<i32> = Box::new(42);
 }
 #+end_src
 Then ~y~ will be a ~Box~ type, which is the simplest form of heap allocation.
@@ -43,11 +43,11 @@ this means that the snippet below will get a compile time error at line 6, becau
 the box containing 42 is no longer owned by ~y~ but rather by ~a~.
 #+begin_src rust
 fn main() {
-let y : Box<i32> = Box::new(42);
-let z = y.clone();
-assert_eq!(y, z);
-let a = y;
-assert_eq!(y, z);
+    let y : Box<i32> = Box::new(42);
+    let z = y.clone();
+    assert_eq!(y, z);
+    let a = y;
+    assert_eq!(y, z);
 }
 #+end_src
 
@@ -78,3 +78,32 @@ This popularity also includes the Linux Development community, where safety, sec
 As of kernel 6.1 Rust is officially supported in the Linux kernel, albeit fairly limited as described throughout this report.
 
 Hence Rust seems like an appropriate tool for a program that has to run in the kernel, where robustness is critical.
+Bu we must also consider what restrictions the kernel imposes on Rust.
+
+*** Rust in the kernel?
+As of kernel version 6.2.8rc, the Rust kernel development framework not a lot of functionality is exposed.
+The crates/modules immediately exposed in the kernel is ~alloc~, ~core~, ~kernel~, ~compiler_builtins~ and ~macros~.
+The ~macros~ crate is tiny and exposes the ability to easily describe a LKMs meta-data.
+The ~compiler_builtins~ are compiler built in functionality which usually resides in the standard library ~std~. The builtins supported in the kernel at the moment is nothing more than a panics (exceptions).
+The ~kernel~ crate exposes the kernel APIs, such as character devices, file descriptors etc.
+The functionality of this crate is mostly intended for use in LKMs, but does provide some features that could be used elsewhere such as random numbers etc.
+The ~alloc~ and ~core~ crates constitutes most of the ~std~ library in Rust and is respectively the implementation of a memory allocator and core functionality. The ~alloc~ and ~core~ crates are often used
+in embedded systems and others situations where no operating system to provide the functionality of the standard library.
+The ~core~ crate exposes basic functionality such as primitive types, references etc.
+The ~alloc~ crate exposes memory allocations and in userspace uses some exposure of malloc, while in kernel space may use either ~kmalloc~ or ~kvmalloc~ to allocate physical and virtual memory inside the kernel.
+In its current form the ~alloc~ crate does not provide much functionality.
+Only simple allocation types such as ~Box~ are exposed and their API is conservative.
+The reason behind is that the kernel has no way to handle Out-Of-Memory cases.
+Thus most datastructures are simply not allowed, because they dont expose a fallible way to allocate memory.
+Whenever a new allocation need to happen a ~try_new()~ function can be called, which will return a ~Result~ type with either a reference or an error.
+For infallible memory allocations with ~new()~ an out of memory will throw an exception, which there is no good way to handle.
+The only datastructure available is ~Vec~, a dynamic array.
+For faster performance on lookup, we might need other datastructures.
+Furthermore the ~alloc~ crate is compiled with a ~no_rc~ feature meaning there is no way to use the reference counted pointers defined in Rust.
+The reason for this is that maintainers of the Rust functionality in Linux have decided that it is unnecessary, since the C part of the kernel
+already defines a reference counting functionality.
+To the best of my knowledge there is no clear exposure of this functionality in any of the crates available.
+We need reference counting for our implementation.
+It is easy to remove this restriction, but may make a potential PCC implementation harder to get merged into the upstream Linux.
+
+It is possible to compile crates that support a ~no_std~ feature (it relies on ~alloc~ and ~core~) and that also does no infallible memory allocations. One example of a library that does this is parser-combinator library ~nom~, which we use for parsing.

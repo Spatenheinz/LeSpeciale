@@ -18,5 +18,5 @@
 #+include: curryhoward.org
 
 
-** eBPF
-#+include: ebpf.org
+# ** eBPF
+# #+include: ebpf.org

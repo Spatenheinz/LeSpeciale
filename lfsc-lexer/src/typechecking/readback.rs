@@ -75,24 +75,17 @@ where T: Eq + Ord + Hash + std::fmt::Debug + BuiltIn + Copy
                        ) -> TResult<AlphaTerm<T>, T>
     {
         match neu.borrow() {
-            Neutral::DBI(i) => {
-                Ok(Ident(DBI(*i)))
-            },
+            Neutral::DBI(i) => Ok(Ident(DBI(*i))),
+            Neutral::Var(name) => Ok(Ident(Symbol(*name))),
             Neutral::Hole(hol) => {
                 if let Some(ty) = &*hol.borrow() {
-                    // TODO: check the cost of this
                     self.readback_neutral(ty.clone())
-                } else {
-                    Ok(Hole)
-                }
+                } else { Ok(Hole) }
             },
-            Neutral::Var(name) => Ok(Ident(Symbol(*name))),
             Neutral::App(f, a) => {
                 let f = self.readback_neutral(f.clone())?;
                 let a = self.readback_normal(a.clone())?;
                 Ok(App(Box::new(f), vec![a]))
-                //TODO fix this to make sense
-                // Ok(App(Box::new(f), Box::new(a)))
             },
         }
     }

@@ -1,13 +1,17 @@
-In LFSC there is two construct we use to keep track of variables and constants. We have signatures, and contexts. Signatures are used to assign kinds and types to constants. This is what the metaframework revolves around.
+In LFSC there are two constructs we use to keep track of variables and constants. We have signatures, and contexts. Signatures are used to assign kinds and types to constants, and thus defing the formal system on which terms are judged.
 Contexts are used to assign types to variables.
-we write them as such and use \Sigma, \Sigma' to denote the concatenation of the two signatures \Sigma and \Sigma' and similarly for contexts. \(L : R\) denotes that L has type R.
-#+begin_export latex
+we write them as in Figure \ref{fig:context} and use we use \Sigma, \Sigma' to denote the concatenation of the two signatures \Sigma and \Sigma' and similarly for contexts.
+
+#+caption: Syntactical categories of LFSC
+#+label: fig:context
+\begin{figure}[h!]
 \begin{align*}
-\Sigma \; ::=& \; \lra{} \mid \Sigma,a : K \mid \Sigma,c : A \\
-\Gamma \; ::=& \; \lra{} \mid \Gamma, x: A\\
+\Sigma \; ::=& \; \lra{} \; \mid \; \Sigma,a : K \; \mid \; \Sigma,c : A \\
+\Gamma \; ::=& \; \lra{} \; \mid \; \Gamma, x: A\\
 \end{align*}
-#+end_export
-The typesystem of LFSC is syntax directed meaning there we have only a single typing rule for each syntactical object.
+\end{figure}
+
+The typesystem of LFSC is syntax directed meaning there exists only a single typing rule for each syntactical object.
 We achieve this by bidirectional typing.
 That means instead of stating that an expression must have a type,
 we can either construct a type from it (called inference)
@@ -23,9 +27,12 @@ All assertions has one of the following forms.
 \end{align*}
 #+end_export
 
-The validity of signatures is as follows, the empty signature is valid. Then Signature may contain either a
-value or a type level constant of a type or kind respectively.
-#+begin_export latex
+The validity of signatures is depicted in Figure \ref{fig:validsig}.
+The empty signature is valid. The concatenation of singatures are valid if,
+\Sigma is valid and the constant is not present in the context. For /KIND-SIG/ $K$ must be valid in \Sigma, while
+for /TYPE-SIG/ we require the $A$ can be inferred to have type $K$.
+#+caption: Valid signatures
+#+label: fig:validsig
 \begin{figure}[h!]
 \begin{equation*}
 \inference[EMPTY-SIG ]{}
@@ -36,25 +43,22 @@ value or a type level constant of a type or kind respectively.
 {\Sigma, a: K \ \checked}
 \end{equation*}
 \begin{equation*}
-\inference[TYPE-SIG ]{\Sigma \ \checked & \vdashs A : K & c \notin dom(\Sigma)}
+\inference[TYPE-SIG ]{\Sigma \ \checked & \vdashs A \Rightarrow K & c \notin dom(\Sigma)}
 {\Sigma, c: A \ \checked}
 \end{equation*}
-\caption{Valid signatures}
 \end{figure}
-#+end_export
 
-An empty context is valid under \Sigma given the validity of \Sigma. For a \(x : A\) to be part of a valid context, \(A\)
-must be of kind * and x must not occur in the domain of the signature.
-#+begin_export latex
+An empty context is valid under \Sigma given the validity of \Sigma. For concatenation $x$ must not occur in \Sigma but can
+occur in \Gamma, and again we require that $A$ can be inferred as any kind, as seen in Figure \ref{fig:validctx}
+#+caption: Valid contexts
+#+label: fig:validctx
 \begin{figure}[h!]
 \begin{equation*}
 \inference[EMPTY-CTX ]{\Sigma \ \checked}
 {\vdashs \lra{}}
 \end{equation*}
 \begin{equation*}
-\inference[TYPE-CTX ]{\vdashs \Gamma & \Gamma \vdashs A: Type & x \notin dom(\Sigma)}
-{\vdashs \Gamma, x: A}
+\inference[TYPE-CTX ]{\vdashs \Gamma & \Gamma \vdashs A \Rightarrow K & x \notin dom(\Sigma)}
+{\vdashs \Gamma, x : A}
 \end{equation*}
-\caption{Valid contexts}
 \end{figure}
-#+end_export

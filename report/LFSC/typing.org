@@ -1,52 +1,71 @@
-Figure \ref{fig:tylookup} describes type inference with respect to the signatures and contexts.
+With the signature and contexts we can define the typing rules for LFSC.
+For the entire section we brevitate $\vdash_\Sigma$ to $\vdash$ and it is assumed $\Sigma$ is valid.
+
+*** Lookup
+Figure \ref{fig:tylookup} describes type inference with respect to the signatures and contexts. That is, they contain all rules that where variables or constants are inferred wrt. the signature and context.
 Given that \Gamma and \Sigma is valid, we can infer the build in types *type* and *type^c* to be *kind*.
-Notice here that *type* and *type^c* are kinds which describes types often denoted as * in the literature, whereas *kind* describes kinds. constants can be inferred either as a kind or a type respcetively if they appear in the signature, whereas object level variables must occur in the context.
+Notice here that *type* and *type^c* are kinds which describes types, whereas *kind* describes kinds.
+Notice further that *kind* cannot be inferred and thus ensures that no type contains itself hence providing a consistent metalogic.
+constants can be inferred either as a kind or a type respcetively if they appear in the signature, whereas object level variables must occur in the context.
 #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
 \inference[TYPE ]{\vdash \Gamma}
-{\context \mathbf{type} \Rightarrow \mathbf{kind}}
+{\Gamma \vdash \mathbf{type} \Rightarrow \mathbf{kind}}
 \qquad
 \inference[TYPEc ]{\vdash \Gamma}
-{\context \mathbf{type}^c \Rightarrow \mathbf{kind}}
+{\Gamma \vdash \mathbf{type}^c \Rightarrow \mathbf{kind}}
+\end{equation*}
+\begin{equation*}
+\inference[MPZ ]{\vdash \Gamma}
+{\Gamma \vdash \mathbf{mpz} \Rightarrow \mathbf{type}}
+\qquad
+\inference[MPQ ]{\vdash \Gamma}
+{\Gamma \vdash \mathbf{mpq} \Rightarrow \mathbf{type}}
 \end{equation*}
 
 \begin{equation*}
 \inference[LOOKUP-CTX ]{\vdash \Gamma & x: A \in \Gamma}
-{\context \synth{x}{A} }
+{\Gamma \vdash \synth{x}{A} }
 \end{equation*}
 
 \begin{equation*}
 \inference[LOOKUP-KIND-SIG ]{\vdash \Gamma & a: K \in \Sigma}
-{\context \synth{a}{K} }
+{\Gamma \vdash \synth{a}{K} }
 \qquad
 \inference[LOOKUP-TYPE-SIG ]{\vdash \Gamma & c: A \in \Sigma}
-{\context \synth{c}{A} }
+{\Gamma \vdash \synth{c}{A} }
 \end{equation*}
 \caption{Typing rules for looking up types.}
 \label{fig:tylookup}
 \end{figure}
 #+end_export
 
+*** Terms and Types
 Figure \ref{fig:tylfsc} describes the bidirectional typing of LFSC.
-For brevity we simply use \vdash instead of \vdash_\Sigma as it is assumed \Sigma is valid.
-/ANN/ states that given object /M/ can be checked to have type /A/ then the annotation can be inferred to type /A/.
 
-Both /TYPE-APP/ and /APP/ states that the rator (left construct) must be a function type and that the operand (right construct) can be checked to be the type of domain of the function type, then an application can be inferred as the substitution of the operand with the /x/ in the construct describing the range of the function.
-/APP-SC/
-/LAMANN/ states that a bound variable /x/ has type /A/ in /M/ can be inferred as a \(\Pi x : A. B\) given that /A/ is a *type* and that /M/ can be inferred as /B/ with \(x : A\) added to the environment.
-Lambda abstractions is the only type that we cannot directly infer but instead must be checked to be a function type. A lambda is valid function type if the body /M/ can be inferred as /B/ with \(x : A\) added to the context.
-concrete integers and rationals must trivially be their respective types.
+- /ANN/ states that given object /M/ can be checked to have type /A/, then the annotation can be inferred to type /A/.
+- /LAM-ANN/ states that a bound variable /x/ has type /A/ in /M/ can be inferred as a \(\Pi x : A. B\), given that /A/ is *type* and that /M/ can be inferred as /B/ with \(x : A\) added to the environment.
+- Lambda abstractions, /LAM/, is the only type that we cannot directly infer, but instead must be checked to be a function type. A lambda a is valid function type if the body /M/ can be inferred as /B/ with \(x : A\) added to the context.
+- Both /TYPE-APP/ and /APP/ states that the function point (left construct) must be a function type and that the argument (right construct) can be checked to be the type of domain of the function type, then an application can be inferred as the substitution of the operand with the /x/ in the construct describing the range of the function.
+- /APP-SC/ is where the type system of LFSC differs from that of LF. If the type of $M$ is a function type, where the range itself is a function type with a side condition as domain, then $N$ will be checked to have type $A$ and the sidecondition $S$ is evaluated by its operations semantics, and must result in $O$.
 #+begin_export latex
 \begin{figure}[h!]
+\begin{equation*}
+\inference[Z ]{\vdash \Gamma}
+{\Gamma \vdash z \Rightarrow \mathbf{mpz}}
+\qquad
+\inference[Q ]{\vdash \Gamma}
+{\Gamma q \Rightarrow \mathbf{mpq}}
+\end{equation*}
 \begin{equation*}
 \inference[ANN ]{\context \tycheck{M}{A} }
 {\context \synth{M : A}{A} }
 \end{equation*}
 
 \begin{equation*}
-\inference[PI ]{\context \tycheck{A}{\mathbf{type}} & \contextcons{x : A} \synth{B}{\alpha} & \alpha \in \{ \mathbf{type}, \mathbf{type^c}, \mathbf{kind} \}  }
-{\context \synth{\Pi x : A. \ B}{\alpha} }
+\inference[PI ]{\context \tycheck{A}{\mathbf{type}} & \contextcons{x : A} \synth{C}{\alpha} & \alpha \in \{ \mathbf{type}, \mathbf{type^c}, \mathbf{kind} \}  }
+{\context \synth{\Pi x : A. C}{\alpha} }
 \end{equation*}
 
 \begin{equation*}
@@ -56,21 +75,21 @@ concrete integers and rationals must trivially be their respective types.
 
 \begin{equation*}
 \inference[TYPE-APP ]{\context \synth{A}{\Pi x : B. \ K} & \context \tycheck{M}{B} }
-{\context \synth{A M}{\subst{M}{x}{K}} }
+{\context \synth{A \; M}{\subst{M}{x}{K}} }
 \end{equation*}
 
 \begin{equation*}
 \inference[APP ]{ \context \synth{M}{\Pi x : A. \ B} & \context \tycheck{N}{A} }
-{\context \synth{M N}{\subst{M}{x}{N}} }
+{\context \synth{M \; N}{\subst{N}{x}{M}} }
 \end{equation*}
 
 \begin{equation*}
-\inference[APP-SC ]{ \context \synth{M}{\Pi x : \{S \; O\}. \ B} & \context \tycheck{N}{A} }
-{\context \synth{M N}{\subst{M}{x}{TODO}} }
+\inference[APP-SC ]{ \context \synth{M}{\Pi x_1 : A. (\Pi x_2 : \{S \; O\}. B)} & \context \tycheck{N}{A} & |\Sigma| \vdash \epsilon;\subst{M}{x}{S} \downarrow \subst{M}{x}{O};\sigma}
+{\context \synth{M \; N}{\subst{N}{x_1}{B}} }
 \end{equation*}
 
 \begin{equation*}
-\inference[LAMANN ]{\context \synth{A}{\mathbf{type}} & \contextcons{x : A} \synth{M}{B}  }
+\inference[LAM-ANN ]{\context \synth{A}{\mathbf{type}} & \contextcons{x : A} \synth{M}{B}  }
 {\context \synth{\lambda x : A. \ M}{\Pi x : A. \ B} }
 \end{equation*}
 
@@ -80,32 +99,58 @@ concrete integers and rationals must trivially be their respective types.
 \end{equation*}
 \caption{Bidirectional typing rules for LFSC}
 \label{fig:tylfsc}
+\medskip
+\small
+Here $\subst{M}{x}{K}$, denotes the substitution of $M$ with $x$ in $K$. The letter $C$ is either a type or a kind.
+$|\Sigma|$ denotes all sidecondition function definitions in $\Sigma$.
 \end{figure}
 #+end_export
 
 
-Typechecking of sideconditions occurs in /PI-SIDE/ of Figure \ref{tylfsc}.
-We follow the structure of the language reference \cite{}.
-Numbers, and variables follows similar rules as for the term language.
-Similarly Let expressions \(\mathbf{let} x S T\) work as its term counterpart.
-Applications are a bit more tricky.
-Applications must be fully applied but at its core construct it should follows.
-\begin{equation*}
-\inference[SCAPP ]{\context \synth{S}{\Pi x : A. B} & \context \synth{T}{C} & x \notin FV(B) }
-{\context \synth{S \; T}{B}}
-\end{equation*}
-Again the operator should be a pi type. But we further require that /x/ does not occur free in /B/.
-This is essentially to ensure that parameters to a side condition program must not occur in the other parameters or in ty return type.
-Below the 3 cateogrical constructs of side conditions are represented.
+*** Side conditions
+For easier readability we split the side condition language into three subcategories:
+1. *numerical* side conditions focused around numerical values.
+2. *side effects* side conditions can update the state in evaluation.
+3. *compound* side conditions are construct that dont fall into the other categories.
 
-The inference of /DO/ is similar to the rule for let except we dont bind anything.
-/MARKVAR/ will simply return the type the inner sidecondition.
-/IFMARKED/ will check the "marked" sidecondition /S/ and that it is a symbolic value aswell as checking that the two branches have the same type.
+For numerical sideconditions the rules are straight forward. They are represented for *integer* in \ref{fig:tynum} but work similarly for rational, except for Z-TO-Q, which as the name suggest requires $S$ to be of type *integer*.
+/IFNEG/ and /IFZERO/ are branching constructs where the condition must be one of the two number types and the branches must have the same type.
+#+begin_export latex
+\begin{figure}[h!]
+\begin{equation*}
+\inference[INT ]{ }
+{\context \synth{n}{\mathbf{integer}}}
+\qquad
+\inference[NEG ]{\context \synth{S}{\mathbf{integer}} }
+{\context \synth{- S}{\mathbf{integer}}}
+\qquad
+\inference[Z-TO-Q ]{\context \synth{S}{\mathbf{integer}} }
+{\context \synth{\mathbf{ztoq} \; S}{\mathbf{rational}}}
+\end{equation*}
+\begin{equation*}
+\inference[BINOP ]{\context \synth{S}{\mathbf{integer}} & \synth{T}{\mathbf{integer}} }
+{\context \synth{S \oplus T}{\mathbf{integer}} }\oplus \in \{+, *, / \}
+\end{equation*}
+\begin{equation*}
+\inference[IFNEG ]{\context \synth{S}{\mathbf{integer}} & \context \synth{T}{A} & \context \synth{U}{A} }
+{\context \synth{\mathbf{ifneg} \; S \; T \; U}{A} }
+\end{equation*}
+\begin{equation*}
+\inference[IFZERO ]{\context \synth{S}{\mathbf{integer}} & \context \synth{T}{A} & \context \synth{U}{A} }
+{\context \synth{\mathbf{ifzero} \; S \; T \; U}{A} }
+\end{equation*}
+\caption{Typing rules for numerical sideconditions}
+\label{fig:tynum}
+\end{figure}
+#+end_export
+
+For side effects rules we have that /LET-SC/ works as its counter part, and /DO/ is mere syntactical sugar for /LET/ but with the binding of a variable.
+/MARKVAR/ will simply return the type the inner sidecondition and /IFMARKED/ will check the "marked" sidecondition /S/ and check that the two branches have the same type, resulting in the type of the branches.
  #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
-\inference[IFMARKED ]{\context \synth{S}{TODO A} & \synth{T_1}{B} & \synth{T_2}{B}}
-{\context \synth{\mathbf{ifmarked} \; n \; S T_1 T_2}{B} }
+\inference[IFMARKED ]{\context \synth{S}{A} & \synth{T}{B} & \synth{U}{B}}
+{\context \synth{\mathbf{ifmarked} \; n \; S \; T \; U}{B} }
 \end{equation*}
 \begin{equation*}
 \inference[MARKVAR ]{\context \synth{S}{A}}
@@ -125,27 +170,27 @@ The inference of /DO/ is similar to the rule for let except we dont bind anythin
 
 
 Compound sideconditions may be a *fail*, described by the /FAIL/ rule, which simply typechecks the inner value.
-The reason *fail* must take an argument is that we have no apparent way to polymorphically check its type from the rules.
+The reason *fail* must take an argument is that we have no polymorphic type $\forall \alpha. \alpha \rightarrow \alpha$ under dependent types.
 For /IFEQ/ \(S_1\) and \(S_2\) must have the same type and the branches
 \(T_1\) and \(T_2\) must equally have the same type.
 Match statement work similar to other functional languages and
-given the scrutinee \(S_1\) can be inferred as \(A\) then for all match cases \(P_i\) must also be inferreable as /A/, whilst all branches \(T_i\) must be inferreable to the same type /B/. \(\mathbf{ctx}(P_i)\) describes the context created from \(P_i\). concretely
+given the scrutinee \(S\) can be inferred as \(A\) then for all match cases \(P_i\) must also be inferreable as /A/, whilst all branches \(T_i\) must be inferreable to the same type /B/. \(\mathbf{ctx}(P_i)\) describes the context created from \(P_i\). concretely
 \(\mathbf{ctx}(P_i) = \lra{}, x_1 : A_1, x_2 : A_2, \dots, x_n : A_n\), when \(P_i = c x_1 \; x_2 \; \dots \; x_n\)
+For applications the function point must not be a dependent function.
+
 #+begin_export latex
 \begin{figure}[h!]
-\begin{multline*}
-\inference[PROGAPP ]{ \context \synth{f}{\{x_1: A_1, \dots, x_1 : A : A_n \} . S} \\
-& \forall i \in \{ 1, \dots, n \}. (\context \tycheck{T_i}{A_i})\\
-& \contextcons{x_1 : A_1,\dots, x_n : A_n} \synth{S}{B} }
-{\context \synth{f (T_1, \dots, T_n)}{B}}
-\end{multline*}
+\begin{equation*}
+\inference[SCAPP ]{\context \synth{S}{\Pi x : A. B} & \context \synth{T}{C} & x \notin FV(B) }
+{\context \synth{S \; T}{B}}
+\end{equation*}
 \begin{equation*}
 \inference[MATCH ]{\context \synth{S}{A} & \forall i \in \{ 1, \dots, n\}.(\context \synth{P_i}{A} & \contextcons{\mathbf{ctx}(P_i)} \synth{T_i}{B} ) }
 {\context \synth{\mathbf{match} \; S \; (P_1, T_1) \dots (P_n,T_n)}{B} }
 \end{equation*}
 \begin{equation*}
 \inference[IFEQ ]{\context \synth{S_1}{A} & \context \synth{S_2}{A} & \context \synth{T_1}{B} & \context \synth{T_2}{B} }
-{\context \synth{\mathbf{ifeq} \; S_1 \; S_2 \; T_1 \; T_2}{B} }
+{\context \synth{\mathbf{ifequal} \; S_1 \; S_2 \; T_1 \; T_2}{B} }
 \end{equation*}
 \begin{equation*}
 \inference[FAIL ]{\context \synth{A}{\mathbf{type}}}
@@ -155,33 +200,3 @@ given the scrutinee \(S_1\) can be inferred as \(A\) then for all match cases \(
 \end{figure}
 #+end_export
 
-Numerical Sideconditions are fairly straight forward and follows standard mathematical rules. The rules are represented for *integer* but work similarly for rational, except for /Z-TO-Q./ /IFNEG/ and /IFZERO/ are similarly to other branching constructs.
-#+begin_export latex
-\begin{figure}[h!]
-\begin{equation*}
-\inference[INT ]{ }
-{\context \synth{n}{\mathbf{integer}}}
-\end{equation*}
-\begin{equation*}
-\inference[NEG ]{\context \synth{S}{\mathbf{integer}} }
-{\context \synth{- S}{\mathbf{integer}}}
-\end{equation*}
-\begin{equation*}
-\inference[Z-TO-Q ]{\context \synth{S}{\mathbf{integer}} }
-{\context \synth{\mathbf{ztoq} \; S}{\mathbf{rational}}}
-\end{equation*}
-\begin{equation*}
-\inference[BINOP ]{\context \synth{S}{\mathbf{integer}} & \synth{T}{\mathbf{integer}} }
-{\context \synth{S \oplus T}{\mathbf{integer}} }\oplus \in \{+, *, / \}
-\end{equation*}
-\begin{equation*}
-\inference[IFNEG ]{\context \synth{S}{\mathbf{integer}} & \context \synth{T}{A} & \context \synth{U}{A} }
-{\context \synth{\mathbf{ifneg} \; S \; T \; U}{A} }
-\end{equation*}
-\begin{equation*}
-\inference[IFZERO ]{\context \synth{S}{\mathbf{integer}} & \context \synth{T}{A} & \context \synth{U}{A} }
-{\context \synth{\mathbf{ifzero} \; S \; T \; U}{A} }
-\end{equation*}
-\caption{Typing rules for numerical sideconditions}
-\end{figure}
-#+end_export

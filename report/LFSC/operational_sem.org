@@ -1,27 +1,31 @@
-The operational semantics is show in Figure [[fig:operational]].
+\footnote{hvad skal jeg skrive som introducerende tekst}The operational semantics is show in Figure \ref{fig:operational}.
 The operational semantics are under the judgement of
-\(\Delta \vdash \sigma \judge{1}{S}{T}{n} \), where \Delta describes all program definitions \(\sigma_1\) and \(\sigma_n\), describes states mapping symbols to markings. The \Delta is elided in all cases where it is unused.
+\(\Delta \vdash \judge{1}{S}{T}{n} \), where \Delta describes all program definitions and \(\sigma_1\) and \(\sigma_n\), describes states mapping symbols to markings, where \(\sigma_1\) is the state $S$ is evaluated under, and \(\sigma_n\) is the state where $S$ has been evaluated to $T$.
+Markings are simply a collection of 32 boolean flags, which can then be used in *ifmarked* conditions.
+The \Delta is elided in all cases where it is unused.
+
 Errors are not included in the operational semantics. Errors might occur when *fail* is evaluated,
 a scrutinee does not match any pattern,
-a *markvar* or *ifmarked* does not evaluate to a variable or division by 0.
-/CST-O/, /VAR-O/ and /NUM-O/ simply evaluate to itself and the store is unchanged.
-/CST-APP/ applies a constant to n sideconditions, update the store with respect to all of them and the resulting value is the constant applied to each updated /S'/.
-/LET-O/ and /DO-O/ evaluates /S/ and then evaluates /T/ with the updated store and in the case of /LET-O/ by substituting occurences of /x/ in T.
-the two rules /IFEQUAL-T/ and /IFEQUAL/ describes a standard semantic for equality checks. Two terms \(S_1'\) and \(S_2'\) are considered equivalent by syntactical equivalence.
-Match constructs evaluate the scrutinee and matches the result
-with one of the patterns.
-If a pattern matches then the given branch is evaluated.
-/FUN-APP/ refers to the application of a sidecondition program.
-/f/ must be a program in \Delta and all arguments are evaluated and then results are substituted into the body of the program T and it is evaluated.
-/BINOP-O/ and /NEG-O/ works similar to any other language.
-/ZTOQ-O/ evaluate S to an integer and then make the rational z/z.
-/IFNEG/ and /IFZERO/ rules are very similar, based on the evaluation of S, either branch /T/ or branch /U/ is evaluated.
-/IFMARKED/ is again similar however the branching depends on the marking of variable /x/ in the store.
-/MARKVAR-O/ is the only rule that can update the store.
-/n/ is the flag that need to be swapped. The language support 32 flags, corresponding to a 32 bit integer where each bit defines a flag.
+a *markvar* or *ifmarked* does not evaluate to a variable or if division by 0 occurs.
+
+For a brief rundown of the rules we have:
+- /CST-O/, /VAR-O/ and /NUM-O/ simply evaluate to itself and the store is unchanged.
+- /CST-APP/ applies a constant to n sideconditions, update the store with respect to all of them and the resulting value is the constant applied to each updated /S'/.
+- /LET-O/ and /DO-O/ evaluates /S/ and then evaluates /T/ with the updated store and in the case of /LET-O/ by substituting occurences of /x/ in T.
+- the two rules /IFEQUAL-T/ and /IFEQUAL/ describes a standard semantic for equality checks. Two terms \(S_1'\) and \(S_2'\) are considered equivalent with respect to $\beta\eta$-equivalence.
+- Match constructs evaluate the scrutinee $S$ and matches the result with one of the patterns.
+  If a pattern matches then the given branch is evaluated.
+- /FUN-APP/ refers to the application of a side condition program.
+  /f/ must be a program in \Delta and all arguments are evaluated and then results are substituted into the body of the program T and it is evaluated.
+- /BINOP-O/ and /NEG-O/ works similar to any other language.
+- /TOQ-O/ evaluate S to an integer and then make the rational z/z.
+- /IFNEG/ and /IFZERO/ rules are very similar, based on the evaluation of S, either branch /T/ or branch /U/ is evaluated.
+- /IFMARKED/ is again similar however the branching depends on the marking of variable /x/ in the store.
+- /MARKVAR-O/ is the only rule that can update the store, by simply switching the flag for the specific mark.
+
 #+caption: Operational semantics for side conditions
 #+label: fig:operational
-\begin{figure}[h!]
+\begin{figure}[H]
 \begin{equation*}
 \inference[CST-O ]{ }
 { \judge{1}{c}{c}{1} }
@@ -46,11 +50,11 @@ If a pattern matches then the given branch is evaluated.
 { \judge{1}{(\mathbf{do}\; S \; T)}{T'}{3} }
 \end{equation*}
 \begin{equation*}
-\inference[IFEQUAL-T ]{ \judge{1}{S_1}{S_1'}{2} & \judge{2}{S_2}{S_2'}{3} & S_1' \equiv_{\beta\eta} S_2' & \judge{3}{T_1}{T_2'}{4} }
+\inference[IFEQUAL-T ]{ \judge{1}{S_1}{S_1'}{2} & \judge{2}{S_2}{S_2'}{3} & S_1' \equiv S_2' & \judge{3}{T_1}{T_2'}{4} }
 { \judge{1}{(\mathbf{ifequal}\; S_1 \; S_2 \; T_1 \; T_2)}{T_2'}{4} }
 \end{equation*}
 \begin{equation*}
-\inference[IFEQUAL-F ]{ \judge{1}{S_1}{S_1'}{2} & \judge{2}{S_2}{S_2'}{3} & S_1' \not\equiv_{\beta\eta} S_2' & \judge{3}{T_1}{T_2'}{4} }
+\inference[IFEQUAL-F ]{ \judge{1}{S_1}{S_1'}{2} & \judge{2}{S_2}{S_2'}{3} & S_1' \not\equiv S_2' & \judge{3}{T_1}{T_2'}{4} }
 { \judge{1}{(\mathbf{ifequal}\; S_1 \; S_2 \; T_1 \; T_2)}{T_2'}{4} }
 \end{equation*}
 

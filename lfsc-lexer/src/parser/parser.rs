@@ -44,13 +44,12 @@ pub fn parse_command(it: &str) -> IResult<&str, StrCommand> {
 }
 
 pub fn parse_term(it: &str) -> IResult<&str, Term<&str>> {
-    let f = alt((
+    alt((
        parse_hole,
        map(parse_ident, |x| Term::Ident(Ident::Symbol(x))),
        map(parse_num, Term::Number),
        open_followed(parse_term_),
-    ))(it);
-    f
+    ))(it)
 }
 
 fn parse_term_(it: &str) -> IResult<&str, Term<&str>> {
@@ -148,11 +147,8 @@ fn parse_sc_(it: &str) -> IResult<&str, TermSC<&str>> {
             preceded(reserved("let"),
                           tuple((parse_ident, parse_sc, parse_sc))),
             |(var, val, body)|  TermSC::Let(var, Box::new(val), Box::new(body))),
-        // side effects
         map(parse_effect, |x| TermSC::SideEffect(Box::new(x))),
-        // numerics
         map(parse_numeric, |x| TermSC::Numeric(Box::new(x))),
-        // compounds
         map(parse_compound, |x| TermSC::Compound(Box::new(x))),
         ))(it)
 
@@ -162,10 +158,6 @@ fn parse_compound(it : &str) -> IResult<&str, CompoundSC<Term<&str>, TermSC<&str
     alt((
         map(preceded(reserved("fail"),
                      parse_term), CompoundSC::Fail),
-        // map(preceded(reserved("compare"),
-        //               tuple((parse_sc, parse_sc, parse_sc, parse_sc))),
-        //     |(a,b,tbranch,fbranch)|
-        //     CompoundSC::Compare{a,b,tbranch, fbranch}),
         map(preceded(reserved("ifequal"),
                      tuple((parse_sc, parse_sc, parse_sc, parse_sc))),
             |(a,b,tbranch,fbranch)|

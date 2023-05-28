@@ -17,10 +17,10 @@ use std::borrow::Borrow;
 
 use std::hash::Hash;
 
-impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
-where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
+impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
+where T: BuiltIn
 {
-    pub fn infer(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
+    pub fn infer(&self, term: &'term AlphaTerm<T>) -> ResRT<'term, T> {
         match term {
             Number(Num::Z(_))  => self.gctx.get_value(&T::_mpz()),
             Number(Num::Q(..)) => self.gctx.get_value(&T::_mpq()),
@@ -77,14 +77,14 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    pub fn infer_as_type(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
+    pub fn infer_as_type(&self, term: &'term AlphaTerm<T>) -> ResRT<'term, T> {
         let x = self.infer(term)?;
         match x.borrow() {
             Type::Star => Ok(x),
             _ => Err(TypecheckingErrors::ExpectedSort)
         }
     }
-    pub fn infer_sort(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T> {
+    pub fn infer_sort(&self, term: &'term AlphaTerm<T>) -> ResRT<'term, T> {
         let x = self.infer(term)?;
         match x.borrow() {
             Type::Box | Type::Star => Ok(x),
@@ -92,7 +92,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    pub fn infer_sc(&self, sc: &'ctx AlphaTermSC<T>) -> ResRT<'ctx, T> {
+    pub fn infer_sc(&self, sc: &'term AlphaTermSC<T>) -> ResRT<'term, T> {
         match sc {
         AlphaTermSC::Number(Num::Z(_)) => self.gctx.get_value(&T::_mpz()),
         AlphaTermSC::Number(Num::Q(..)) => self.gctx.get_value(&T::_mpq()),
@@ -128,7 +128,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    fn infer_sideeffect(&self, sc: &'ctx AlphaSideEffectSC<T>) -> ResRT<'ctx, T>
+    fn infer_sideeffect(&self, sc: &'term AlphaSideEffectSC<T>) -> ResRT<'term, T>
     {
         match sc {
             Do(a, b) => { self.infer_sc(a)?; self.infer_sc(b) },
@@ -140,7 +140,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    fn infer_compound(&self, sc: &'ctx AlphaCompoundSC<T>) -> ResRT<'ctx, T>
+    fn infer_compound(&self, sc: &'term AlphaCompoundSC<T>) -> ResRT<'term, T>
     {
         match sc {
             Fail(x) => { self.infer_as_type(x)?; Ok(self.eval(x)?) },
@@ -172,8 +172,8 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
     }
 
     fn infer_pattern(&self,
-                     p: &'ctx AlphaPattern<T>,
-                    ) -> TResult<(Option<RT<'ctx, T>>, Self), T>
+                     p: &'term AlphaPattern<T>,
+                    ) -> TResult<(Option<RT<'term, T>>, Self), T>
     {
         match p {
             AlphaPattern::Default => Ok((None, self.clone())),
@@ -193,7 +193,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
     }
 
     // indirection to since we might now assign to a borrow...
-    fn force_pi(&self, ty: RT<'ctx, T>) -> TResult<(RT<'ctx, T>, Self), T> {
+    fn force_pi(&self, ty: RT<'term, T>) -> TResult<(RT<'term, T>, Self), T> {
         if let Type::Pi(_, dom, ran) = ty.borrow() {
             Ok((ran(dom.clone(), self.gctx)?, self.update_local(dom.clone())))
         } else {
@@ -201,7 +201,7 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
         }
     }
 
-    fn infer_num(&self, sc: &'ctx AlphaNumericSC<T>) -> ResRT<'ctx, T>
+    fn infer_num(&self, sc: &'term AlphaNumericSC<T>) -> ResRT<'term, T>
         where T: Clone + Eq + Ord + Hash + std::fmt::Debug + BuiltIn
     {
         match sc {

@@ -1,49 +1,32 @@
-The syntax has 5 categories. At its core LFSC is a typed lambda calculus,
-so it consists of terms/objects, types and kinds.
-Terms are denoted by M, N and O.
-Types are denoted by A and B and used for classification of Terms.
+Figure \ref{fig:lfscsyntax} shows the 5 categories of the LFSC language.
+At its core LFSC is a typed lambda calculus and it consists of terms/objects, types and kinds. The last two categories are patterns and side conditions.
+
+Terms are denoted by /M/, /N/ and /O/ and are used as syntactical entities, proofs or inference rules in a logic.
+Types are denoted by /A/ and /B/ and used for classification of Terms, and to the describe judgements and assertions.
 Kinds are denoted by K and is used to classify types.
-I use ~x~ to be a metavariable ranging over the set of variables that might occur in terms,
-~c~ to denote constants in terms (free variables).
+
+We use ~x~ to be a metavariable ranging over the set of variables that might occur in terms,
+~c~ to denote constants in terms, i.e. free variables.
 ~a~ will range over constants in types.
-Sideconditions is denoted by S and T.
-Patterns describes pattern in side condition match cases and is denoted by P.
-I write keywords in *bold*.
-I write [M_1/x_1,...,M_n/x_n]N, for simultanious substitution of ~M_1~, ~M_2 ,..~ with free ocurrences of ~x_1~, ~x_2 ~,... in N. We assume renaming, to avoid name clashing.
-I use * to denote a hole.
+Sideconditions is denoted by /S/ and /T/ and /U/.
+Patterns describes pattern in side condition match cases and is denoted by /P/.
+Primitives and keywords of the side condition language are represented in *bold*.
+~z~ and ~q~ are metasymbols representing integers and rationals.
+$*$ represents a hole, which might be any term.
+Both \Pi and \lambda are abstractions which bind the varaible in the body.
+type annotations are given by $:$ and $\{S \; M\}$ is a pair.
 
-Figure \ref{} shows the syntactical categories.
-TODO: make the figure.
-
-Terms maybe be either a constant ~c~,
-a variable ~x~,
-a type annotation ~M : A~ stating that term M must have type ~A~,
-an abstraction \lambda ~x [:M] . N~, which binds the term M to ~x~ in ~N~,
-and lastly a term might be an application of term M to N, notice that application in terms is left-associative, so M N O is (M N) O.
-
-Types may be a type constant ~a~,
-an application of a type to a term, ~A M~.
-a lambda abstraction ...,
-or a dependent product type. Pi types may contain sidecondtions in their binders.
-
-Kinds may be either the *type* which classifies types or they may be a pi type.
-
-Sideconditions may be:
-1) an unbounded number, which may be either an integer or a rational.
-2) a variable ~x~
-3) a *let* binding, setting ~x~ to ~S~ in ~T~.
-4) an application. Notice that we require that functions are fully applied and thus non-associative,
-sideconditions may then also be one of the categories Compounds, Numerical and Sideeffects.
-
-Compound sideconditions may be either a *fail* ~A~, which raises an exception with type ~A~,
-*match* expressions, which will match the scrutinee against patterns and evaluate corrsponding ~S_i~ in a similar manner to ML.
-*ifequal* compares ~S~ and ~T~ for syntactical equality.
-
-Numerical sideconditions may be the binary operation addition, multiplication and division,
-these follow standard conventions.
-It may be a negation, a convertion from integer to rational or it may be one of the two
-branching constructs.
-
-Sideeffects may be *ifmarked* a branch based on the marking of a varible. markvar which marks a variable, *do* S T, which is equivalent to *let* ~x~ = ~S~ ~T~ where ~x~ does not occur in ~T~.
-
-Patterns may be either a constructor applied to 0 or more arguments, but the constructor must always be fully applied.
+#+caption: Syntactical categories of LFSC
+#+label: fig:lfscsyntax
+\begin{figure}[h!]
+\begin{align*}
+K \; ::=& \; \mathbf{type} \; | \; \mathbf{type}^c \; | \; \mathbf{kind} \; | \; \pilf{x}{A}{K} \; | \; \mathbf{mpz} \; | \mathbf{mpq} \\
+A,B \; ::=& \; a \; | \; A \; M \; | \; \pilf{x}{\{S \; M\}}{A} \; | \; \pilf{x}{A}{B} \\
+M,N,O \; ::=& \; x \; | \; c \; | \; z \; | \; q \; | \; * \; | \; M : A \; | \mathbf{let} \; x \; M \; N \; | \; \lambda x . M \; | \; \lambda x : A . M \; | \; M \; N \\
+P \; ::=& \; c \; | \; c \; x_1 \dots x_n \\
+S,T,U \; ::=& \; x \; | c \; | \; - S \; | \; S \oplus S \; | \; c \; S_1 \dots S_n \; | \; \mathbf{let} \; x \; S \; T \; | \; \mathbf{markvar} \; S \; |\\
+& \; \mathbf{ifequal} \; S_1 \; S_2 \; T \; U \; | \; \mathbf{match} \; S \; (P_1 \; T_1) \; \dots \; (P_n \; T_n) \; | \; \mathbf{fail} \; S \; |\\
+& \; \mathbf{ifneg} \; S \; T \; U \; | \mathbf{ifzero} \; S \; T \; U \; | \mathbf{ifmarked} \; S \; T \; U \; |  \; \mathbf{ztoq} \; S\\
+\oplus \; \in& \; \{+, /, *\cdot\}
+\end{align*}
+\end{figure}

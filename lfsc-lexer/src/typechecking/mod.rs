@@ -122,9 +122,8 @@ where 'a: 'b
             if gctx.contains(id) {
                 return Err(TypecheckingErrors::SymbolAlreadyDefined(id))
             }
-            // check that type of the program is type or a datatype
-            let res_kind = env.infer(ty)?;
-            is_type_or_datatype(res_kind.borrow())?;
+            // check that type of the program is type
+            env.infer_as_type(ty)?;
             let res_ty = env.eval(ty)?;
             // check all arguments, they must also be either type or datatypes
             let mut args_ty = Vec::new();
@@ -138,7 +137,6 @@ where 'a: 'b
             }
             let lctx = tmp_env.lctx.clone();
             drop(tmp_env);
-            // order is important since it will allow us to introduce recursion for functions
             let typ = Rc::new(Value::Prog(args_ty.clone(), body));
             gctx.define(id, res_ty.clone(), typ);
 

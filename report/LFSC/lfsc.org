@@ -1,21 +1,41 @@
 * Logical Framework with Side Conditions
-LFSC is a extention of the Edinbourgh Logical Framework (LF)\cite{} and is a predicative typed lambda calculus with dependent types. This allow proof systems to be encoded as signatures, which amounts to a set of typing declarations. LFSC extends LF by including sideconditions. In this context sideconditions is a operational semantic which might be evaluated during typechecking.
-I will in the following section describe the calculus and its typing along with the operational semantic of sideconditions.
+LFSC\cite{lfsc} is a extention of the Edinbourgh Logical Framework (LF)\cite{lf} and is a predicative typed lambda calculus with dependent types. This allow proof systems to be encoded as signatures, which amounts to a set of typing declarations. LFSC extends LF by including side conditions. In this context sideconditions refers to a functional programming language with an operational semantic which is evaluated during typechecking.
+Section \ref{sec:syntax} gives an introduction to the abstract syntax of LFSC.
+Section \ref{sec:signatures} describes the /signatures/ and /contexts/ under which typing is judged and then we describe the typing rules and the operational semantics of the side conditions in \ref{sec:typing} \ref{sec:operational}.
+Lastly we briefly introduce the concrete syntax in \ref{sec:concrete} and then we present a "small" example that shows that \(P \wedge \neg P\) is unsatisfiable.
 
 ** Abstract Syntax
+:PROPERTIES:
+:CUSTOM_ID: sec:syntax
+:END:
 #+include: syntax.org
 
 ** Signatures and Contexts
+:PROPERTIES:
+:CUSTOM_ID: sec:signatures
+:END:
 #+include: signatures.org
 
 ** Typing
+:PROPERTIES:
+:CUSTOM_ID: sec:typing
+:END:
 #+include: typing.org
 
-*** Operational Semantics of Sideconditions
+** Operational Semantics of Sideconditions
+:PROPERTIES:
+:CUSTOM_ID: sec:operational
+:END:
 #+include: operational_sem.org
 
 ** Concrete Syntax
+:PROPERTIES:
+:CUSTOM_ID: sec:concrete
+:END:
 #+include: grammar.org
 
-** A Small Example
+** Using LFSC to show \(P \wedge \neg P\) is unsatisfiable
+:PROPERTIES:
+:CUSTOM_ID: sec:example
+:END:
 #+include: example.org

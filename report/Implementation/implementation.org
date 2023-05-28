@@ -1,76 +1,48 @@
 * The in-kernel proof checker
-# In this Section we provide a highlevel overview of the in-kernel proof checker.
-# Followed by an indepth description of implementation for each subpart of the design.
+In this section we present the implementation. We first some high level design decisions taken
+to reduce the amount of memory needed and to make the typechecking algorithm efficient.
+We then discuss the actual representation of the language and how we process it in terms of parsing and typechecking.
+In this process we discuss why we have chosen the specific Rust features we have with respect to the Linux kernel.
 
-# ** TODO Overall design
-# We can split the actual design into multiple levels.
-# Firstly we must consider the overall interaction between the code producer and the code consumer.
-# In this interaction we will strive for doing as little work as possible inside the kernel.
-# Specifically we want the following properties for an implementation:
-
-# 1. The implementation should be correct and follow soundness of the LFSC typesystem.
-# 2. The implementation must be both memory and runtime efficient (comparative to the verifier).
-# 3. The implementation should be safe.
-# 4. The implementation should be simple in nature, to minimize the risk of bugs (WELL, NICE NOT NEED?)
-
-# Moving as much computation to user-space as possible will give the best chance of an implementation that
-# will be competitive with the verifier whilst being less code heavy and proovably correct.
-# Unsurprisingly, most of the work still needs to reside in the kernel,
-
-# however if we require that the input must be using De Bruijn indices for bound variables we can
-# eliminate a fraction of both memory from variable names when looking up variables.
-# Furthermore we get equality for free, as it simply amounts to syntactical equality.
-
-# By using Rust as implementation language, we can get a lot of the requirements for free.
-# Although it does not guarantee the implementation to be safe in terms of malicious inputs,
-# it will greatly decrease the risk of any memory leak.
-
-# ALL OF THIS IS GARBAGE!!!
-In this section i present some implementation specific design decisions I have taken
-to reduce the amount of memory needed, the efficiency of the typechecking algorithm
-and some pure restrictions posed by the current status of Rust in the kernel.
-Duely note however than my current implementation does not actually run inside the kernel but rather
-is subject to experiments I have done along the way.
-
-The implementation uses normalization by evaluation with De Bruijn indices and explicit substitutions.
+We uses normalization by evaluation with De Bruijn indices and explicit substitutions.
 
 *** De Bruijn Indicies
-The reason I have decided to use De Brujin indices is two-fold.
-First, using debrujin indices uses less memory than explicit naming,
-the improvement might be negliable but is there nonetheless and
-secondly, using De Bruijn indices allows for easier consideration of \alpha-equivalence between two terms, meaning that they have the same meaning, since \alpha-equivalence amounts to syntactical equivalence with De Bruijn indices.
-Consider the types:
+From the description of the type semantics in \ref{}, we notice that for a type to be correctly checked it must have definitional equality.
+Using De Bruijn indices makes this process a lot easier since it allows for \alpha-equivalence syntactical equivalence. Specifically with De Bruijn indices, when $\beta\eta$ normal form has been achieved, we get \alpha-equivalence for free.
+De Bruijn indices even further makes the process of beta-reduction easier, as variables dont have to be renamed, i.e. \alpha-convertion.
+Consider application
 \( (\lambda x. \lambda y. x y) y\)
 then if we were to do direct substitution in
-\( \lbrack x/y \rbrack (\lambda y. x y) \)
+\( \subst{y}{x}{(\lambda y. x y)} \)
 we would get
 \( \lambda y. y y \)
-which changes the meaning of the term.
+This changes the meaning of the term.
 De Brujin indices instead swap each bound variable with a positive integer.
-The meaning of the integer $n$ is then constituted by the $n^th$ enclosing abstraction, \Pi or \lambda.
-This further reduce the need for a binding name.
+The meaning of the integer $n$ is then constituted by the $n^{th}$ enclosing abstraction, \Pi, \lambda or $let$.
 Specifically if we have the following
 \( \lambda x . \lambda y . \lambda y . x y \) and \( \lambda y . \lambda x . \lambda x . y x \)
-which are alpha-equivalent since they are the same function, but not syntactically identical.
-however in using De Bruijn notation we get:
-\( \lambda \lambda 2 0\) for both, since the outermost binder in the inner application is described by the outermost lambda, whilst the argument for the application is 0, since it is captured by the innermost abstraction.
-Hence we see that they are now syntactical equivalent and capture avoiding since
-\( (\lambda \lambda 1 0) y\) reduces to \( \lambda \lambda 1 y \).
-I will only consider De Bruijn notation for bound variables, this way we get around any capture avoiding complications.
+which are on \(\beta\eta\)-long form and alpha-equivalent but not syntactically identical.
+Using De Bruijn notation we get:
+\( \lambda \lambda \lambda 2 0\) for both, since the function point in the inner application is described by the second inner-most binder, starting from zero,  whilst the argument for the application is 0, since it is captured by the innermost abstraction.
+If we again consider \( (\lambda x. \lambda y. x y) y\) the De bruijn representation is
+\( (\lambda \lambda 1 0) y\) and by beta reduction becomes \(\lambda y 0\).
+We only consider De Bruijn notation for bound variables, this way we get around any capture avoiding complications.
 We could potentially also consider using De Bruijn indices for free variables, however this would complicate the code as this would require lifting binders.
 Although it could be interesting to consider De Bruijn levels since these are not relative to the scope.
 
-We also consider De Bruijn indices for other binders such as in the program definitions, for instance a program like:
+We also consider De Bruijn indices for other binders such as program definitions, like:
 #+begin_src
 (function sc_arith_add_nary ((t1 term) (t2 term)) term
   (a.+ t1 t2))
 #+end_src
- will get converted into
+will get converted into
 #+begin_src
 (function sc_arith_add_nary ((term) (term)) term
-  (a.+ 1 0))
+  (a.+ _1 _0))
 #+end_src
-We can similarly do the same for pattern matching, when a constructor is applied to multiple arguments.
+Where _ denotes a De Bruijn index, to distinguish them from integers.
+
+Similarly in pattern matching, when a constructor is applied to multiple arguments:
 #+begin_src
   (match t
     ((apply t1 t2)
@@ -82,302 +54,80 @@ gets converted into:
 #+begin_src
   (match t
     ((apply 2)
-      (let (getarg f 1)
-        (ifequal 0 l tt (nary_ctn f 1 l))))
+      (let (getarg f _1)
+        (ifequal _0 l tt (nary_ctn f _1 l))))
     (default ff))
 #+end_src
-Notice here that the arguments ~t1~ and ~t2~ is substituted by a 2, we need to save the number of arguments to not lose the meaning of the constructor, as they must be fully applied. In the example we likewise eliminated the binder of the "let".
+Notice here that the arguments ~t1~ and ~t2~ is substituted by a 2, we need to save the number of arguments to not lose the meaning of the constructor, as they must be fully applied. In the example we also converted the binder of the "let".
 
 *** Explicit substitutions
-We have already touched upon substitution, but another matter at which we shall consider it is the sheer cost of direct substitution. When doing direct substitution on terms we cause an explosion in size of the term and thus wastes memory and execution time because we have to copy the struct at each occurence.
-In the substitution $\( \subst{M}{x}{N} \) then if $M$ is large or if $x$ occurs many times in $N$ we can potentially generate
-a new term which are exponentially bigger than the two terms to begin with.
-Considering explicit substitution on the other hand allow us to not generate anything enecessarily large and keep the computation at a minimum.
-I consider a substitution which is lazy, meaning we use the result of a substititution, by lookup, when necessary and then proceed.
-Specifically we use closures which close a \Gamma
-TODO: example.
-I will not go into detail about how the abstract syntax and type system looks with explicit substitution, as there is no significant difference
-with having constructs for explicit substitution as presented in \ref{} as opposed to storing it in \Gamma.
+We have already touched upon substitution, but another matter at which we shall consider is the sheer cost of direct substitution.
+Performing direct substitution on terms we cause an explosion in the size of the term and unnecessarily waste both memory and execution time because we have to copy the struct at each occurence and also traverse terms multiple times.
+Considering explicit substitution on the other hand allow us to not generate anything unnecessarily large and keep the computation at a minimum.
+We consider a substitution which is lazy, meaning we use the result of a substititution, by lookup, when necessary and then proceed, but does not generate any explicit substitutions.
+Specifically we use Rust closures to capture \Gamma.
 
-*** Normalization by evaluation
-Normalization by evaluation is a process first introduced by Berger and Schwichtenberg\cite{} for efficient normalization of simply typed calculus, but it has since been refined for more other systems in Barendregt's lambda cube. This implementation is inspired by Christensens tutorial "Implementing Dependent Types in Haskell"\cite{}.
+
+*** Normalization by Evaluation
+As mentioned, we consider checking of types w.r.t. definitional equality. To do this we must have terms on normal forms, and we use the Normalization by Evaluation (NbE) for this.
+NbE is a process first introduced by Berger and Schwichtenberg\cite{nbe} for efficient normalization of simply typed calculus, but it has since been refined for other systems in Barendregt's lambda cube.
+This implementation is inspired by Christensens writeup "Checking Dependent Types with Normalization by Evaluation"\cite{nbehs}.
 The technique ties a connection between syntax and semantics.
 
-The process of evaluation might dependent on a context but for programming languages this amounts to either compilation to machine code and then execution or by an interpreter. In both evaluation gives meaning to said program. For instance if the result of an interpretation is a number then the number constitutes the meaning. The meaning may not be concrete, but can also be functions.
-LFSC have values for the built in types *type*, *kind* and function types such as \Pi types.
-Evaluation in general is only sensible for closed terms as free variables.
+The process of evaluating a programming language amounts to either compilation to machine code and then execution or by an interpreter.
+In both evaluation gives meaning to said program.
+For instance, if the result of an interpretation is a number then the number constitutes the meaning of that program.
+The meaning may not be concrete but can for instance also be functions, and since we consider typechecking that can envoke evaluation values and types live in a similar domain.
+evaluation of LFSC can result in values for the built in types *type*, *kind* and function types such as \Pi types.
+Evaluation in general is only sensible for closed terms, but we must also consider how to handle open terms.
 
 The process of Normalization on the other hand is to transform a program into its normal form.
-Letting \(nf(t)\) denote the normal form of term $t$ with \(\context t : A\),
+Letting \(nf(M)\) denote the normal form of term $M$ with \(\context M : A\),
 then the following properties must hold:
-- \(\context nf(t) : A\)
-- \(\context nf(nf(t)) = nf(t) \)
-- \( \llbracket nf(t) \rrbracket = \llbracket t \rrbracket\)
-That is the normal form has the same type as the original term,
-the normal form is idempotent and cannot be further normalized and
-the meaning doesnt change when normalizing a term.
-However many such functions follow these properties.
-Informally, we consider the normal form to be expressions which contains no redexes.
+- \(\context nf(M) : A\)
+- \(\context nf(nf(M)) = nf(M) \)
+- \( \llbracket nf(M) \rrbracket = \llbracket M \rrbracket\)
+That is the normal form has the same type as the original term.
+The normal form is idempotent and cannot be further normalized and
+the meaning does not change when normalizing a term.
+Many functions have these properties, so we further consider the normal form to be expressions which contains no redexes.
 A redex is function type applied directly to an argument.
 Specifically the normalization is considered with respect to \beta-conversion.
-However the process of \beta-reduction is slow.
-instead we interpret the understanding of finding a normal form can as evaluating open terms, however the result of evaluation
-will not be a value buth rather a modified term with possibly unknown values.
+As already mentioned the process of \beta-reduction is slow, since it requires multiple traversals of terms.
+Instead we interpret the understanding of finding a normal form can as evaluation on open terms.
+The result of such an evaluation will not have any meaning; hence not be a value but rather a modified term with possibly unknown values.
 We denote these as neutral expressions. A neutral expression in general may be free variables
-or application where the function is neutral.
-
-To perform normalization by evaluation we therefore must extend the set of possible values to also include neutrals. We the require a reflection function $T \longrightarrow \llbracket T \rrbracket$ giving mening to terms, the evaluator per se.
-We then further a reification function $\llbracket T \rrbracket \longrightarrow T$, the inverse of the evaluator that gives normal forms of type $T$.
-A normal form is then obtained by reflection followed by reification.
-For typed derivation of lambda calculus the reification process is syntax directed buth rather inductive on the type of the normal form. Section \ref{} goes into more details about this.
+or application where the function point is a neutral, or in the case of LFSC, a hole.
+By including neutrals, we can in fact perform evaluation on open terms.
+We define an evaluation reflection function $T \longrightarrow \llbracket T \rrbracket$ giving mening to terms.
+Then to convert the meaning back into a normal form, we define a reification function $\llbracket T \rrbracket \longrightarrow T$.
+A normal form is then obtained by evaluation followed by reification. We describe the concrete implementation of these in \ref{sec:eval} and \ref{sec:readback}.
 
 ** Reading and formatting proofs
-Section \ref{} describes the concrete syntax of LFSC, proofs generated by CVC5 will be in this format, however by the reasoning above we would prefer the format to be using De Bruijn indices.
-Therefore I propose a interface which is split in two. As presented in Figure \ref{}, we have a parser, converter and formatter pipeline in userspace and then we have a parser to get the correct form in kernel space.
-The parser in user space will parse the concrete syntax. The converter will then \alpha-convert the AST and lastly a converter can realize the converted ast.
-This convertion could be a pretty printer or a serializer into some specific format that can easily be deserialized.
-This structure gives more leeway in terms of structure.
-For instance the Kernel can be picky about arbitrary nested parenthesis making it less errorprone to stack overflows,
-(In reality, the current implementation is stack safe wrt. nested parenthesis).
-I have looked into using a zero copy serialization framework, however i have not found one that has been easily usable in the kernel.
-
-My first implementation was a handwritten lexer and recursive descent parser, however this implementation quickly got scrapped, when realizing how crates can be used in the Rust kernel development.
-
-*** What restrictions is imposed by the Rust kernel?
-In the Rust kernel development framework not a lot of functionality is exposed.
-The crates immediately exposed in the kernel is ~alloc~, ~core~, ~kernel~, ~compiler_builtins~ and ~macros~.
-The ~macros~ crate is tiny and exposes the ability to easily describe a LKM meta-data.
-The ~compiler_builtins~ are a compiler built in functionality which usually resides in the standard library ~std~. The builtins supported in the kernel at the moment is nothing more than a way to handle panics (exceptions).
-The ~kernel~ crate exposes the kernel APIs, such as character devices, file descriptors etc.
-The functionality of this crate is mostly intended for use in LKMs, which for time being is the inteded use for Rust.
-Rust is not considered to be part of the core kernel, which need to communicate which each other but rather for "leafs" in the kernel hierachy.
-The ~alloc~ and ~core~ crates constitutes most of the ~std~ library in Rust and is respectively the implementation of a memory allocator and core functionality. The ~alloc~ and ~core~ crates are often
-in embedded system and others where the is no operating system or kernel to provide the functionality of the standard library.
-The ~core~ crate exposes basic functionality such as primitive types, references etc.
-The ~alloc~ crate exposes memory allocations and in userspace uses some exposure of malloc, while in kernel space may use either ~kmalloc~ or ~kvmalloc~ to allocate physical and virtual memory inside the kernel.
-In its current form the ~alloc~ crate does not provide much functionality.
-Only simple allocation types such as ~Box~ are exposed and their API is conservative.
-The reason behind is that the kernel "apparently" has no way to handle Out-Of-Memory cases.\footnote{What about the OOM killer?}
-Thus most datastructures are simply not allowed, because they dont expose a secure way to allocate memory. Whenever a new allocation need to happen a ~try_new()~ function can be called, which will return a ~Result~ type with either a reference or an error.
-The only modifiable datastructures available is ~Vec~, a dynamic array, this might take a toll on the performance. A discussion on the matter is presented in Section \ref{}.
-Furthermore the ~alloc~ crate is compiled with a ~no_rc~ feature meaning there is no way to use the reference counted pointers defined in Rust, because the maintainers of the Rust functionality in Linux have decided that it is unnecessary since the C part of the kernel
-already defines reference counting.
-To the best of my knowledge there is no clear exposure of this functionality however in any of the currently supported crates and interfacing can thus be a little tricky.
-It is easy to remove this restriction, but may make a potential PCC implementation harder to get merged into the upstream Linux.
-
-It is possible to compile crates that support a ~no_std~ feature (it relies on ~alloc~ and ~core~) and that also does no memory allocations.
-From my investigation I have found the parser combinator library ~nom~ to be compilable in the kernel.
-I use this library for my parser.
-
-
-** Abstract syntax in Rust
-Despite being similar to C and CPP in syntax, Rust provides a much richer typesystem that allow us to create enumerations which has fields aka Sum types.
-We might for instance define a construction for Identifiers as such:
-#+begin_src rust
-pub enum Ident<Id> {
-  Symbol(Id),
-  DBI(u32)
-}
-#+end_src
-
-An identifier can either be a Symbol if it is free or a De Bruijn index if it is bound.
-Terms are then defined almost identical to constructs described in \ref{}.
-The major difference comes from the way we represent binders.
-#+begin_src rust
-pub enum BinderKind {
-  Pi,
-  Lam,
-}
-pub enum Term<Id> {
-  Binder{ kind: BinderKind, var: Id,
-          ty: Option<Box<Type<Id>>>,
-          body: Box<Term<Id>> },
-  // rest of terms
-}
-#+end_src
-
-A binder is either a \Pi type or a \lambda abstraction, that abstract the var in the body or it can be a locally defined variable in a \(let\).
-We use an option type as \lambda abstractions might contain an annotation but can have an annonymous type aswell.
-This structure is convenient in the frontend representation of the language as this allow for simpler \alpha-normalization.
-In the backend language we however, split this structure into seperate constructors of the ~AlphaTerm~ enum.
-
-#+begin_src rust
-pub enum AlphaTerm<Id> {
-    Number(Num),
-    Hole,
-    Ident(Ident<Id>),
-    Pi(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
-    Lam(Box<AlphaTerm<Id>>),
-    AnnLam(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
-    Asc(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
-    SC(AlphaTermSC<Id>, Box<AlphaTerm<Id>>),
-    App(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
-}
-#+end_src
-
-We define a similar structure for the rest of the language.
-We parameterize ~AlphaTerm~ by ~Id~ which is the data representation of symbols.
-In the specific implementation we consider a ~&str~, which is a reference to a fixed sized string.
-We use this type over a ~String~ type because it is more efficient and there is no need for a term to
-own the string.
-Having terms parameterized by the Identifer type allow for easily convertion to De Bruijn levels instead of
-string identifiers.
-
-*** Parsing lFSC
-We use ~nom~ for parsing. ~nom~ is a parser combinator library that has evolved over the years from being mainly driven by macros
-to in version 7 using composable closures. It is mainly focused around parsing bytes and hereby also ~str~.
-The interfacing is a little confusing at times because there are many ways to call and compose parsers.
-I have settled for a structure that look mostly like the following:
-
-#+begin_src rust
-pub fn parse_file(it: &str) -> IResult<&str, Vec<StrCommand>> {
-    delimited(ws, many0(parse_command), eof)(it)
-}
-#+end_src
-That is, we have our input string, ~it~, which is parsed with a parser.
-We define the parser for a file by compostion. ~delimited~ takes 3 parsers, parse the first, the second and then the third and return the result of the second.
-This style is the one propsed from the ~nom~ maintainers\cite{nom combinators}.
-We can parse term binders as such:
-#+begin_src rust
-fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
-    alt((
-        map(
-            preceded(alt((reserved("let"),reserved("@"))),
-                          tuple((parse_ident, parse_term, parse_term))),
-            |(var, val, body)|  binder!(let var, val, body)
-        ),
-        map(
-            preceded(alt((reserved("pi"),reserved("!"))),
-                     tuple((parse_ident, parse_term, parse_term))),
-            |(var, ty, body)| binder!(pi, var : ty,  body),
-        ),
-        ...
-    ))(it)
-}
-#+end_src
-We parse the different aspects of a binder, indentifier, binding term and the bound term and the construct the appropriate binder.
-We might be able to do some fancy combination of conditional compilation and macros to reuse this code,
-but for now we settle on the kernel parser being a copy of the userspace parser with identifier parsing removed in binders.
-
-*** Convertion from terms
-With front end language, we can pretty simply convert it the language into the backend language.
-We traverse the AST and uses an environment to update symbols appropriately.
-The lookup is simply a collection on names that need be substituted.
-The environment is simply a vector if ~&str~.
-When a new binder is found we push it to the end of a the vector. When we meet a symbol we can then look up if it should be converted into a binder.
-#+begin_src rust
-fn lookup_(vars: &[&str], var: &str) -> Option<u32> {
-    vars.iter().rev()
-               .position(|&x| x == var)
-               .map(|x| (x as u32))
-}
-#+end_src
-and specifically map the option as follow:
-#+begin_src rust
-pub(crate) trait Lookup<'a> {
-    fn lookup(vars: &[&'a str], var: &'a str) -> Self;
-}
-
-impl<'a> Lookup<'a> for StrAlphaTerm<'a> {
-    fn lookup(vars: &[&'a str], var: &'a str) -> Self {
-        lookup_(vars, var).map(|x| Ident(DBI(x)))
-                          .unwrap_or(Ident(Symbol(var)))
-    }
-}
-#+end_src
-
-One thing to note however is that this approach is errorprone.
-Consider the expression:
-\( \lambda x . ((\lambda y . x y) : (\lambda z. z)) \)
-then we push x to the ~vars~ environment, to update the body of the abstraction and then we have two branches of the ascription,
-the type and the term. When transforming the type, we push ~y~ to ~vars~, then we replace ~x~ with the index 1.
-Then we replace and ~y~ with 1.
-We then get to transforming the term of the ascription and because vectors are a mutable structure, when pushing z it will lie at vars[2].
-For a simple solution, I define a function ~local~ inspired by the effectful function ~local~ of the Reader monad.
-
-#+begin_src rust
-fn local<'a, 'b, Input, Output>
-    (fun: impl Fn(Input, &mut Vec<&'a str>) -> Output + 'b,
-     vars: &'b mut Vec<&'a str>
-    ) -> Box<dyn FnMut(Input) -> Output + 'b>
-{
-    Box::new(move |term| {
-      let len = vars.len();
-      let aterm = fun(term, vars);
-      vars.truncate(len);
-      aterm
-    })
-}
-#+end_src
-We create a closure which takes in a term, the closure will call ~fun~ with the term and the environment as arguments and then it will truncate the environment to its size before ~fun~ was called.
-
-We can then use the function as such:
-#+begin_src rust
-  Term::Ascription { ty, val } => {
-      let mut alpha_local = local(alpha_normalize, vars);
-      let ty = alpha_local(*ty);
-      let val = alpha_local(*val);
-      Asc(Box::new(ty), Box::new(val))
-  },
-#+end_src
-
-Following these rules we simply convert the AST.
-
-*** Serialization
-To feed the transformed AST to the kernel we imagine a function that can convert this into a format the kernel can read.
-I have not focused on this part and thus have no implementation for it at the moment.
-Ideally we would want to serialize the data into a binary format that is easy to deserialize.
-I have spent some time looking into good libraries for this and formats such as Cap'n Proto or rkyv,
-however they are not implemented with ~no_std~ that support ~no_oom_handling~ and are thus not feasible without much further work.
-We could also introduce a specific binary format which could then be parsed using nom,
-which has decent support for zero copy, given the right circumstances.
-Again this would require a fairly deep knowledge of when zero copy is supported in Nom.
-The most simple solution would be to implement a pretty-printer.
+#+include: reading.org
 
 ** Typechecking LFSC
-In this section i describe the implementation that corresponds to Section \ref{} through \ref{}.
-I present how the code is structured and why I have decided to do so.
+In this section we describe the implementation of the type-checkign semantics.
+We start by introducing the value representation obtained by inference and evaluation.
+Then we describe the Signature and Contexts, followed by inference, type-equality and then reification and evaluation at last.
 
-*** Values
-as mentioned, we consider typechecking using normalization by evaluation. To define what an evaluation look like we need another type.
-We define them as such:\footnote{Notice here that Z and Q should actually have unbounded integers as fields. I have not looked into a solution that is compatible with the kernel}
-#+begin_src rust
-pub enum Value<'a, T: Copy> {
-    Pi(RT<'a, T>, Closure<'a, T>),
-    Lam(Closure<'a, T>),
-    Box,
-    Star,
-    ZT,
-    Z(i32),
-    QT,
-    Q(i32, i32),
-    Neutral(RT<'a, T>, Rc<Neutral<'a, T>>),
-    Run(&'a AlphaTermSC<T>, RT<'a, T>),
-    Prog(Vec<RT<'a, T>>, &'a AlphaTermSC<T>),
-}
-#+end_src
-A value might be one of the abstractions in the term language, as these cannot be reduced further.
-It can be a $\square$ or a $\star$ where $\star$ is /kind/ and $\square$ is a sort classifying kinds, these specifically correspond to *kind* and *type*.
-Notice that we dont consider a *type^c* as it by construction in the implementation will never clash with *type*
-It can then be the value of a \mathcal{Z} or \mathcal{Q} or it can be the base types: \mathcal{Z} and \mathcal{Q}.
-Neutral expressions, consists of an RT which is the type describing it, and a the neutral expression it describe.
-The RT typesynonym is a reference counted pointer to a value.
-The reason we use reference counting is to reduce the overall memory needed.
-It allow us to only define a value once instead of having to potentially cloning it again and again.
-This may not be immediately obvious for the simpler types, but for the complex values that contain closures which captures
-term this may get costly quickly.
-We use reference counter over compile time references because we dont immediately know the owner of a value and thus also not the lifetime of it. Considering that most of the functions I am gonna describe produces values, the value will be handed to the caller of the function, but in some cases the owner may be the environment or we would have to clone values from the context.
-Further because of the lifetime guarantee there is no way to create a value and return a reference to it. Although we cant fully utilize the borrowing system, reference counting in Rust makes for lot cleaner code. The reference counted smartpointer looks as follows:
+*** IDK WHERE TO PUT THIS
+We use compile time references when we can to not unnecessarily create new objects.
+When compile time references are not possible because we dont know the owner of a value and thus also not the lifetime of it we instead use reference counted pointers.
+Most of the functions we describe returns values. The ownership will then lie at the caller of the function,
+but in some cases the owner of a result value may be $\Sigma$. This for instance happen when inferring the type of a constant.
+Further because of the lifetime guarantee there is no way to create a value and return a reference to it.
 
+The reference counted smartpointer looks as follows:
 #+begin_src rust
 pub struct Rc<T: ?Sized> {
     ptr: NonNull<RcBox<T>>,
     phantom: PhantomData<RcBox<T>>,
 }
 #+end_src
-An Rc is nothing more than a struct, which contains a pointer to the inner value that is referenced, along with a phantom field.
-The fanthom field is merely there to keep strong static typing in a similar way to a phantom type in Haskell.
-The ptr in this struct points to the following struct:
+An Rc is nothing more than a struct that contains a pointer to the inner value that is referenced and a phantom field.
+The phantom field is merely there to keep strong static typing in a similar way to a phantom type in Haskell.
+The ~ptr~ in this struct points to the following struct:
 #+begin_src rust
 #[repr(C)]
 struct RcBox<T: ?Sized> {
@@ -386,290 +136,33 @@ struct RcBox<T: ?Sized> {
     value: T,
 }
 #+end_src
-Which contains the values and the counts for strong and week reference counts. Whenever the Rc is then cloned we simply take the RcBox inside of Rc and increment the pointer, and construct a new Rc struct. The ease of use then comes from the drop trait which will either decrement the inner RcBox and drop the Rc or it will drop both if the strong count is 0.
-Hence, allowing us to only specify when we want a new reference, but dont need to decrement or drop manually.
+Which contains the values and the counts for strong and week reference counts.
+Whenever the ~Rc~ is then cloned we simply take the ~RcBox~ inside of Rc and increment the pointer, and construct a new ~Rc~ struct. The ease of use then comes from the ~Drop~ trait which will either decrement the count in the ~RcBox~ and drop the ~Rc~ or it will drop both if the strong count is 0.
+Hence we can easily create new references, but we dont need to know the owner, but it does not matter since they are deallocated automatically. This gives some overhead compared to regular references but is highly likely more efficient that cloning.
 
-Abstractions \Pi and \lambda contain a closure which at its core is a function of type $RT \longrightarrow RT$, which closes over a local context and the body of the term it was constructed from.
-The Pi value further contain its domain and a boolean value. This boolean value denotes if the variable bound occurs free in the body. This is extremely important for performance reasons which we describe more in detail in Section \ref{}.
+*** Values
+#+include: values.org
 
-Values can then also be neutral expressions, which can be either a neutral variable a global or local scope, It can then be a hole, or an application of a neutral term to a normal form.
-The constructor Neutral for values is a Value Neutral pair. The value constitutes the type of the neutral.
-Which is what allows for reification.
-#+begin_src rust
-#[derive(Debug, Clone)]
-pub enum Neutral<'a, T: Copy>
-{
-    Var(T),
-    DBI(u32),
-    Hole(RefCell<Option<RT<'a, T>>>),
-    App(Rc<Neutral<'a, T>>, Normal<'a, T>),
-}
-
-#[derive(Debug, Clone)]
-pub struct Normal<'a, T: Copy>(pub Rc<Type<'a, T>>, pub Rc<Value<'a, T>>);
-#+end_src
-
-Lastly Values can be programs and run commands.
-Programs can not be constructed by reflection but must exist in the same type to be part of the signature.
-Likewise Run cannot be directly constructed but will always be a domain of a Pi value.
-
-*** Contexts
-The context has been the most complicated part of this implementation.
-As described in \ref{} we consider two levels of environments.
-Signatures \Sigma are used for the global context while /Context/  \Gamma is used for the local context.
-They have a similar interface but internally works quite differently.
-A global context is defined as such:
-#+begin_src rust
-pub struct GlobalContext<'term, K: Copy> {
-    pub kind: RT<'term, K>,
-    keys: Vec<K>,
-    values: Vec<TypeEntry<'term, K>>,
-}
-#+end_src
-The kind field is simply meant to be a \square and is only placed like this for ease of use.
-The kind then has a ~keys~ and a ~values~ field.
-These are vectors (although in the future should probably be either a hashmap or btree or the likes of that) and does not
-cause too muche trouble with the borrow-checker, since the global environment is passed around as a shared reference in all but one function, ~handle_command~ which will typecheck a command and add the results to the vector, as explained per \ref{}.
-
-Both the global and the local context contain type-entries of the following form:
-#+begin_src rust
-pub enum TypeEntry<'a, Key: Copy> {
-    Def { ty: RT<'a, Key>, val: RT<'a, Key> },
-    IsA { ty: RT<'a, Key>, marks: RefCell<u32> },
-    Val ...
-}
-#+end_src
-Notice here that this does not directly correspond to our definition in \ref{}.
-The ~IsA~ construct corresponds directly to \(x : A\).
-The other two are defined purely for ease of use.
-The ~Def~ constructor is used for definitions such that we can express \( c = M : A \) in the signatures and hereby stating that /c/ is a term /M/ with type /A/. This is purely useful when considering evaluation or for let expressions.
-The ~Val~ is used in extending the environment in evaluation. Again for simplicity we reuse the contexts instead of having a seperate environment.
-
-The global context exposes the following functions:
-#+begin_src rust
-pub fn insert(&self, key: K, ty: RT<'a, K>)
-pub fn define(&self, name: K, ty: RT<'a, K>, val: RT<'a, K>)
-pub fn get_value(&self, key: &K) -> ResRT<'a, K>
-pub fn get_type(&self, key: &K) -> ResRT<'a, K>
-#+end_src
-If one tries to get the value of a IsA type, they get a neutral expression consisting of the stored type ~ty~ and a neutral symbol.
-
-The local context exposes a much similar interface.
-The underlying datastructure is however different.
-The local context is implemented as a linked list using reference counted pointers and much more closely
-represent the concatenation of \Gamma presented in \ref{}.
-#+begin_src rust
-pub enum LocalContext<'a, K: BuiltIn> {
-    Nil,
-    Cons(TypeEntry<'a, K>, Rlctx<'a, K>),
-}
-#+end_src
-
-Most functions we use such as ~eval~, ~infer~ etc, needs to have access to both \Sigma and \Gamma and thus for simplicity we define the following wrapper.
-#+begin_src rust
-struct EnvWrapper<'global, 'term, T: Copy> {
-    pub lctx: Rlctx<'term, T>,
-    pub gctx: Rgctx<'global, 'term, T>,
-    pub allow_dbi: u32,
-}
-#+end_src
-The Rlctx is a type synonym for a reference counted \Gamma. Whereas Rgctx is a standard reference to \Sigma.
+*** Signature and Contexts
+#+include: context.org
 
 *** Commands
-We define a single function to handle a specific command and then apply this on an iterator of all commands.
-The function starts by constructing the environment wrapper, with the current \Sigma and an empty \Gamma.
-- Declarations are first checked that the symbol we want to bind \(\alpha \notin dom(\Sigma)\)
-and then infers the type to make sure \(\alpha : K\) or \(\alpha : A\).
-We then evaluate the expression and insert it, as an ~IsA~.
-- Definitions is similarly first typechecked, and the ty must not be of a kindlevel.
-  They are then stored in the global environment as ~Def~ where the value is the evaluation of the term.
-- Checks is nothing more than infering the type to check for well-typedness.
-- Programs are complicated for multiple reasons.
-  Firstly we check that the return type of a program is a type, either built in or a declared inductive datatype.
-  We then check each argument against the empty \Gamma and add them to a \Gamma' which will be used for checking the body.
-  Because we have an environment wrapper defined we must drop it, before we can mutably borrow it to add define a program,
-  before we can check the body. We must do it in this specific order, as programs may be recursive and thus we need access
-  to the type of the program before we check the body.
-  #+begin_src rust
-let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx, 0);
-    ... other cases ...
-    Command::Prog { cache: _chache, id, args, ty, body } => {
-      ... typesignature check ...
-      let lctx = tmp_env.lctx.clone();
-      drop(tmp_env); // drop before we can push
-      let typ = Rc::new(Value::Prog(args_ty.clone(), body));
-      gctx.define(id, res_ty.clone(), typ);
-
-      let env = EnvWrapper::new(lctx, gctx, 0); // make new
-      let body_ty = env.infer_sc(body)?;
-      ... sameness check }
-  #+end_src
-  We then lastly check that the body has the same type as the return value.
-  Notice further that we must create a ~Prog~ type instead of a ~Pi~ type as we cannot construct a ~&AlphaTerm~.
-  This has the neat sideeffect that we dont have to check for ~Pi~ types that actually describe programs when checking terms.
+#+include: commands.org
 
 *** Inferring types.
-We define an ~infer~ function for each of the constructs in the language,
-The functions are implemented as inherent implementations (concrete associated functions) and has the types:
-#+begin_src rust
-impl<'global, 'ctx, T> EnvWrapper<'global, 'ctx, T>
-where T: BuiltIn
-{
-    pub fn infer(&self, term: &'ctx AlphaTerm<T>) -> ResRT<'ctx, T>
-    pub fn infer_sc(&self, sc: &'ctx AlphaTermSC<T>) -> ResRT<'ctx, T> {
-    fn infer_sideeffect(&self, sc: &'ctx AlphaSideEffectSC<T>) -> ResRT<'ctx, T>
-    fn infer_compound(&self, sc: &'ctx AlphaCompoundSC<T>) -> ResRT<'ctx, T>
-    fn infer_num(&self, sc: &'ctx AlphaNumericSC<T>) -> ResRT<'ctx, T>
-}
-#+end_src
-We here define that the typeparameter ~T~ must implement the Trait ~BuiltIn~.
-The trait is bound by other traits:
-pub trait BuiltIn: Eq + Ord + Hash + Copy.
-It must be PartialEq to be able to look up the ~T~ in the environment.
-It must also be copy. We uses this stricter trait than clone, as it allows for quick "copying" and is a satisfied criteria for both &str and u32's that could be used for De Bruijn levels.
-Hash and Ord is not strictly necessary but is required to use Hashmaps or Btrees. Using such types is also described in Section \ref{}.
-The BuiltIn trait itself defines how the builtin types *type*, *mpz* and *mpq* is defined.
-For &str this is simply a stringification of the literals, for u32 prepresented De bruijn indices these may be 0,1,2.
-
-The functions follow closely the rules in \ref{}. The function patternmatches on term,
-and for \lambda sideconditions and holes the inference fails. when inferring a ~Pi~ we check if the domain is a
-sidecondition, if that is the case we check them respectively and create a Run type.
-In case it is not a sidecondition, we simply infer the domain to have *type* and then evaluate it, to get its value.
-We can then update the local environment stating that DBI 0 in the localcontext ~IsA~ val type.
-#+begin_src rust
-AlphaTerm::Pi(a, b) => {
-    let val =
-        if let SC(t1, t2) = &**a {
-            let t1_ty = self.infer_sc(t1)?;
-            self.check(t2, t1_ty.clone())?;
-            Rc::new(Type::Run(t1, t1_ty, self.lctx.clone()))
-        } else {
-            self.infer_as_type(a)?;
-            self.eval(a)?
-        };
-    self.update_local(val).infer_sort(b)
-},
-#+end_src
-
-The most compliated rule Application. Instead of interpreting multiple continious application as curried form we use a flat approach in which we evaluate each argument in a loop.
-First we evaluate the function point, this is saved in a mutable variable updated each iteration of the loop.
-Each argument is checked against the domain of the \Pi type, if the variable bound by the \Pi is free, then we evaluate it or we return an arbitrary value.
-Lastly the body is evaluated, with either the new value or default added to the local environment. the result is bound to ~f_ty~. This happens for each iteration and lastly we return the bound value.
-In case the argument is a Hole, we do not check it, as it is trivially the correct type at this point. We add it to the environment and evaluate the body.
-#+begin_src rust
-App(f, args) => {
-    let mut f_ty = self.infer(f)?;
-    for n in args {
-        f_ty = if let Type::Pi(free,a,b) = f_ty.borrow() {
-         if Hole == *n {
-             let hole = Rc::new(Neutral::Hole(RefCell::new(None)));
-             b(Rc::new(Type::Neutral(a.clone(), hole)), self.gctx)?
-         } else {
-            self.check(n, a.clone())?;
-             let x = if *free { self.eval(n)? } else { a.clone() };
-            b(x, self.gctx)?
-         }
-        } else {
-            return Err(TypecheckingErrors::NotPi)
-        }
-    };
-    Ok(f_ty)
-#+end_src
-
-similar inference is done for the sidecondition language.
+#+include: infer.org
 
 *** Checking types
-We define two functions for typechecking. One takes a term and a value/type t2 and check against it.
-The other takes a sideconditions as first argument, but essentially does the same.
-We match on term and if it an anonymous lambda then we check /LAM/-rule of Figure \ref{},
-otherwise we infer the type of the term to t1 and check t2 and t1 for "sameness".
-This process is two-fold. Firstly we do a value comparison between t1 and t2.
-to their canonical form using reification as decribed in \ref{} and check for equality.
-Generally we cannot compare values, as functions such as \Pi is implemented using Closures, which cannot easily be compared.
-The main reason for the ~ref_compare~ call, is to fill in holes.
-The function return a boolean of the equality between the two values, and as long as the values are one of the simple types or
-syntactically the same neutrals. If one of the arguments is a hole it is filled with the other value.
-This is done using the interior mutability of Refcells.
-We cannot fill the holes after reading back values as a hole might occur in multiple places and we must ensure
-that it is filled with the same value.
-However empirically, the ref_compare will return ~true~ most of the time.
-In case it returns 0. We readback (a more idimatic term than reification) the values into their normal form and compare them.
-
-#+begin_src rust
-pub fn convert(&self,
-            t1: RT<'term, T>,
-            t2: RT<'term, T>,
-            tau: RT<'term, T>) -> TResult<(), T>
-{
-    if ref_compare(t1.clone(), t2.clone()) { return Ok(()) }
-    let e1 = self.readback(tau.clone(), t1)?;
-    let e2 = self.readback(tau, t2)?;
-    if e1 == e2 {
-        Ok(())
-    } else {
-        Err(TypecheckingErrors::Mismatch(e1, e2))
-    }
-}
-#+end_src
-
+#+include: checking.org
 
 *** Readback (Reification)
-As mentioned previously, reading back semantical objects into the term language is type directed.
-~read_back~ takes a type and a value as arguments. The we first check if the value is neutral.
-Is it the case, then we call ~read_back~ neutral.
-
-Neutral values have enough information to be read back without a type.
-Variables can be read back directly, holes either get read back as its inner value or as a term language hole.
-Application will read back the function point and then argument point. And construct an application from it.
-Be aware here that the argument point is a ~Normal~ type. It will thus call ~read_back~ with its type and val.
-
-If the value of ~read_back~ is not neutral, we patternmatch on the type.
-If the type is \mathcal{Z} or \mathcal{Q} then we can read back integers and rationals respectively.
-All built in types can be readback to the built in terms.
-Pi types can be read back by reading back the domain, then evaluate the body and read the body back.
-Run commands can be read_back as the second argument and constructing and ~SC~ type by cloining the actual
-sidecondition call.
+:PROPERTIES:
+:CUSTOM_ID: sec:readback
+:END:
+#+include: readback.org
 
 *** evaluation
-We define evaluation on two levels, both on terms and on the functional sidecondition language.
-Evaluation of the term language is straightforward.
-Sideconditions and holes cannot be evaluated.
-Application have a similar structure to ~infer~.
-We consider applications in applicative order evaluation with a loop over the arguments.
-The function ~do_app~ is then called with the function and the argument evaluated
-#+begin_src rust
-pub fn do_app(&self, f: RT<'ctx, T>, arg: RT<'ctx, T>) -> ResRT<'ctx, T>
-{
-match f.borrow() {
-    Value::Lam(closure) => closure(arg, self.gctx),
-    Value::Neutral(f, neu) => {
-        if let Value::Pi(_,dom, ran) = f.borrow() {
-            Ok(Rc::new(Value::Neutral(
-                ran(arg.clone(), self.gctx)?,
-                Rc::new(Neutral::App(neu.clone(), Normal(dom.clone(), arg))))))
-        } else {
-            todo!("This should be an error")
-        }
-    }
-    _ => todo!("This should be an error"),
-}
-}
-#+end_src
-Functions can be either a concrete lambda abstraction in which we simply evaluate the closure.
-A Function can also be unknown, in which case, we check that the type of the neutral value is a function type.
-We construct a new neutral value, where the type of the neutral value is range of the \Pi and the value is an application of the
-unknown value onto the normal expression (dom, arg). stating that arg has type dom.
-For instance if we consider the application (f x y), where f :: a -> b -> c,
-then we construct:
-Neu( b -> c, f (x : a))
-by the first applcation and
-Neu(c, (f (x : a)) (y : b))
-If we then want to read back, we will get (f x y) back since it is already in normal form.
-
-Evaluation of \Pi terms are also interesting. For standard \Pi constructs,
-we simply evaluate the domain, construct a closure around the body, check if the bound variable is free in the range
-and construct a Pi value. However if the domain of a \Pi is a sidecondition, we evaluate the sidecondition, the target and check for equivalence.
-Lastly the result is inserted in the local context and the body is evaluated.
-This is what enables execution of sideconditions in the typechecking.
-
-\footnote{should i mention anything about evaluation of sideconditions?}
+:PROPERTIES:
+:CUSTOM_ID: sec:eval
+:END:
+#+include: eval.org
