@@ -86,11 +86,9 @@ pub fn handle_command<'a, 'b>(com: &'b StrAlphaCommand<'a>,
                              gctx: &mut GlobalContext<'b, &'a str>) -> TResult<(), &'a str>
 where 'a: 'b
 {
-    // let lctx = Rc::new(LocalContext::new());
     let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx);
     match com {
       Command::Declare(id, ty) => {
-          // actually doing this for pi will check that it is a sort already,
             // println!("declare: {}", id);
             if gctx.contains(id) {
                 return Err(TypecheckingErrors::SymbolAlreadyDefined(id))
@@ -111,12 +109,7 @@ where 'a: 'b
             gctx.define(id, ty, env.eval(term)?);
             Ok(())
         },
-        Command::Check(term) => {
-            // println!("check");
-            env.infer(term)?;
-            // println!("ok");
-            Ok(())
-        },
+        Command::Check(term) => { env.infer(term)?; Ok(()) },
         Command::Prog { cache: _chache, id, args, ty, body } => {
             // println!("prog: {}", id);
             if gctx.contains(id) {

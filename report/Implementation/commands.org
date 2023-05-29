@@ -1,30 +1,53 @@
 Before explaining the inference algorithm we should quickly describe how commands are handled.
 We define a single function to handle a specific command and then apply this on an iterator of all commands presented to the proof checker.
 The function starts by constructing the environment wrapper, with the current \Sigma and an empty \Gamma.
-- For declarations we first check that the constant we want to bind \(a \notin dom(\Sigma)\)
-  and then infers the type to make sure \(a : K\) or \(a : A\).
-  We then evaluate the expression and insert it, as an ~IsA~.
-- Definitions is similarly first typechecked, but must not be of a kind level.
-  They are then stored in the global environment as ~Def~ where the value is the evaluation of the term.
-- Checks is nothing more than infering the type to check for well-typedness.
-- Programs are complicated for multiple reasons.
-  As for other modifications to \Sigma we check that the identifier is not in $dom(\Sigma)$.
-  We check that the return type of a program is a *type*.
-  We then check each argument against the empty \Gamma and add them to another \Gamma' which will be used for checking the body.
-  By this we ensure that parameters does not depend on each other.
-  Then before we can typecheck the body, we must first add it \Sigma, since side condition programs may be recursive.
-  Then we have to drop the ~EnvWrapper~ because it borrows \Sigma immutably and we want to borrow it mutably to insert an entry.
-  We insert symbol $id$ as a ~Def~ with the type as the return type of the function and a ~Prog~ type as value.
-  We can then check the body to have the return type.
-  #+begin_src rust
-let env = EnvWrapper::new(Rc::new(LocalContext::new()), gctx, 0);
-    ... other cases ...
-    Command::Prog { cache: _chache, id, args, ty, body } => {
-      ... typesignature check ...
-      let lctx = tmp_env.lctx.clone();
-      drop(tmp_env);
-      let typ = Rc::new(Value::Prog(args_ty.clone(), body));
-      gctx.define(id, res_ty.clone(), typ);
-      EnvWrapper::new(lctx, gctx).check_sc(body, res_ty)?;
+
+For declarations we first check that the constant we want to bind \(a \notin dom(\Sigma)\)
+and then infers the type to make sure \(a : K\) or \(a : A\).
+We then evaluate the expression and insert it, as an ~IsA~, as such:
+#+begin_src none -n
+Command::Declare(id, ty) => {
+      if gctx.contains(id) {
+          return Err(TypecheckingErrors::SymbolAlreadyDefined(id))
+      }
+      env.infer_sort(ty)?;
+      gctx.insert(id,  env.eval(ty)?);
       Ok(())
+},
+#+end_src
+
+Definitions is similarly first typechecked, but must not be of a kind level.
+They are then stored in the global environment as ~Def~ where the value is the evaluation of the term.
+
+Checks is nothing more than infering the type to check for well-typedness.
+
+Programs are complicated for multiple reasons.
+As for other modifications to \Sigma we check that the identifier is not in $dom(\Sigma)$.
+We check that the return type of a program is a *type*.
+We then check each argument against the empty \Gamma and add them to another $\Gamma'$ which will be used for checking the body.
+By this we ensure that parameters do not depend on each other.
+Then, before we can typecheck the body, we must first add it to \Sigma, since side condition programs may be recursive.
+Then we have to drop the ~EnvWrapper~ because it borrows \Sigma immutably and we want to borrow it mutably to insert an entry.
+We insert symbol $id$ as a ~Def~ with the type as the return type of the function and a ~Prog~ type as value.
+We can then check the body to have the same type as the return type. The code very verbosely look as follows:
+  #+begin_src none -n
+Command::Prog { cache: _chache, id, args, ty, body } => {
+    ... checking id is not define and return type ...
+    let mut args_ty = Vec::new();
+    let mut tmp_env = env.clone();
+    for arg in args.iter() {
+        let arg_ty = env.infer(arg)?;
+        is_type_or_datatype(arg_ty.borrow())?;
+        let ty = env.eval(arg)?;
+        tmp_env = tmp_env.update_local(ty.clone());
+        args_ty.push(ty);
+    }
+    let lctx = tmp_env.lctx.clone();
+    drop(tmp_env);
+    let typ = Rc::new(Value::Prog(args_ty.clone(), body));
+    gctx.define(id, res_ty.clone(), typ);
+
+    EnvWrapper::new(lctx, gctx).check_sc(body, res_ty)?;
+    Ok(())
+}
   #+end_src

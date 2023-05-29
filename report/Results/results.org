@@ -71,6 +71,9 @@ In the following section we evaluate the implementation, /lfscr/ by runtime spee
 We further argue for the completeness and correctness aswell as general comparison compared to /lfscc./
 
 ** Speed
+:PROPERTIES:
+:CUSTOM_ID: sec:speed
+:END:
 In the first iteration of the code, the performance of /lfscr/ presented in this report were atrocious.
 From Table \ref{tab:slow} it should be clear that, /lfscr/ were extremely slow.
 For a single instruction, the performance are similar to /lfscc/. In this case we essentially just check all the signatures distributed by cvc5\cite{lfscsigs} along with a small proof.

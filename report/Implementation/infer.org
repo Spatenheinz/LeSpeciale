@@ -5,9 +5,11 @@ impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
 where T: BuiltIn
 {
     pub fn infer(&self, term: &'term AlphaTerm<T>) -> ResRT<'term, T>
-    pub fn infer_sc(&self, sc: &'term AlphaTermSC<T>) -> ResRT<'term, T> {
-    fn infer_sideeffect(&self, sc: &'term AlphaSideEffectSC<T>) -> ResRT<'term, T>
-    fn infer_compound(&self, sc: &'term AlphaCompoundSC<T>) -> ResRT<'term, T>
+    pub fn infer_sc(&self, sc: &'term AlphaTermSC<T>) -> ResRT<'term, T>
+    fn infer_sideeffect(&self, sc: &'term AlphaSideEffectSC<T>)
+                        -> ResRT<'term, T>
+    fn infer_compound(&self, sc: &'term AlphaCompoundSC<T>)
+                      -> ResRT<'term, T>
     fn infer_num(&self, sc: &'term AlphaNumericSC<T>) -> ResRT<'term, T>
 }
 #+end_src
@@ -15,14 +17,15 @@ The functions follow closely the rules in Figure \ref{fig:tylfsc}.
 Taking ~infer~ as example it pattern-matches on ~term~,
 and for \lambda, side conditions and holes the inference fails.
 And variables and symbols are simply looked up in either \Sigma or \Gamma respectively.
-For some of the more complicated rules:
+Now for some of the more complicated rules:
 
-inferring a ~Pi~ will check if the domain is a
-sidecondition.
-If that is the case, we infer the type of the side-condition and check it to have the same type as type of the second part of the pair. We create a Run type for the domain.
+inferring a ~Pi~ can be seen in Figure \ref{fig:inferpi}. We first check if the domain is a side condition.
+If that is the case, we infer the type of the side condition and check it to have the same type as type of the second part of the pair. We create a Run type ~val~ which will be bound in the inference of the ~b~.
 In case it is not a sidecondition, we simply infer the domain to have *type* and then evaluate it, to get its value.
-We can then update the local environment stating that De Bruijn index 0 in the localcontext ~IsA~ ~val~ type.
-#+begin_src rust
+We can then update the local environment stating that De Bruijn index 0 in the localcontext ~IsA { val }~ type.
+#+begin_export latex
+\begin{figure}[h!]
+\begin{lstlisting}
 AlphaTerm::Pi(a, b) => {
     let val =
         if let SC(t1, t2) = &**a {
@@ -35,14 +38,20 @@ AlphaTerm::Pi(a, b) => {
         };
     self.update_local(val).infer_sort(b)
 },
-#+end_src
+\end{lstlisting}
+\caption{Inference of Pi-term}
+\label{fig:inferpi}
+\end{figure}
+#+end_export
 
-For application instead of interpreting multiple continious application as curried form, we use a flat approach in which we evaluate each argument in a loop.
-First we infer the function point, this is saved in a mutable variable updated each iteration of the following loop.
+For application instead of interpreting multiple continuous applications as curried form, we use a flat approach in which we evaluate each argument in a loop, as presented in Figure \ref{fig:inferapp}.
+First we infer the function point, which is saved in a mutable variable updated each iteration of the following loop.
 Each argument is checked against the domain of the \Pi type. If the variable bound by the \Pi is free in the body, then we evaluate it. Otherwise we return an arbitrary value.
-Lastly the body is evaluated, with either the new value or a default added to the local environment. The result is bound to ~f_ty~. This happens for each iteration and lastly we return the bound value.
-In case the argument is a Hole, we do not check it, as it is trivially the correct type at this point. We add it to the environment and evaluate the body.
-#+begin_src rust
+Lastly the body is evaluated, with either the new value or a default value added to the local environment. The result is bound to ~f_ty~. This happens for each iteration and lastly we return the bound value.
+In case the argument is a hole we do not check it, as it is trivially the correct type at this point. We add it to the environment and evaluate the body.
+#+begin_export latex
+\begin{figure}[h!]
+\begin{lstlisting}
 App(f, args) => {
     let mut f_ty = self.infer(f)?;
     for n in args {
@@ -60,6 +69,10 @@ App(f, args) => {
         }
     };
     Ok(f_ty)
-#+end_src
+\end{lstlisting}
+\caption{Inference of application term}
+\label{fig:inferapp}
+\end{figure}
+#+end_export
 
-similar inference is done for the sidecondition language.
+Similar inference is done for the side condition language.

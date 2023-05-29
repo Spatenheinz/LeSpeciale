@@ -1,25 +1,25 @@
 Although the concrete syntax of LFSC is not terribly important, there is no clear presentation of how signatures are supposed to represent a formal system purely from the abstract syntax and the typing rules, as there is no way to extend it from the rules.
-we give a brief introduction to make the understanding of the examples presented later easier to understand.
+We give a brief introduction to the examples presented later easier to understand.
 
-LFSC implements the core language and sideconditions as S-expressions.
+LFSC implements the core language and side conditions as S-expressions.
 At the toplevel LFSC allows the following commands.
-- *define* takes two arguments the constant to be bound ~c~ and a term ~M~. it will then bind x to the term ~M~ with type ~A~.
-- *declare* takes a constant ~a~ and a type ~A~ check ~A~ to be a kind, then bind ~a~ to ~A~.
-- *function* is used to define sideconditions. It takes a constant name, a pairwise list of (x A), which is the arguments to the function,
-  then a return type and a body. It will then check the body with the parameters added to a context, and then match the type of the program body with the return type.
-- *check* will take a single argument, a term or a type and then typecheck it.
-The intention here is that *declare* and *function* is allowed only in the signature definitions, which defiens the formal system, and then
-a user proof can use *define* and *check* to construct a proof under the formal system defined in the signature.
+- *define* takes two arguments: the constant to be bound ~c~ and a term ~M~. It will then bind ~c~ to the term ~M~ with type ~A~, where ~A~ is the type of inference.
+- *declare* takes a constant ~a~ and a type ~A~, check that ~A~ is a kind, then bind ~a~ to ~A~.
+- *function* is used to define sideconditions. It takes an identifier, a pairwise list of (~x~, ~A~), which is the arguments to the function,
+  then a return type and a body. It will check the body with the parameters added to a context, and then match the type of the program body with the return type.
+- *check* will take a single argument, a term or a type, and then typecheck it.
+The intention here is that *declare* and *function* is allowed only in the signature definitions, which defines the formal system, and then
+a user can utilize *define* and *check* to construct a proof under the formal system defined in the signature.
 
 For the term language the following symbols are used:
 | Abstract Syntax | Concrete Syntax |
 |-----------------+-----------------|
 | \Pi x : A . B     | ! x A B         |
-| A : M           | : A M           |
-| \lambda x : M N       | # x M N         |
-| \lambda x N           | \ x N           |
+| M : A           | : A M           |
+| \lambda x : A . M     | # x A M         |
+| \lambda x . N         | \ x N           |
 | let x M N       | @ x M N         |
 | { S T }         | ^ S T           |
 | *               | _               |
 
-The sidecondition language directly uses the keywords marked with bold in the previous sections.
+The side condition language directly uses the keywords marked with bold in the previous sections.

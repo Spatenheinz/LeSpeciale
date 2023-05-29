@@ -1,18 +1,46 @@
-We define two functions for typechecking. One takes a term ~term~ and a ~Value~ ~t2~ and check against it.
-The other takes a sideconditions as first argument, but essentially does the same.
+We define two functions for typechecking. One takes a term ~term~ and a ~t2~ and check against it.
+The other takes a sideconditions as first argument, but otherwise essentially does the same. The one defined for terms can be seen in Figure \ref{fig:checkimpl}.
+
+#+begin_export latex
+\begin{figure}[h!]
+\begin{lstlisting}
+pub fn check(&self, term: &'ctx AlphaTerm<T>, tau: RT<'ctx, T>) -> TResult<(), T>
+{
+    match term {
+        AlphaTerm::Lam(body) => {
+            if let Value::Pi(_, a,b) = tau.borrow() {
+                let val = b(mk_neutral_var_with_type(a.clone()),
+                            self.gctx)?;
+                let env = self.update_local(a.clone());
+                return env.check(body, val)
+            }
+            Err(TypecheckingErrors::NotPi)
+        },
+        _ => {
+            let t = self.infer(term)?;
+            self.same(t, tau)
+        }
+    }
+}
+\end{lstlisting}
+\caption{Typechecking a term}
+\label{fig:inferapp}
+\end{figure}
+#+end_export
 
 We match on ~term~ and if it an anonymous lambda then we check /LAM/-rule of Figure \ref{fig:tylfsc},
 otherwise we infer the type of the ~term~ to ~t1~ and check ~t2~ and ~t1~ for definitional equality.
 
-This process is two-fold. Firstly we do a value comparison between ~t1~ and ~t2~. If not succesful we convert them
+This process is two-fold and can be seen in code below.
+Firstly we do a value comparison between ~t1~ and ~t2~. If not succesful we convert them
 to their canonical form using reification and check for equality.
-Generally we cannot compare values, as functions such as ~Pi~ has a closures inside it that cannot easily be compared.
-The main reason for the ~ref_compare~ call, is to fill holes.
+Generally we cannot compare values, as functions such as ~Pi~ has a closure inside it that cannot easily be compared.
+The main reason for the ~ref_compare~ call is to fill holes.
 The function return a boolean of the equality between the two values, and as long as the values are one of the simple types or
 syntactically same neutrals it returns true.
 If one of the arguments is a hole it is filled with the other value.
 This is done using the interior mutability of Refcells.
-We must do it this way, as holes cannot be filled after reading back values as a hole might occur in multiple places and we must ensure
+We must do it this way, as holes cannot be filled after reading back values because a hole might occur in multiple places and we must ensure
 that it is filled with the same value.
 Empirically, the ~ref_compare~ will return ~true~ most of the time.
 In case it returns ~false~, we reify the values into their normal form and compare them.

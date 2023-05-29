@@ -12,6 +12,9 @@
 #+LATEX_HEADER: \usepackage[table, xcdraw]{xcolor}
 #+LATEX_HEADER: \usepackage{titlesec}
 #+LATEX_HEADER: \usepackage{float}
+#+LATEX_HEADER: \usepackage{caption}
+#+LATEX_HEADER: \captionsetup{belowskip=0pt}
+#+LATEX_HEADER: \setlength{\belowcaptionskip}{-10pt}
 
 % Setup for the official front page from KU
 #+LATEX_HEADER: \usepackage[english, science, titlepage]{Preamble/ku-frontpage}

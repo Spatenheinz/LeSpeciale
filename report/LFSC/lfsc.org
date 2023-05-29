@@ -2,10 +2,10 @@
 :PROPERTIES:
 :CUSTOM_ID: sec:lfsc
 :END:
-LFSC\cite{lfsc} is a extention of the Edinbourgh Logical Framework (LF)\cite{lf} and is a predicative typed lambda calculus with dependent types. This allow proof systems to be encoded as signatures, which amounts to a set of typing declarations. LFSC extends LF by including side conditions. In this context sideconditions refers to a functional programming language with an operational semantic which is evaluated during typechecking.
+LFSC\cite{lfsc} is a enxtention of the Edinbourgh Logical Framework (LF)\cite{lf} and is a predicative typed lambda calculus with dependent types. This allow proof systems to be encoded as signatures, which amounts to a set of typing declarations. LFSC extends LF by including side conditions. In this context side conditions refers to a functional programming language with an operational semantic which is evaluated during typechecking.
 Section \ref{sec:syntax} gives an introduction to the abstract syntax of LFSC.
-Section \ref{sec:signatures} describes the /signatures/ and /contexts/ under which typing is judged and then we describe the typing rules and the operational semantics of the side conditions in \ref{sec:typing} \ref{sec:operational}.
-Lastly we briefly introduce the concrete syntax in \ref{sec:concrete} and then we present a "small" example that shows that \(P \wedge \neg P\) is unsatisfiable.
+Section \ref{sec:signatures} describes the /signatures/ and /contexts/ under which typing is judged and then we describe the typing rules and the operational semantics of the side conditions in \ref{sec:typing} and \ref{sec:operational}.
+Lastly we briefly introduce the concrete syntax in \ref{sec:concrete} and then we present a small example that shows that \(P \wedge \neg P\) is unsatisfiable using LFSC.
 
 ** Abstract Syntax
 :PROPERTIES:
@@ -25,7 +25,7 @@ Lastly we briefly introduce the concrete syntax in \ref{sec:concrete} and then w
 :END:
 #+include: typing.org
 
-** Operational Semantics of Sideconditions
+** Operational Semantics of Side conditions
 :PROPERTIES:
 :CUSTOM_ID: sec:operational
 :END:

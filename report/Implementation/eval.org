@@ -1,6 +1,6 @@
-We define evaluation on two levels, both on terms and on the functional side condition language.
+We define evaluation on two levels, namely on terms and on the functional side condition language.
 Evaluation of the term language is straightforward.
-Sideconditions and holes cannot be evaluated.
+Side conditions pairs and holes cannot be evaluated.
 Application have a similar structure to ~infer~.
 We consider applications in applicative order evaluation with a loop over the arguments.
 The function ~do_app~ is then called with the function and the evaluated argument:
@@ -22,23 +22,25 @@ match f.borrow() {
 }
 }
 #+end_src
-Functions can be either a concrete lambda abstraction in which we simply evaluate the closure or
-a function can also be unknown.
-If this the case, we check that the type of the neutral value is a function type.
-We construct a new neutral value, where the type of the neutral value is the range of the \Pi and the value is an application of the
+Functions can be either a concrete lambda abstraction in which we simply evaluate the closure, or
+a it can be unknown.
+If this is the case we check that the type of the neutral value is a function type.
+We construct a new neutral value, where the type of the neutral value is the range of \Pi and the value is an application of the
 unknown value onto the normal expression (~dom~, ~arg~). stating that ~arg~ has type ~dom~.
-For instance if we consider the application (f x y), where f :: a -> b -> c,
+For instance if we consider the application $(f x y)$, where $f :: a -> b -> c$,
 then we construct:
 \[Neu( b -> c, f (x : a))\]
 by the first application and
 \[Neu(c, (f (x : a)) (y : b))\]
 after the second application.
-To come full circle, if we want to read back, we will get (f x y) since it is already in normal form.
+To come full circle, if we want to read back, we will get $(f x y)$ since it is already in normal form.
 
 Evaluation of \Pi terms are also interesting. For standard \Pi constructs,
 we simply evaluate the domain, construct a closure around the body, check if the bound variable is free in the range
-and construct a Pi value.
-More interesting, if the domain of a \Pi is a sidecondition, we evaluate the sidecondition and the target and check for equivalence.
+and construct a ~Pi~ value.
+More interesting, if the domain of a \Pi is a sidecondition, we evaluate the side condition and the target and check for equivalence.
 Lastly the result is inserted in the local context and the body is evaluated.
-This is what enables execution of sideconditions in the typechecking.
-\footnote{should i mention anything about evaluation of sideconditions?}
+This is what enables execution of side conditions in the typechecking.
+
+Side conditions on the other hand may only be evaluated, when part of \Pi type.
+We evaluate the sidecondition language by the ~sc~ function, which follow the operational semantics in Figure \ref{fig:operational}.

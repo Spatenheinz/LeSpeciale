@@ -5,22 +5,10 @@ Terms are denoted by /M/, /N/ and /O/ and are used as syntactical entities, proo
 Types are denoted by /A/ and /B/ and used for classification of Terms, and to the describe judgements and assertions.
 Kinds are denoted by K and is used to classify types.
 
-We use ~x~ to be a metavariable ranging over the set of variables that might occur in terms,
-~c~ to denote constants in terms, i.e. free variables.
-~a~ will range over constants in types.
-Sideconditions is denoted by /S/ and /T/ and /U/.
-Patterns describes pattern in side condition match cases and is denoted by /P/.
-Primitives and keywords of the side condition language are represented in *bold*.
-~z~ and ~q~ are metasymbols representing integers and rationals.
-$*$ represents a hole, which might be any term.
-Both \Pi and \lambda are abstractions which bind the varaible in the body.
-type annotations are given by $:$ and $\{S \; M\}$ is a pair.
-
-#+caption: Syntactical categories of LFSC
-#+label: fig:lfscsyntax
+#+begin_export latex
 \begin{figure}[h!]
 \begin{align*}
-K \; ::=& \; \mathbf{type} \; | \; \mathbf{type}^c \; | \; \mathbf{kind} \; | \; \pilf{x}{A}{K} \; | \; \mathbf{mpz} \; | \mathbf{mpq} \\
+K \; ::=& \; \mathbf{type} \; | \; \mathbf{type}^c \; | \; \mathbf{kind} \; | \; \pilf{x}{A}{K} \; | \; \mathbf{integers} \; | \mathbf{rationals} \\
 A,B \; ::=& \; a \; | \; A \; M \; | \; \pilf{x}{\{S \; M\}}{A} \; | \; \pilf{x}{A}{B} \\
 M,N,O \; ::=& \; x \; | \; c \; | \; z \; | \; q \; | \; * \; | \; M : A \; | \mathbf{let} \; x \; M \; N \; | \; \lambda x . M \; | \; \lambda x : A . M \; | \; M \; N \\
 P \; ::=& \; c \; | \; c \; x_1 \dots x_n \\
@@ -29,4 +17,16 @@ S,T,U \; ::=& \; x \; | c \; | \; - S \; | \; S \oplus S \; | \; c \; S_1 \dots 
 & \; \mathbf{ifneg} \; S \; T \; U \; | \mathbf{ifzero} \; S \; T \; U \; | \mathbf{ifmarked} \; S \; T \; U \; |  \; \mathbf{ztoq} \; S\\
 \oplus \; \in& \; \{+, /, *\cdot\}
 \end{align*}
+\caption{Syntactical categories of LFSC}
+\label{fig:lfscsyntax}
 \end{figure}
+#+end_export
+
+We use $x$ to be a metavariable ranging over the set of variables that might occur in terms, $c$ to denote constants in terms, i.e. free variables. $a$ will range over constants in types.
+Sideconditions is denoted by /S/ and /T/ and /U/.
+Patterns describes pattern in side condition match cases and is denoted by /P/.
+Primitives and keywords of the side condition language are represented in *bold*. $z$ and $q$ are metasymbols representing integers and rationals.
+$*$ represents a hole, which can be filled with any term in the typechecking process.
+Both \Pi and \lambda are abstractions which bind the varaible in the body.
+type annotations are given by $:$ and $\{S \; M\}$ is a pair.
+

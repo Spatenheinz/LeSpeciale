@@ -1,7 +1,7 @@
 We use ~nom~ for parsing. ~nom~ is a parser combinator library that has evolved over the years from being mainly driven by macros
-to in version 7 using composable closures. It is mainly focused around parsing bytes and hereby also ~str~.
+,to in version 7, using composable closures. It is mainly focused around parsing bytes and hereby also ~str~.
 
-Taking the topmost function ~parse_file~ we structure it by compostion as such:
+Taking the topmost function ~parse_file~ we structure it by composition as such:
 #+begin_src rust
 pub fn parse_file(it: &str) -> IResult<&str, Vec<StrCommand>> {
     delimited(ws, many0(parse_command), eof)(it)
@@ -14,11 +14,6 @@ We can parse term binders as such:
 fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
     alt((
         map(
-            preceded(alt((reserved("let"),reserved("@"))),
-                          tuple((parse_ident, parse_term, parse_term))),
-            |(var, val, body)|  binder!(let var, val, body)
-        ),
-        map(
             preceded(alt((reserved("pi"),reserved("!"))),
                      tuple((parse_ident, parse_term, parse_term))),
             |(var, ty, body)| binder!(pi, var : ty,  body),
@@ -27,9 +22,10 @@ fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
     ))(it)
 }
 #+end_src
-We parse the different aspects of a binder, indentifier, binding term and the bound term and the construct the appropriate binder.
-For terms in general, we must ensure the parser the parser to be robust and able to handle arbitrary nesting of parenthesis.
-So when parsing nonterminal terms, we first parse an open parenthesis followed by ~parse_term_~, we then try to parse a binder followed by a closed parenthesis\footnote{here binders also include : and ^}. If we fail it must be a terminal or an application if we can parse multiple terms.
+We parse the different aspects of a binder, indentifier, binding term and the bound term, and then construct the appropriate binder.
+
+For terms in general we must ensure the parser to be robust and able to handle arbitrary nesting of parentheses.
+So, when parsing nonterminal terms, we first parse an open parenthesis followed by ~parse_term_~. We then try to parse a binder followed by a closed parenthesis\footnote{here binders also include : and \^}. If we fail it parse a term or, if we can parse multiple terms, an application, as shown below.
 #+begin_src rust
 pub fn parse_term(it: &str) -> IResult<&str, Term<&str>> {
     alt((
@@ -39,11 +35,8 @@ pub fn parse_term(it: &str) -> IResult<&str, Term<&str>> {
        open_followed(parse_term_),
     ))(it)
 }
-
 fn parse_term_(it: &str) -> IResult<&str, Term<&str>> {
-    if let res @ Ok(..) = terminated(parse_binder, closed)(it) {
-        return res;
-    }
+    if let res @ Ok(..) = terminated(parse_binder, closed)(it) {return res;}
     let (rest, head) = parse_term(it)?;
     let (rest, tail) = many0(parse_term)(rest)?;
     let (rest, _) = closed(rest)?;
@@ -54,5 +47,3 @@ fn parse_term_(it: &str) -> IResult<&str, Term<&str>> {
     }
 }
 #+end_src
-
-At the moment no parser for De Bruijn syntax exists, however modifying this parser would not require much.

@@ -106,3 +106,33 @@ We need reference counting for our implementation.
 It is easy to remove this restriction, but may make a potential PCC implementation harder to get merged into the upstream Linux.
 
 It is possible to compile crates that support a ~no_std~ feature (it relies on ~alloc~ and ~core~) and that also does no infallible memory allocations. One example of a library that does this is parser-combinator library ~nom~, which we use for parsing.
+
+*** Reference Counting
+In the implementation we make heavye use of reference counting, and we must therefore forego the ~no_rc~ restriction.
+We use compile time references when possible to not unnecessarily create new objects.
+When compile time references are not possible, because we dont know the owner of a value and thus also not the lifetime of it, we instead use reference counted pointers.
+Most of the functions we describe returns values. The ownership will then lie at the caller of the function,
+but in some cases the owner of a result value may be the context we does typechecking with respect to. This for instance happen when inferring the type of a constant.
+Furthermore because of the lifetime guarantee there is no way to create a value and return a reference to it.
+
+The reference counted smartpointer looks as follows:
+#+begin_src rust
+pub struct Rc<T: ?Sized> {
+    ptr: NonNull<RcBox<T>>,
+    phantom: PhantomData<RcBox<T>>,
+}
+#+end_src
+An Rc is nothing more than a struct that contains a pointer to the inner value that is referenced and a phantom field.
+The phantom field is merely there to keep strong static typing in a similar way to a phantom type in Haskell.
+The ~ptr~ in this struct points to the following struct:
+#+begin_src rust
+#[repr(C)]
+struct RcBox<T: ?Sized> {
+    strong: Cell<usize>,
+    weak: Cell<usize>,
+    value: T,
+}
+#+end_src
+This contains the values and the counts for strong and week reference counts.
+Whenever the ~Rc~ is cloned we simply take the ~RcBox~ inside of ~Rc~, increment the pointer, and construct a new ~Rc~ struct. The ease of use then comes from the ~Drop~ trait which will either decrement the count in the ~RcBox~ and drop the ~Rc~ or it will drop both if the strong count is 0.
+Hence we can easily create new references without knowing the owner, as it does not matter since they are deallocated automatically. This gives some overhead compared to regular references but is highly likely more efficient that cloning.

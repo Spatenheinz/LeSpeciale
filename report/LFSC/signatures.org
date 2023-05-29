@@ -2,14 +2,17 @@ In LFSC there are two constructs we use to keep track of variables and constants
 Contexts are used to assign types to variables.
 we write them as in Figure \ref{fig:context} and use we use \Sigma, \Sigma' to denote the concatenation of the two signatures \Sigma and \Sigma' and similarly for contexts.
 
-#+caption: Syntactical categories of LFSC
-#+label: fig:context
+#+begin_export latex
 \begin{figure}[h!]
 \begin{align*}
 \Sigma \; ::=& \; \lra{} \; \mid \; \Sigma,a : K \; \mid \; \Sigma,c : A \\
-\Gamma \; ::=& \; \lra{} \; \mid \; \Gamma, x: A\\
+\Gamma \; ::=& \; \lra{} \; \mid \; \Gamma, x: A
 \end{align*}
+\caption{Signatures and Contexts}
+\label{fig:context}
 \end{figure}
+#+end_export
+
 
 The typesystem of LFSC is syntax directed meaning there exists only a single typing rule for each syntactical object.
 We achieve this by bidirectional typing.
@@ -23,14 +26,16 @@ All assertions has one of the following forms.
 \vdash_\Sigma \ \Gamma & \qquad (\Gamma\ \text{is a valid context in} \ \Sigma)\\
 \Gamma \ \vdash_\Sigma K & \qquad (K \ \text{is a kind in \(\Gamma\) and \(\Sigma\)})\\
 \Gamma \ \vdash_\Sigma M \Leftarrow A & \qquad (M \ \text{can be checked to have type \(A\) in \(\Gamma\) and \(\Sigma\)})\\
-\Gamma \ \vdash_\Sigma M \Rightarrow A & \qquad (M \ \text{can be infered to have type \(A\) in \(\Gamma\) and \(\Sigma\)})\\
+\Gamma \ \vdash_\Sigma M \Rightarrow A & \qquad (M \ \text{can be inferred to have type \(A\) in \(\Gamma\) and \(\Sigma\)})
 \end{align*}
 #+end_export
+The notion of inference here describes the type-level semantic of an object, meaning if there is a judgement from $M$ that gives $A$, then $M \Rightarrow A$.
+The notion of checking a type we consider to be $\beta\eta$ equivalence. Specifially $M \Leftarrow A \equiv (M : B) \wedge (B \equiv_{\beta\eta} A)$.
 
 The validity of signatures is depicted in Figure \ref{fig:validsig}.
-The empty signature is valid. The concatenation of singatures are valid if,
+The empty signature is valid. The concatenation of singatures are valid if
 \Sigma is valid and the constant is not present in the context. For /KIND-SIG/ $K$ must be valid in \Sigma, while
-for /TYPE-SIG/ we require the $A$ can be inferred to have type $K$.
+for /TYPE-SIG/ we require that $A$ can be inferred to have type $K$.
 #+caption: Valid signatures
 #+label: fig:validsig
 \begin{figure}[h!]
@@ -48,8 +53,9 @@ for /TYPE-SIG/ we require the $A$ can be inferred to have type $K$.
 \end{equation*}
 \end{figure}
 
-An empty context is valid under \Sigma given the validity of \Sigma. For concatenation $x$ must not occur in \Sigma but can
-occur in \Gamma, and again we require that $A$ can be inferred as any kind, as seen in Figure \ref{fig:validctx}
+Figure \ref{fig:validctx} depicts validity of cntexts. An empty context is valid under \Sigma given the validity of \Sigma. For concatenation $x$ must not occur in \Sigma but can
+occur in \Gamma, and again we require that $A$ can be inferred as any kind.
+
 #+caption: Valid contexts
 #+label: fig:validctx
 \begin{figure}[h!]

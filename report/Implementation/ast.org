@@ -1,4 +1,4 @@
-Despite being similar to C and CPP in syntax, Rust provides a much richer typesystem that allow us to create enumerations with fields, a.k.a Sum types.
+Despite being similar to C and C++ in syntax, Rust provides a much richer typesystem that allow us to create enumerations with fields, a.k.a Sum types.
 We might for instance define a construction for Identifiers as such:
 #+begin_src rust
 pub enum Ident<Id> {
@@ -8,7 +8,7 @@ pub enum Ident<Id> {
 #+end_src
 An identifier can either be a Symbol if it is free or a De Bruijn index if it is bound.
 Terms are then defined almost identical to the abstract syntax.
-The major difference comes from the way we represent binders.
+The major difference comes from the way we represent binders like so:
 #+begin_src rust
 pub enum BinderKind {
   Pi,
@@ -29,7 +29,7 @@ We use an option type as \lambda abstractions might contain an annotation but ca
 This structure is convenient in the frontend representation of the language as this allow for simpler \alpha-normalization.
 In the backend language we split this structure into seperate constructors of the ~AlphaTerm~ enum.
 A similar structure is used for the side condition language.
-
+The ~AlphaTerm~ sum type looks as follows.
 #+begin_src rust
 pub enum AlphaTerm<Id> {
     Number(Num),
@@ -48,5 +48,5 @@ We parameterize ~AlphaTerm~ by ~Id~ which is the data representation of symbols.
 In the specific implementation we consider a ~&str~, which is a reference to a fixed sized string.
 We use this type over a ~String~ type because it is more efficient and there is no need for a term to
 own the string.
-Having terms parameterized by the ~Id~ type allow for easily convertion to De Bruijn levels instead of
+Having terms parameterized by the ~Id~ type allow for easy convertion to De Bruijn levels instead of
 string identifiers.

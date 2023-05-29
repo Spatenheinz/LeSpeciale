@@ -1,11 +1,13 @@
 Reification or reading back semantical objects into the term language is type directed.
 ~read_back~ takes a type and a value as arguments.
-first the term to be read back is check to be neutral, if that is the case then we call ~read_back_neutral~, since ~Neutral~'s encode their own type.
+First the term to be read back is checked to be neutral, and if that is the case then we call ~read_back_neutral~ since ~Neutral~'s encode their own type. Figure \ref{fig:readbackneu} shows the ~read_back_neutral~ function.
 
-Variables can be read back directly, holes either get read back as its inner value or as a term language hole.
-Application will read back the function point and then argument point. And construct an application from it.
+Variables can be read back directly. Holes either get read back as its inner value or as a term language hole.
+Application will read back the function point and then argument point, and construct an application from it.
 Be aware here that the argument point is a ~Normal~ type. It will thus call ~read_back~ with its type and val.
-#+begin_src rust
+#+begin_export latex
+\begin{figure}[h!]
+\begin{lstlisting}
 fn readback_neutral(&self, neu: Rc<Neutral<'term, T>>)
                     -> TResult<AlphaTerm<T>, T>
 {
@@ -24,9 +26,15 @@ fn readback_neutral(&self, neu: Rc<Neutral<'term, T>>)
         },
     }
 }
+\end{lstlisting}
+\caption{Reification of neutral terms}
+\label{fig:readbackneu}
+\end{figure}
+#+end_export
+#+begin_src rust
 #+end_src
 
-If the value of ~read_back~ is not neutral, we patternmatch on the type.
+If the value of ~read_back~ is not neutral we patternmatch on the type.
 If the type is \mathcal{Z} or \mathcal{Q} then we can read back integers and rationals respectively.
-All built in types can be readback to the built in terms.
-Pi types can be read back by reading back the domain, then evaluate the body and read the body back.\footnote{should i add more here?}
+All built in types can be readback to the builtin terms.
+~Pi~ types can be read back by reading back the domain, then evaluate the body and read the body back.

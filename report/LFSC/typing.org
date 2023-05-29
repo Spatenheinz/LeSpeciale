@@ -2,11 +2,11 @@ With the signature and contexts we can define the typing rules for LFSC.
 For the entire section we brevitate $\vdash_\Sigma$ to $\vdash$ and it is assumed $\Sigma$ is valid.
 
 *** Lookup
-Figure \ref{fig:tylookup} describes type inference with respect to the signatures and contexts. That is, they contain all rules that where variables or constants are inferred wrt. the signature and context.
-Given that \Gamma and \Sigma is valid, we can infer the build in types *type* and *type^c* to be *kind*.
+Figure \ref{fig:tylookup} describes type inference for variables, constants and built in types. That is, they contain all rules where variables or constants are inferred w.r.t. the signature and context.
+Given that \Gamma and \Sigma is valid, we can infer the built in types *type* and *type^c* to be *kind*.
 Notice here that *type* and *type^c* are kinds which describes types, whereas *kind* describes kinds.
 Notice further that *kind* cannot be inferred and thus ensures that no type contains itself hence providing a consistent metalogic.
-constants can be inferred either as a kind or a type respcetively if they appear in the signature, whereas object level variables must occur in the context.
+Constants can be inferred either as a kind or a type respectively if they appear in the signature, whereas object level variables must occur in the context.
 #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
@@ -18,10 +18,10 @@ constants can be inferred either as a kind or a type respcetively if they appear
 \end{equation*}
 \begin{equation*}
 \inference[MPZ ]{\vdash \Gamma}
-{\Gamma \vdash \mathbf{mpz} \Rightarrow \mathbf{type}}
+{\Gamma \vdash \mathbf{integer} \Rightarrow \mathbf{type}}
 \qquad
 \inference[MPQ ]{\vdash \Gamma}
-{\Gamma \vdash \mathbf{mpq} \Rightarrow \mathbf{type}}
+{\Gamma \vdash \mathbf{rational} \Rightarrow \mathbf{type}}
 \end{equation*}
 
 \begin{equation*}
@@ -43,12 +43,6 @@ constants can be inferred either as a kind or a type respcetively if they appear
 
 *** Terms and Types
 Figure \ref{fig:tylfsc} describes the bidirectional typing of LFSC.
-
-- /ANN/ states that given object /M/ can be checked to have type /A/, then the annotation can be inferred to type /A/.
-- /LAM-ANN/ states that a bound variable /x/ has type /A/ in /M/ can be inferred as a \(\Pi x : A. B\), given that /A/ is *type* and that /M/ can be inferred as /B/ with \(x : A\) added to the environment.
-- Lambda abstractions, /LAM/, is the only type that we cannot directly infer, but instead must be checked to be a function type. A lambda a is valid function type if the body /M/ can be inferred as /B/ with \(x : A\) added to the context.
-- Both /TYPE-APP/ and /APP/ states that the function point (left construct) must be a function type and that the argument (right construct) can be checked to be the type of domain of the function type, then an application can be inferred as the substitution of the operand with the /x/ in the construct describing the range of the function.
-- /APP-SC/ is where the type system of LFSC differs from that of LF. If the type of $M$ is a function type, where the range itself is a function type with a side condition as domain, then $N$ will be checked to have type $A$ and the sidecondition $S$ is evaluated by its operations semantics, and must result in $O$.
 #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
@@ -80,11 +74,16 @@ Figure \ref{fig:tylfsc} describes the bidirectional typing of LFSC.
 
 \begin{equation*}
 \inference[APP ]{ \context \synth{M}{\Pi x : A. \ B} & \context \tycheck{N}{A} }
-{\context \synth{M \; N}{\subst{N}{x}{M}} }
+{\context \synth{M \; N}{\subst{N}{x}{B}} }
 \end{equation*}
 
 \begin{equation*}
-\inference[APP-SC ]{ \context \synth{M}{\Pi x_1 : A. (\Pi x_2 : \{S \; O\}. B)} & \context \tycheck{N}{A} & |\Sigma| \vdash \epsilon;\subst{M}{x}{S} \downarrow \subst{M}{x}{O};\sigma}
+\inference[APP-HOLE ]{ \context \synth{M}{\Pi x : A. \ B}}
+{\context \synth{M \; *}{\subst{*}{x}{B}} }
+\end{equation*}
+
+\begin{equation*}
+\inference[APP-SC ]{ \context \synth{M}{\Pi x_1 : A. (\Pi x_2 : \{S \; O\}. B)} & \context \tycheck{N}{A} & |\Sigma| \vdash \epsilon;\subst{N}{x}{S} \downarrow \subst{N}{x}{O};\sigma}
 {\context \synth{M \; N}{\subst{N}{x_1}{B}} }
 \end{equation*}
 
@@ -100,20 +99,28 @@ Figure \ref{fig:tylfsc} describes the bidirectional typing of LFSC.
 \caption{Bidirectional typing rules for LFSC}
 \label{fig:tylfsc}
 \medskip
+\medskip
 \small
 Here $\subst{M}{x}{K}$, denotes the substitution of $M$ with $x$ in $K$. The letter $C$ is either a type or a kind.
-$|\Sigma|$ denotes all sidecondition function definitions in $\Sigma$.
+$|\Sigma|$ denotes all side condition function definitions in $\Sigma$.
 \end{figure}
 #+end_export
+
+- /ANN/ states that given object /M/ can be checked to have type /A/, then the annotation can be inferred to type /A/.
+- /LAM-ANN/ states that a bound variable /x/ has type /A/ in /M/ can be inferred as a \(\Pi x : A. B\), given that /A/ is *type* and that /M/ can be inferred as /B/ with \(x : A\) added to the environment.
+- Lambda abstractions, /LAM/, is the only type that we cannot directly infer, but instead must be checked to be a function type. A lambda is a valid function type if the body /M/ can be inferred as /B/ with \(x : A\) added to the context.
+- Both /TYPE-APP/ and /APP/ states that if the function point (left construct) is a function type and that the argument (right construct) can be checked to be the type of domain of the function type, then an application can be inferred as the substitution of the operand with the /x/ in the construct describing the range of the function.
+- /APP-HOLE/ is the only rule where a hole might occur. It may only occur as argument in an application. We dont type check it as it is trivially the correct term, but the first time a hole occurs as part of a check it will be filled with the other value, continuing to have the type of the other term.
+- /APP-SC/ is where the type system of LFSC differs from that of LF. If the type of $M$ is a function type where the range itself is a function type with a side condition as domain, then $N$ will be checked to have type $A$ and the side condition $S$ is evaluated by its operational semantics, and must result in $O$.
 
 
 *** Side conditions
 For easier readability we split the side condition language into three subcategories:
-1. *numerical* side conditions focused around numerical values.
-2. *side effects* side conditions can update the state in evaluation.
-3. *compound* side conditions are construct that dont fall into the other categories.
+1. *numerical* side conditions that focused around numerical values.
+2. *side effects* side conditions that can update the state in evaluation.
+3. *compound* side conditions that are construct that dont fall into the other categories.
 
-For numerical sideconditions the rules are straight forward. They are represented for *integer* in \ref{fig:tynum} but work similarly for rational, except for Z-TO-Q, which as the name suggest requires $S$ to be of type *integer*.
+For *numerical sideconditions* the rules are straight forward. They are represented for *integer* in Figure \ref{fig:tynum} but work similarly for *rational*, except for Z-TO-Q, which as the name suggest requires $S$ to be of type *integer*.
 /IFNEG/ and /IFZERO/ are branching constructs where the condition must be one of the two number types and the branches must have the same type.
 #+begin_export latex
 \begin{figure}[h!]
@@ -144,8 +151,8 @@ For numerical sideconditions the rules are straight forward. They are represente
 \end{figure}
 #+end_export
 
-For side effects rules we have that /LET-SC/ works as its counter part, and /DO/ is mere syntactical sugar for /LET/ but with the binding of a variable.
-/MARKVAR/ will simply return the type the inner sidecondition and /IFMARKED/ will check the "marked" sidecondition /S/ and check that the two branches have the same type, resulting in the type of the branches.
+For *side effects* rules we have that /LET-SC/ works as its counter part, and /DO/ is mere syntactical sugar for /LET/ but with the binding of a variable, as can be seen from Figure \ref{fig:tyside}
+/MARKVAR/ will simply return the type of the inner side condition and /IFMARKED/ will check the "marked" side condition /S/ and check that the two branches have the same type, with the type of the branches as the resulting type.
  #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
@@ -164,18 +171,18 @@ For side effects rules we have that /LET-SC/ works as its counter part, and /DO/
 \inference[DO ]{\context \synth{S}{A} & \context \synth{T}{B} }
 {\context \synth{\mathbf{do} \; S \; T}{B} }
 \end{equation*}
-\caption{Typing rules for sideeffects}
+\caption{Typing rules for side effects}
+\label{fig:tyside}
 \end{figure}
 #+end_export
 
-
-Compound sideconditions may be a *fail*, described by the /FAIL/ rule, which simply typechecks the inner value.
+*compound* sideconditions is seen in Figure \ref{fig:tycompound} may be a *fail*, described by the /FAIL/ rule, which simply typechecks the inner value.
 The reason *fail* must take an argument is that we have no polymorphic type $\forall \alpha. \alpha \rightarrow \alpha$ under dependent types.
 For /IFEQ/ \(S_1\) and \(S_2\) must have the same type and the branches
 \(T_1\) and \(T_2\) must equally have the same type.
-Match statement work similar to other functional languages and
-given the scrutinee \(S\) can be inferred as \(A\) then for all match cases \(P_i\) must also be inferreable as /A/, whilst all branches \(T_i\) must be inferreable to the same type /B/. \(\mathbf{ctx}(P_i)\) describes the context created from \(P_i\). concretely
-\(\mathbf{ctx}(P_i) = \lra{}, x_1 : A_1, x_2 : A_2, \dots, x_n : A_n\), when \(P_i = c x_1 \; x_2 \; \dots \; x_n\)
+Match statements work similar to other functional languages;
+given the scrutinee \(S\) can be inferred as \(A\) then for all match cases \(P_i\) must also be inferreable as /A/, whilst all branches \(T_i\) must be inferreable to the same type /B/. \(\mathbf{ctx}(P_i)\) describes the context created from \(P_i\). Concretely
+\(\mathbf{ctx}(P_i) = \lra{}, x_1 : A_1, x_2 : A_2, \dots, x_n : A_n\), when \(P_i = c x_1 \; x_2 \; \dots \; x_n\).
 For applications the function point must not be a dependent function.
 
 #+begin_export latex
@@ -196,7 +203,8 @@ For applications the function point must not be a dependent function.
 \inference[FAIL ]{\context \synth{A}{\mathbf{type}}}
 {\context \synth{\mathbf{fail} \; A}{A} }
 \end{equation*}
-\caption{Typing rules for compound sideconditions}
+\caption{Typing rules for compound side conditions}
+\label{fig:tycompound}
 \end{figure}
 #+end_export
 

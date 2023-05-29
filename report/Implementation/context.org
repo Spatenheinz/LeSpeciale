@@ -1,4 +1,4 @@
-Signatures \Sigma is denoted as ~GlobalContext~ while \Gamma is used for the ~LocalContext~.
+Signatures \Sigma are denoted as ~GlobalContext~ while \Gamma is used for the ~LocalContext~.
 They have a similar interface but internally works quite differently.
 A global context is defined as such:
 #+begin_src rust
@@ -22,8 +22,8 @@ pub enum TypeEntry<'term, Key: BuiltIn>
 #+end_src
 Notice here that this does not directly correspond to our definition in \ref{sec:signatures}.
 - The ~IsA~ construct corresponds directly to \(x : A\), while the other two are defined purely for ease of use.
-- The ~Def~ constructor is used for definitions stating that a constant /c/ is a term /M/ with type /A/. We mainly use this for top-level definition aswell as type inference of let bindings.
-- The ~Val~ is used in extending the environment in evaluation. This constructor can never occur in \Sigma but may occur in $\Gamma$.
+- The ~Def~ constructor is used for definitions stating that a constant /c/ is a term /M/ with type /A/. We mainly use this for top-level definitions as well as type inference of let bindings.
+- ~Val~ is used for extending the environment in evaluation. This constructor can never occur in \Sigma but may occur in $\Gamma$.
   Having this constructor allow us to reuse $\Gamma$ for evaluation.
 
 The global context exposes the following functions:
@@ -35,9 +35,9 @@ pub fn get_type(&self, key: &K) -> ResRT<'term, K>
 #+end_src
 If one tries to get the value of a ~IsA~ type,
 they get a neutral expression consisting of the stored type ~ty~ and a neutral symbol of the key.
-On the other hand if one tries to get the type of ~Val~ then an error occurs.
+On the other hand if one tries to get the type of ~Val~ an error occurs.
 
-The local context exposes a much similar interface but with a different underlying datastructure.
+The local context exposes a much similar interface but with a different underlying data structure.
 The local context is implemented as a linked list using reference counted pointers and much more closely
 represent the concatenation of \Gamma presented in \ref{sec:signatures}.
 #+begin_src rust
@@ -47,7 +47,7 @@ pub enum LocalContext<'a, K: BuiltIn> {
 }
 #+end_src
 
-Most functions we use such as ~eval~, ~infer~ etc, needs to have access to both \Sigma and \Gamma and thus for simplicity we define the following wrapper.
+Most functions we use, such as ~eval~, ~infer~ etc, needs to have access to both \Sigma and \Gamma, and thus for simplicity we define the following wrapper.
 #+begin_src rust
 struct EnvWrapper<'global, 'term, T: Copy> {
     pub lctx: Rlctx<'term, T>,
@@ -55,4 +55,4 @@ struct EnvWrapper<'global, 'term, T: Copy> {
     pub allow_dbi: u32,
 }
 #+end_src
-Here ~Rlctx~ is a type synonym for a reference counted \Gamma. Whereas ~Rgctx~ is a standard reference to \Sigma, with lifetime ~'global~.
+Here ~Rlctx~ is a type synonym for a reference counted \Gamma, whereas ~Rgctx~ is a standard reference to \Sigma with lifetime ~'global~.

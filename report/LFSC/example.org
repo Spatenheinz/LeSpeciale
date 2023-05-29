@@ -1,4 +1,4 @@
-In this Section we give an example of how LFSC can be used to construct proofs.
+In this section we give an example of how LFSC can be used to construct proofs.
 We do so, by explaining a proof that \(P \wedge \neg P \) is unsatisfiable.
 The proof can be encoded by the following commands:
 
@@ -13,27 +13,28 @@ The proof can be encoded by the following commands:
 (and_elim _  _  1 a0)
 (and_elim _  _  0 a0) ff cvc.p))))
 #+end_src
-The program first defines a variable ~cvc.p~ which is an application of the function ~var~ which is used to define free constants under SMT-Lib, it is specifically charaterized by a unique number and a sort.
-This makes ~cvc.p~ unique.
-~cvc.p~ describes the /P/ in the formula above.
 
-Then the proof is constructed by a check command.
+The program first defines a variable ~cvc.p~ by application of the function ~var~, a function used to define free constants under SMT-Lib, and it is specifically characterized by a unique number and a sort.
+This makes ~cvc.p~ unique.
+~cvc.p~ corresponds to the /P/ in the formula above.
+
+The proof is constructed by a check command.
 We first define ~a0~ stating that \(P \wedge (\neg P \wedge \top)\) holds.
-The reason ~true~ is also included, is because SMT-lib considers applications as n-ary functions and these will be represented as
+The reason ~true~ is also included is because SMT-lib considers applications as n-ary functions and these will be represented as
 a null-terminated curried form of higher order application.
 Specifically ~and~ is defined by:
-#+begin_src
+#+begin_src none -n
 (declare apply (! t1 term (! t2 term term)))
 (declare f_and term)
 (define and (# t1 term (# t2 term (apply (apply f_and t1) t2))))
 #+end_src
 
-the body of the check is then an annotation stating that
-line 5-7 should have the type ~holds false~.
-We notice that there are quite a number of holes. these will get filled out as we go.
+The body of the check is then an annotation stating that
+line 5-7 should have the type ~holds false~, meaning we can derive $\bot$ and unsatisfiable.
+We notice that there are quite a number of holes. These will get filled out as we go.
 
 ~resolution~ and ~and_elim~ are declared as follows:
-#+begin_src
+#+begin_src none -n
 (declare resolution (! c1 term
                     (! c2 term
                     (! c term
@@ -49,14 +50,14 @@ We notice that there are quite a number of holes. these will get filled out as w
                   (! r (^ (nary_extract f_and f1 n) f2)  (holds f2)))))))
 
 #+end_src
-We can from these declarations see that the 3 holes on line 5 in Figure \ref{fig:proog}, should match parameters ~c1, c2, c~, these occur later in the type and can therefore be "derived" the latter arguments.
-similarly for ~and_elim~ the hole used for argument ~f1~ will be filled by argument ~p~ because the types must match.
+We can from these declarations see that the 3 holes on line 5 in Figure \ref{fig:proof}, should match parameters ~c1, c2~ and ~c~. These occur later in the type and can therefore be derived from the latter arguments.
+Similarly for ~and_elim~ the hole used for argument ~f1~ will be filled by argument ~p~ because the types must match.
 
-Since the fourth argument of the ~and_elim~ applications are ~a0~, we can syntactically compare ~a0~ and ~(holds f1)~, letting ~f1~ = ~(and cvc.p (and (not cvc.p) true))~.
-Notice here that both applications of ~and_elim~ is provided with 4 arguments. But by the typing rules the inner sidecondition will be evaluated.
-Hence when all types are checked ~nary_extract~ is run.
+Since the fourth argument of the ~and_elim~ applications are ~a0~ we can syntactically compare ~a0~ and ~(holds f1)~, letting ~f1~ = ~(and cvc.p (and (not cvc.p) true))~.
+Notice here that both applications of ~and_elim~ are provided with 4 arguments, even though the type suggest, that it should take 5. However from the typing rules the inner side condition of Figure \ref{fig:tylfsc} will be evaluated,
+hnce when all types are checked ~nary_extract~ is run.
 ~nary_extract~ is defined as:
-#+begin_src
+#+begin_src none -n
 (function nary_extract ((f term) (t term) (n mpz)) term
   (match t
     ((apply t1 t2)
@@ -66,26 +67,27 @@ Hence when all types are checked ~nary_extract~ is run.
 )
 #+end_src
 It will extract the ~n~-th element of an ~f~ application in ~t~.
-so when nary_extract is called with ~f_and~, ~f1~ = ~(and cvc.p (and (not cvc.p) true))~ and ~1~, then by beta reduction we have:
-~f1~ = ~(apply (apply f_and cvc.p) (and (not cvc.p) true))~.
-The only branch of ~nary_extract~ matches this scrutinee and we check if n is 0.
-Since it is not we recursively call extract.
+so when ~nary_extract~ is called with ~f_and~, ~f1~ = ~(and cvc.p (and (not cvc.p) true))~ and ~1~, and we by beta reduction have:
+~f1~ = ~(apply (apply f_and cvc.p) (and (not cvc.p) true))~
+the only branch of ~nary_extract~ matches this scrutinee and we check if ~n~ is ~0~.
+Since this is false we recursively call ~nary_extract~.
 In the next iteration we get:
 ~t~ = ~(apply (apply f_and (not cvc.p)) true))~,
-now ~n~ is also 0 and we call ~getarg~ defined as follows:
-#+begin_src
+now ~n~ is also ~0~ and we call ~getarg~ defined as follows:
+#+begin_src none -n
 (function getarg ((f term) (t term)) term
   (match t ((apply t1 t2) (ifequal t1 f t2 (fail term)))))
 #+end_src
-~t~ now is ~(apply f_and (not cvc.p))~.
+Now ~t~ = ~(apply f_and (not cvc.p))~.
 Since ~t1~ and ~f~ is both ~f_and~ we therefore get ~(not cvc.p)~ back.
+
 This is then checked agains ~f2~ (in the run case of ~and_elim~) and the body ~(holds f2)~ is then checked.
 By similar approch we get ~cvc.p~ from the other application of ~and_elim~.
 
 By now we have established all the arguments to ~resolution~,
 ~c1~ = ~(not cvc.p)~, ~c2~ = ~cvc.p~, ~c~ is still a hole and ~p1~ and ~p2~ is ~(holds (not cvc.p))~ and ~(holds cvc.p)~ respectively.
-and ~sc_resolution~ is evaluated.
-#+begin_src
+Finally ~sc_resolution~ is evaluated.
+#+begin_src none -n
 (function sc_resolution
     ((c1 term) (c2 term) (pol flag) (l term)) term
   (nary_elim f_or
@@ -101,43 +103,19 @@ and ~sc_resolution~ is evaluated.
     false)
   false))
 #+end_src
-at the inner most applications we have calls to ~nary_intro~ which lifts a value into ~n~-ary form.
+At the inner most applications we have calls to ~nary_intro~ which lifts a value into ~n~-ary form.
 The two calls will turn ~c1~ into ~(or c1 false)~ and vice versa.
 ~nary_rm_first_or_self~ will then check if the result of ~nary_intro~ is equivalent to the ~ifequal~ call and return the fourth argument ~false~ if that is the case otherwise it will remove the first occurence of ~f_or~.
-For the application in line 4, the arguments are ~(or (not cvc.p) false) (apply f_not cvc.p) false~.
+For the application in line 4 the arguments are ~(or (not cvc.p) false) (apply f_not cvc.p) false~.
 The first two arguments are not equivalent and thus we remove the first occurence of ~f_or~ in the first argument.
-\beta-reduced the term is ~(apply (apply f_or (not cvc.p)) false)~ hence the result will be ~false~.
+\beta-reducing the term results in ~(apply (apply f_or (not cvc.p)) false)~, hence the result will be ~false~.
 For line 5 we equally get ~false~.
 
-~nary_concat~ will then also return ~false~, since the arguments are not ~n~-ary applications.
+~nary_concat~ will also return ~false~, since the arguments are not ~n~-ary applications.
 We can then clearly not eliminate any ~f_or~ from the expression, thus the result becomes ~false~.
 
-We match hole ~f_2~ in ~resolution~ with the result and get ~holds false~ which is equivlaent to the annotated type,
+We match hole ~f_2~ in ~resolution~ with the result and get ~holds false~ which is equivalent to the annotated type,
 hereby concluding the proof.
 
-From this small example, the takeaway should be that sideconditions can be useful because they allow recursive structure,
-meaning we for instance can extract the $n^{th}$ clause of a conjuction, instead of applying conjunction elimination $n$ times.
-
-
-# apply (apply f_or (not cvc.p)) false
-# apply (apply f_or (apply f_not cvc.p)) false
-# ...
-# let t12 = getarg f t1 => apply f_not cvc.p
-# false
-
-# line 5 ===
-# (or cvc.p false) cvc.p false
-# apply (apply f_or cvc.p) false
-# let t12 = getarg f t1 => cvc.p => false
-
-# nary_concat : false
-# nanry elim f_or false false = default => null
-
-
-
-
-
-# and argument for line 5 (or cvc.p false) (cvc.p). Here the two cases are equivalent to
-
-
-# Although typechecking should be fast, the proofs ma
+From this small example the takeaway should be that side conditions can be useful because they allow recursive structure,
+meaning we for instance can extract the $n^{th}$ clause of a conjunction, instead of applying conjunction elimination $n$ times.

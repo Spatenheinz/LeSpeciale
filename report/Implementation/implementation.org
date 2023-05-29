@@ -2,160 +2,64 @@
 :PROPERTIES:
 :CUSTOM_ID: sec:implementation
 :END:
-In this section we present the implementation, LFSCR. We first some high level design decisions taken
-to reduce the amount of memory needed and to make the typechecking algorithm efficient.
-We then discuss the actual representation of the language and how we process it in terms of parsing and typechecking.
-In this process we discuss why we have chosen the specific Rust features we have with respect to the Linux kernel.
-
-We uses normalization by evaluation with De Bruijn indices and explicit substitutions.
-
-*** De Bruijn Indicies
-From the description of the type semantics in \ref{}, we notice that for a type to be correctly checked it must have definitional equality.
-Using De Bruijn indices makes this process a lot easier since it allows for \alpha-equivalence syntactical equivalence. Specifically with De Bruijn indices, when $\beta\eta$ normal form has been achieved, we get \alpha-equivalence for free.
-De Bruijn indices even further makes the process of beta-reduction easier, as variables dont have to be renamed, i.e. \alpha-convertion.
-Consider application
-\( (\lambda x. \lambda y. x y) y\)
-then if we were to do direct substitution in
-\( \subst{y}{x}{(\lambda y. x y)} \)
-we would get
-\( \lambda y. y y \)
-This changes the meaning of the term.
-De Brujin indices instead swap each bound variable with a positive integer.
-The meaning of the integer $n$ is then constituted by the $n^{th}$ enclosing abstraction, \Pi, \lambda or $let$.
-Specifically if we have the following
-\( \lambda x . \lambda y . \lambda y . x y \) and \( \lambda y . \lambda x . \lambda x . y x \)
-which are on \(\beta\eta\)-long form and alpha-equivalent but not syntactically identical.
-Using De Bruijn notation we get:
-\( \lambda \lambda \lambda 2 0\) for both, since the function point in the inner application is described by the second inner-most binder, starting from zero,  whilst the argument for the application is 0, since it is captured by the innermost abstraction.
-If we again consider \( (\lambda x. \lambda y. x y) y\) the De bruijn representation is
-\( (\lambda \lambda 1 0) y\) and by beta reduction becomes \(\lambda y 0\).
-We only consider De Bruijn notation for bound variables, this way we get around any capture avoiding complications.
-We could potentially also consider using De Bruijn indices for free variables, however this would complicate the code as this would require lifting binders.
-Although it could be interesting to consider De Bruijn levels since these are not relative to the scope.
-
-We also consider De Bruijn indices for other binders such as program definitions, like:
-#+begin_src
-(function sc_arith_add_nary ((t1 term) (t2 term)) term
-  (a.+ t1 t2))
-#+end_src
-will get converted into
-#+begin_src
-(function sc_arith_add_nary ((term) (term)) term
-  (a.+ _1 _0))
-#+end_src
-Where _ denotes a De Bruijn index, to distinguish them from integers.
-
-Similarly in pattern matching, when a constructor is applied to multiple arguments:
-#+begin_src
-  (match t
-    ((apply t1 t2)
-      (let t12 (getarg f t1)
-        (ifequal t12 l tt (nary_ctn f t2 l))))
-    (default ff))
-#+end_src
-gets converted into:
-#+begin_src
-  (match t
-    ((apply 2)
-      (let (getarg f _1)
-        (ifequal _0 l tt (nary_ctn f _1 l))))
-    (default ff))
-#+end_src
-Notice here that the arguments ~t1~ and ~t2~ is substituted by a 2, we need to save the number of arguments to not lose the meaning of the constructor, as they must be fully applied. In the example we also converted the binder of the "let".
-
-*** Explicit substitutions
-We have already touched upon substitution, but another matter at which we shall consider is the sheer cost of direct substitution.
-Performing direct substitution on terms we cause an explosion in the size of the term and unnecessarily waste both memory and execution time because we have to copy the struct at each occurence and also traverse terms multiple times.
-Considering explicit substitution on the other hand allow us to not generate anything unnecessarily large and keep the computation at a minimum.
-We consider a substitution which is lazy, meaning we use the result of a substititution, by lookup, when necessary and then proceed, but does not generate any explicit substitutions.
-Specifically we use Rust closures to capture \Gamma.
+In this section we present the implementation, LFSCR. We first describe some high level design decisions taken
+to reduce the amount of memory needed and to make the typechecking algorithm efficient. We do so in Section \ref{sec:highlevelimpl}.
+In Section \ref{sec:readingimpl} we discuss how to read and format the proofs to a format appropriate for the Linux kernel.
+Lastly we go through the implementation of the typechecker in Section \ref{sec:typeimpl}
 
 
-*** Normalization by Evaluation
-As mentioned, we consider checking of types w.r.t. definitional equality. To do this we must have terms on normal forms, and we use the Normalization by Evaluation (NbE) for this.
-NbE is a process first introduced by Berger and Schwichtenberg\cite{nbe} for efficient normalization of simply typed calculus, but it has since been refined for other systems in Barendregt's lambda cube.
-This implementation is inspired by Christensens writeup "Checking Dependent Types with Normalization by Evaluation"\cite{nbehs}.
-The technique ties a connection between syntax and semantics.
-
-The process of evaluating a programming language amounts to either compilation to machine code and then execution or by an interpreter.
-In both evaluation gives meaning to said program.
-For instance, if the result of an interpretation is a number then the number constitutes the meaning of that program.
-The meaning may not be concrete but can for instance also be functions, and since we consider typechecking that can envoke evaluation values and types live in a similar domain.
-evaluation of LFSC can result in values for the built in types *type*, *kind* and function types such as \Pi types.
-Evaluation in general is only sensible for closed terms, but we must also consider how to handle open terms.
-
-The process of Normalization on the other hand is to transform a program into its normal form.
-Letting \(nf(M)\) denote the normal form of term $M$ with \(\context M : A\),
-then the following properties must hold:
-- \(\context nf(M) : A\)
-- \(\context nf(nf(M)) = nf(M) \)
-- \( \llbracket nf(M) \rrbracket = \llbracket M \rrbracket\)
-That is the normal form has the same type as the original term.
-The normal form is idempotent and cannot be further normalized and
-the meaning does not change when normalizing a term.
-Many functions have these properties, so we further consider the normal form to be expressions which contains no redexes.
-A redex is function type applied directly to an argument.
-Specifically the normalization is considered with respect to \beta-conversion.
-As already mentioned the process of \beta-reduction is slow, since it requires multiple traversals of terms.
-Instead we interpret the understanding of finding a normal form can as evaluation on open terms.
-The result of such an evaluation will not have any meaning; hence not be a value but rather a modified term with possibly unknown values.
-We denote these as neutral expressions. A neutral expression in general may be free variables
-or application where the function point is a neutral, or in the case of LFSC, a hole.
-By including neutrals, we can in fact perform evaluation on open terms.
-We define an evaluation reflection function $T \longrightarrow \llbracket T \rrbracket$ giving mening to terms.
-Then to convert the meaning back into a normal form, we define a reification function $\llbracket T \rrbracket \longrightarrow T$.
-A normal form is then obtained by evaluation followed by reification. We describe the concrete implementation of these in \ref{sec:eval} and \ref{sec:readback}.
+** General implementation choices
+:PROPERTIES:
+:CUSTOM_ID: sec:highlevelimpl
+:END:
+In this section we describe some general consideration for the implementation w.r.t performance.
+In short LFSCR can uses normalization by evaluation with De Bruijn indices and explicit substitutions as techniques.
+#+include: highlevel.org
 
 ** Reading and formatting proofs
+:PROPERTIES:
+:CUSTOM_ID: sec:readingimpl
+:END:
 #+include: reading.org
 
 ** Typechecking LFSC
-In this section we describe the implementation of the type-checkign semantics.
-We start by introducing the value representation obtained by inference and evaluation.
-Then we describe the Signature and Contexts, followed by inference, type-equality and then reification and evaluation at last.
-
-*** IDK WHERE TO PUT THIS
-We use compile time references when we can to not unnecessarily create new objects.
-When compile time references are not possible because we dont know the owner of a value and thus also not the lifetime of it we instead use reference counted pointers.
-Most of the functions we describe returns values. The ownership will then lie at the caller of the function,
-but in some cases the owner of a result value may be $\Sigma$. This for instance happen when inferring the type of a constant.
-Further because of the lifetime guarantee there is no way to create a value and return a reference to it.
-
-The reference counted smartpointer looks as follows:
-#+begin_src rust
-pub struct Rc<T: ?Sized> {
-    ptr: NonNull<RcBox<T>>,
-    phantom: PhantomData<RcBox<T>>,
-}
-#+end_src
-An Rc is nothing more than a struct that contains a pointer to the inner value that is referenced and a phantom field.
-The phantom field is merely there to keep strong static typing in a similar way to a phantom type in Haskell.
-The ~ptr~ in this struct points to the following struct:
-#+begin_src rust
-#[repr(C)]
-struct RcBox<T: ?Sized> {
-    strong: Cell<usize>,
-    weak: Cell<usize>,
-    value: T,
-}
-#+end_src
-Which contains the values and the counts for strong and week reference counts.
-Whenever the ~Rc~ is then cloned we simply take the ~RcBox~ inside of Rc and increment the pointer, and construct a new ~Rc~ struct. The ease of use then comes from the ~Drop~ trait which will either decrement the count in the ~RcBox~ and drop the ~Rc~ or it will drop both if the strong count is 0.
-Hence we can easily create new references, but we dont need to know the owner, but it does not matter since they are deallocated automatically. This gives some overhead compared to regular references but is highly likely more efficient that cloning.
+:PROPERTIES:
+:CUSTOM_ID: sec:typeimpl
+:END:
+In this section we describe the implementation of the type-checking semantics.
+We start by introducing the value representation obtained by inference and evaluation in Section \ref{sec:valimpl}.
+Then we describe the Signature and Contexts in Section \ref{sec:sigimpl} and how we handle commands in \ref{sec:impl}.
+We describe inference in Section \ref{sec:inferimpl}, and typechecking by definitional equality in \ref{sec:checkimpl}.
+Lastly we go over the normalization process by desscribing reification and evaluation in Section \ref{sec:readback} and \ref{sec:eval}.
 
 *** Values
+:PROPERTIES:
+:CUSTOM_ID: sec:valimpl
+:END:
 #+include: values.org
 
 *** Signature and Contexts
+:PROPERTIES:
+:CUSTOM_ID: sec:sigimpl
+:END:
 #+include: context.org
 
 *** Commands
+:PROPERTIES:
+:CUSTOM_ID: sec:comimpl
+:END:
 #+include: commands.org
 
-*** Inferring types.
+*** Inferring Types
+:PROPERTIES:
+:CUSTOM_ID: sec:inferimpl
+:END:
 #+include: infer.org
 
-*** Checking types
+*** Checking Types
+:PROPERTIES:
+:CUSTOM_ID: sec:checkimpl
+:END:
 #+include: checking.org
 
 *** Readback (Reification)
@@ -164,7 +68,7 @@ Hence we can easily create new references, but we dont need to know the owner, b
 :END:
 #+include: readback.org
 
-*** evaluation
+*** Evaluation
 :PROPERTIES:
 :CUSTOM_ID: sec:eval
 :END:
