@@ -1,7 +1,7 @@
 BPF (Berkeley Package Filter) as it was originally presented is a system for effective filtering of network packages by allowing dynamical loading of package filters from userspace into the network stack in kernel space.
 The extended Berkeley Packet Filter (eBPF) was later introduced in the Linux kernel, offering a different approach to kernel extension.
 The eBPF virtual machine leverages the privileges of the kernel to oversee the entire system, enabling more powerful control.
-the eBPF name furthermore refers to a just-in-time (JIT) compiled reduced instruction set computer (RISC). The ecosystem seeks to ensure security by performing static analysis of the limited language.
+The eBPF name furthermore refers to a just-in-time (JIT) compiled reduced instruction set computer (RISC). The ecosystem seeks to ensure security by performing static analysis of the limited language.
 This language is designed not to be turing complete,
 to reduce the number of rejected programs due to limitations in the static analysis.
 In eBPF there are 11 registers, r0-r10, where r0 is used for return values of functions and r10 is a readonly framepointer to a 512 byte stack.
@@ -11,14 +11,14 @@ Instructions can be moves, addition and jumps in a similar manner to other reduc
 The eBPF program loading process is presented in Figure \ref{fig:loader}.
 First step in the process involves obtaining a program using an abstraction tool such as BCC\cite{BCC} or libbpf\cite{libbpf} or writing the program by hand in C macros.
 The ~bpf~ syscall is then invoked and the eBPF bytecode is moved into the kernel.
-The verifier then performs a series of security measures that determines if a program is allowed for loading or rejected.
+The verifier then performs a series of security measures that determines if a program is accepted for loading or rejected.
 The security measures involves static analysis in the form of abstract interpretation using tristate numbers, cycle detection,
 division by zero, and more.
 We describe this in detail in Section \ref{sec:verifier}.
 If a program is determined safe by the verifier, the program is loaded into the kernel, either for interpretation or JIT-compiled depending on the kernel configurations. The program is then attached to a hook.
 
 #+CAPTION: eBPF loading process \cite{loader}
-#+NAME:   fig:laoder
+#+NAME:   fig:loader
 [[./Background/loader.png]]
 
 
@@ -29,10 +29,10 @@ It can interact with both the kernel and user space through a collection of key-
 These data structures also reside in kernel space and are constructed through the ~bpf~ syscall, allowing eBPF programs to read and write to a map. Users can also read and write to the maps using the ~bpf~ syscall, thus serving as a communication layer between eBPF program and user space.
 
 eBPF programs should likewise not been seen as a coherent part of the kernel as it cannot call kernel functions directly.
-The reason for this is that eBPF is designed to be kernel version agnostic\cite{helpers}, and linux kernels functions are not stable.
+The reason for this is that eBPF is designed to be kernel version agnostic\cite{helpers}, and Linux kernel functions are not stable.
 In reality it is not agnostic since different versions of the verifier will reject and accept different programs.
 Instead, the eBPF subsystem provides a stable API of helper functions to provide functionality not immediately accessible in the limited instruction set.
 Furthermore it is possible to have eBPF programs call other eBPF programs, and even chain them together in tail calls similar to
 standard function calls, greatly extending the functionality of eBPF programs.
 
-This subsystem hence serves an opportunity for users to extend the kernel with functionality that may not break the system while still leveraging the powers of the kernel. Unfortunately due to bugs in the verifier, most major Linux distributions such as Ubuntu, Fedora, Redhat and many more, disallow non-root users to load eBPF programs.
+This subsystem hence serves an opportunity for users to extend the kernel with functionality that can run in a sandboxed manner while still leveraging the powers of the kernel. Unfortunately due to bugs in the verifier, most major Linux distributions such as Ubuntu, Fedora, Redhat and many more disallow non-root users to load eBPF programs.

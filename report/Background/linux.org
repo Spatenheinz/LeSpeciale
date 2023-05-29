@@ -1,4 +1,8 @@
 * Background
+:PROPERTIES:
+:CUSTOM_ID: sec:background
+:END:
+
 ** Linux and the eBPF subsystem
 :PROPERTIES:
 :CUSTOM_ID: sec:linux
@@ -7,7 +11,7 @@
 
 ** Proof Carrying Code
 :PROPERTIES:
-:CUSTOM_ID: pcc
+:CUSTOM_ID: sec:pcc
 :END:
 #+include: pcc.org
 
@@ -16,7 +20,3 @@
 
 ** TODO Curry Howard Isomorphism
 #+include: curryhoward.org
-
-
-# ** eBPF
-# #+include: ebpf.org

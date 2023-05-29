@@ -42,11 +42,10 @@ We specifically consider the dependently typed meta framework, Logical Framework
 We describe the semantics of the typecheking and present an implementation.
 
 The report is structured as follows.
-
-Section \ref{sec:linux} gives a brief introduction to the linux kernel
-and how the eBPF subsystem works. In this presentation we elaborate on how the kernel code for loading an eBPF program is
-structured to get an overview of what parts of the verifier is still necessary given a proof carrying code architecture and what parts that can be removed.
-We then describe proof carrying code and describe how this can replace parts of the verifier.
-Lastly, as preliminary analysis, we present a vision for a full PCC code system and argues for the proof checkers place in this
-setup and argue for the highlevel design decisions, before we introduce LFSC and its typing semantics.
-Lastly we evaluate on the implementation and discuss if the prototype can be used in a PCC system down the line.
+In Section \ref{sec:background} we give a brief introduction to eBPF, Proof Carrying Code, Rust and what limitations.
+Then in Section \ref{sec:pccandebpf} we go into detail about how the eBPF verifier works and discuss Proof Carrying Code in the context of eBPF.
+We then present the syntax and semantics of the LFSC in Section \ref{sec:lfsc}, to serve as a basis for the implementation of the proof-checker.
+We do not prove any properties of the type system.
+In Section \ref{sec:implementation} we present the design choices and implementation details of the typechecker called LFSCR.
+We then evaluate the performance and general usability of LFSCR in a PCC system Section \ref{sec:evaluation}, by considering proofs generated from a simple verification condition generator, presented in Section \ref{sec:experiments}.
+Lastly we conclude the project and present some ideas for future work in \ref{sec:conclusion1} and \ref{sec:conclusion2}.

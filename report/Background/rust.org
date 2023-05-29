@@ -1,5 +1,4 @@
-In this section we give a short description of the Rust programming language to motivate why it used as host language in this project.
-
+In this section we give a short description of the Rust programming language to motivate why it is used as host language in this project.
 Rust is a modern systems programming language that was first introduced in 2010.
 It was designed to address common issues faced by developers in writing low-level, high-performance code, such as memory safety and thread safety.
 
@@ -33,13 +32,13 @@ fn main() {
 }
 #+end_src
 Then ~y~ will be a ~Box~ type, which is the simplest form of heap allocation.
-objects in rust can implement at trait, essentially an interface, called ~Drop~, and implement the ~drop~ function.
+Objects in rust can implement a trait, essentially an interface, called ~Drop~, and define a ~drop~ function.
 When ~y~ goes out of scope a call to ~drop~ happens and the memory will be freed.
 
 Ownership can be transfered by either ~move~, ~copy~ or ~clone~.
-For primitive types, those that usually reside on the stack, they can be copied from one variable to another.
-Heap allocated values can be either ~cloned~, which essentially works as a ~memcpy~ or by moving it,
-this means that the snippet below will get a compile time error at line 6, because the variable that owns
+For primitive types, those that usually reside on the stack, they can be ~copied~ from one variable to another.
+Heap allocated values can be either ~cloned~, which essentially works as a ~memcpy~, or by moving it.
+This means that the snippet below will get a compile time error at line 6, because the variable that owns
 the box containing 42 is no longer owned by ~y~ but rather by ~a~.
 #+begin_src rust
 fn main() {
@@ -60,12 +59,12 @@ There are two types of references, exclusive and shared references.
 Exclusive references can mutate the borrowed value, while a shared reference may only read the reference.
 There are 3 rules that borrowing is subject to:
 
-1 There can exist either a single exclusive reference or multiple shared references at a given time.
-2 References must always be valid, which mean it is impossible the borrow a value after its owner has gone out of scope.
-3 A value cannot be modified whilst referenced.
+1. There can exist either a single exclusive reference or multiple shared references at a given time.
+2. References must always be valid, which mean it is impossible the borrow a value after its owner has gone out of scope.
+3. A value cannot be modified whilst referenced.
 
 These rules invariantly ensure that a reference is always as perceived to the borrower.
-If multiple mutable borrows were allowed at the same time or even at the same time as a shared reference, then
+If multiple mutable borrows were allowed at the same time, or even simultaneously with a shared reference, then
 one of the mutable borrows may destroy the reference for the others.
 An example where this is extremely obvious is when we consider a reference to a datastructure that might need to be reallocated,
 such as dynamic arrays. In such a situation the address of the old array will no longer be valid.
@@ -73,11 +72,11 @@ This is ensured to never happen according to rule 3.
 
 Rust also promises zero cost abstractions and high-level features such as sum types, pattern matching and traits/interfaces, while still having performance similar to C.
 
-These promises of memory safety and high level abstractions is what constitutes the basics of the Rust programming language the safe memory management without the overhead of a garbage collector has gained Rust popularity in recent years, especially in the systems programming community, due to its combination of performance, safety, and ease-of-use.
+These promises of memory safety and high level abstractions is what constitutes the basics of the Rust programming language. The safe memory management without the overhead of a garbage collector has gained Rust popularity in recent years, especially in the systems programming community, due to its combination of performance, safety, and ease-of-use.
 This popularity also includes the Linux Development community, where safety, security and reliability is mission critical.
 As of kernel 6.1 Rust is officially supported in the Linux kernel, albeit fairly limited as described throughout this report.
 
-Hence Rust seems like an appropriate tool for a program that has to run in the kernel, where robustness is critical.
+Hence Rust seems like an appropriate tool for a program that has to run in the kernel, and where robustness is critical.
 Bu we must also consider what restrictions the kernel imposes on Rust.
 
 *** Rust in the kernel?

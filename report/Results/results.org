@@ -1,4 +1,7 @@
 * Experiments
+:PROPERTIES:
+:CUSTOM_ID: sec:experiments
+:END:
 Since the purpose of this project is to check the feasibility of an in-kernel proof-checker that can replace the eBPF verifier,
 we want to evaluate the implementation with proofs that resemble what would occur in a PCC context. To do so, we consider a simple verification condition
 generator based on the weakest precondition predicate transformers.
@@ -61,6 +64,9 @@ it may reduce both the size of the proof as well as making the typechecking fast
 
 
 * Evaluation
+:PROPERTIES:
+:CUSTOM_ID: sec:evaluation
+:END:
 In the following section we evaluate the implementation, /lfscr/ by runtime speed and memory usage.
 We further argue for the completeness and correctness aswell as general comparison compared to /lfscc./
 
@@ -189,6 +195,9 @@ typechecking errors.
 Hereby the ~?~ shortcut can be used, and no types should changes as they already implement ~Result~ types.
 
 * Is PCC a good idea?
+:PROPERTIES:
+:CUSTOM_ID: sec:conclusion1
+:END:
 Even with a Rust implementation that promises memory safety and has no unexpected errors that can crash the program, the answer is not definite at this time.
 It might still not be feasible to use LFSC for an in kernel proof checker as part of a larger proof carrying code architecture, since a lot of questions are still unanswered.
 The eBPF verifier does a lot more than just validating instructions of a bytecode format. It check validity in memory alignment, user-rights, does program rewrites and much more.

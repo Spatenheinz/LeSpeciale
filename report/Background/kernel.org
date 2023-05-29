@@ -1,14 +1,14 @@
  The Linux kernel is a monolithic kernel, meaning that it provides not only the fundamental services necessary for a fully functioning operating system, but also a virtual interface for communication with hardware, including filesystems, network stacks, and device drivers, among others, all in a single executable.
  This contrast with micro kernels, where only the core functionality of the operating system exists in kernel and all other functionality lives in userspace.
- In both cases the standard form of communication between a processes in userspace and a the kernel is through system calls, this for instance happens when accessing hardware, requests memory etc.
+ In both cases the standard form of communication between processes in userspace and the kernel is through system calls. This for instance happens when accessing hardware, requesting memory etc.
 
- One major advantage of monolithic kernels is the minimal overhead of system level tasks as there is no need for interprocess communication from the different parts of the system, where micro kernels needs the same as tasks such as filesystems live in userspace and thus have no direct "knowledge" of other processes.
+ One major advantage of monolithic kernels is the minimal overhead of system level tasks as there is no need for interprocess communication from the different parts of the system. In a micro kernels parts of the functionality provided by a monolithic kernel live in userspace, such as filesystems. Since processes does not have direct "knowledge" of other processes, there will be an overhead when doing some system level tasks.
 On the other hand monolithic kernels in general provides little to no
-extensionality.
+extensionality, where microkernels on the other hand is design for exactly this.
 
-Despite its monolithic architecture, the Linux kernel is characterized by its modular nature.
-This can be achieved either with dynamically loadable kernel modules (LKMs) or through the eBPF subsystem.
-LKMs are more general and can extended functionality and support for a diverse range of services, such as device drivers, virtual filessystems etc. They function similarly to traditional filesystems in their execution and can be loaded and unloaded as necessary.
+Albeit being a monolithic architecture the Linux kernel is characterized by its modular nature.
+The modularity is achieved either with dynamically loadable kernel modules (LKMs) or through the eBPF subsystem.
+LKMs are more general and can extend functionality and support a diverse range of services, such as device drivers, virtual filessystems etc. They function similarly to traditional filesystems in their execution and can be loaded and unloaded as necessary.
 They provide great power but at the same time no safety guarantees.
 Thus LKMs have inherent security risks and require root privileges, limiting their use to trusted users.
 A malicious LKM can destroy a kernel completely, especially considering that kernel modules may be proprietary.
@@ -16,3 +16,6 @@ This creates a tradeoff between extensionality and trust.
 
 eBPF on the other hand is more limited in capabilities but provides
 a platform for doing smaller tasks which still leverages the power of the kernel without the same level of risk.
+
+** eBPF
+#+include: ebpf.org

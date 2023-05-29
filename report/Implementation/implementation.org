@@ -1,5 +1,8 @@
-* The in-kernel proof checker
-In this section we present the implementation. We first some high level design decisions taken
+* The in-kernel proof checker - LFSCR
+:PROPERTIES:
+:CUSTOM_ID: sec:implementation
+:END:
+In this section we present the implementation, LFSCR. We first some high level design decisions taken
 to reduce the amount of memory needed and to make the typechecking algorithm efficient.
 We then discuss the actual representation of the language and how we process it in terms of parsing and typechecking.
 In this process we discuss why we have chosen the specific Rust features we have with respect to the Linux kernel.
