@@ -1,0 +1,32 @@
+Reification or reading back semantical objects into the term language is type directed.
+~read_back~ takes a type and a value as arguments.
+first the term to be read back is check to be neutral, if that is the case then we call ~read_back_neutral~, since ~Neutral~'s encode their own type.
+
+Variables can be read back directly, holes either get read back as its inner value or as a term language hole.
+Application will read back the function point and then argument point. And construct an application from it.
+Be aware here that the argument point is a ~Normal~ type. It will thus call ~read_back~ with its type and val.
+#+begin_src rust
+fn readback_neutral(&self, neu: Rc<Neutral<'term, T>>)
+                    -> TResult<AlphaTerm<T>, T>
+{
+    match neu.borrow() {
+        Neutral::DBI(i) => Ok(Ident(DBI(*i))),
+        Neutral::Var(name) => Ok(Ident(Symbol(*name))),
+        Neutral::Hole(hol) => {
+            if let Some(ty) = &*hol.borrow() {
+                self.readback_neutral(ty.clone())
+            } else { Ok(Hole) }
+        },
+        Neutral::App(f, a) => {
+            let f = self.readback_neutral(f.clone())?;
+            let a = self.readback_normal(a.clone())?;
+            Ok(App(Box::new(f), vec![a]))
+        },
+    }
+}
+#+end_src
+
+If the value of ~read_back~ is not neutral, we patternmatch on the type.
+If the type is \mathcal{Z} or \mathcal{Q} then we can read back integers and rationals respectively.
+All built in types can be readback to the built in terms.
+Pi types can be read back by reading back the domain, then evaluate the body and read the body back.\footnote{should i add more here?}

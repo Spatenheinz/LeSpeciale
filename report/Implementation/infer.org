@@ -1,0 +1,65 @@
+To infer types of LFSC we define an ~infer~ function for each of the constructs in the language,
+The functions are implemented as inherent implementations (concrete associated functions) and has the types:
+#+begin_src rust
+impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
+where T: BuiltIn
+{
+    pub fn infer(&self, term: &'term AlphaTerm<T>) -> ResRT<'term, T>
+    pub fn infer_sc(&self, sc: &'term AlphaTermSC<T>) -> ResRT<'term, T> {
+    fn infer_sideeffect(&self, sc: &'term AlphaSideEffectSC<T>) -> ResRT<'term, T>
+    fn infer_compound(&self, sc: &'term AlphaCompoundSC<T>) -> ResRT<'term, T>
+    fn infer_num(&self, sc: &'term AlphaNumericSC<T>) -> ResRT<'term, T>
+}
+#+end_src
+The functions follow closely the rules in Figure \ref{fig:tylfsc}.
+Taking ~infer~ as example it pattern-matches on ~term~,
+and for \lambda, side conditions and holes the inference fails.
+And variables and symbols are simply looked up in either \Sigma or \Gamma respectively.
+For some of the more complicated rules:
+
+inferring a ~Pi~ will check if the domain is a
+sidecondition.
+If that is the case, we infer the type of the side-condition and check it to have the same type as type of the second part of the pair. We create a Run type for the domain.
+In case it is not a sidecondition, we simply infer the domain to have *type* and then evaluate it, to get its value.
+We can then update the local environment stating that De Bruijn index 0 in the localcontext ~IsA~ ~val~ type.
+#+begin_src rust
+AlphaTerm::Pi(a, b) => {
+    let val =
+        if let SC(t1, t2) = &**a {
+            let t1_ty = self.infer_sc(t1)?;
+            self.check(t2, t1_ty.clone())?;
+            Rc::new(Type::Run(t1, t1_ty, self.lctx.clone()))
+        } else {
+            self.infer_as_type(a)?;
+            self.eval(a)?
+        };
+    self.update_local(val).infer_sort(b)
+},
+#+end_src
+
+For application instead of interpreting multiple continious application as curried form, we use a flat approach in which we evaluate each argument in a loop.
+First we infer the function point, this is saved in a mutable variable updated each iteration of the following loop.
+Each argument is checked against the domain of the \Pi type. If the variable bound by the \Pi is free in the body, then we evaluate it. Otherwise we return an arbitrary value.
+Lastly the body is evaluated, with either the new value or a default added to the local environment. The result is bound to ~f_ty~. This happens for each iteration and lastly we return the bound value.
+In case the argument is a Hole, we do not check it, as it is trivially the correct type at this point. We add it to the environment and evaluate the body.
+#+begin_src rust
+App(f, args) => {
+    let mut f_ty = self.infer(f)?;
+    for n in args {
+        f_ty = if let Type::Pi(free,a,b) = f_ty.borrow() {
+         if Hole == *n {
+             let hole = Rc::new(Neutral::Hole(RefCell::new(None)));
+             b(Rc::new(Type::Neutral(a.clone(), hole)), self.gctx)?
+         } else {
+            self.check(n, a.clone())?;
+             let x = if *free { self.eval(n)? } else { a.clone() };
+            b(x, self.gctx)?
+         }
+        } else {
+            return Err(TypecheckingErrors::NotPi)
+        }
+    };
+    Ok(f_ty)
+#+end_src
+
+similar inference is done for the sidecondition language.

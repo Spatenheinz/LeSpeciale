@@ -1,0 +1,52 @@
+Despite being similar to C and CPP in syntax, Rust provides a much richer typesystem that allow us to create enumerations with fields, a.k.a Sum types.
+We might for instance define a construction for Identifiers as such:
+#+begin_src rust
+pub enum Ident<Id> {
+  Symbol(Id),
+  DBI(u32)
+}
+#+end_src
+An identifier can either be a Symbol if it is free or a De Bruijn index if it is bound.
+Terms are then defined almost identical to the abstract syntax.
+The major difference comes from the way we represent binders.
+#+begin_src rust
+pub enum BinderKind {
+  Pi,
+  Lam,
+  Let,
+}
+pub enum Term<Id> {
+  Binder{ kind: BinderKind, var: Id,
+          ty: Option<Box<Type<Id>>>,
+          body: Box<Term<Id>> },
+  // rest of terms
+}
+#+end_src
+
+A binder is either a \Pi type, a \lambda abstraction or a let binding.
+We use an option type as \lambda abstractions might contain an annotation but can have an anonymous type aswell.
+\Pi, $let$ and annotated \lambda all have a Some value for $ty$. We can reuse the same structure as terms and types are both defined by ~Term~.
+This structure is convenient in the frontend representation of the language as this allow for simpler \alpha-normalization.
+In the backend language we split this structure into seperate constructors of the ~AlphaTerm~ enum.
+A similar structure is used for the side condition language.
+
+#+begin_src rust
+pub enum AlphaTerm<Id> {
+    Number(Num),
+    Hole,
+    Ident(Ident<Id>),
+    Pi(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
+    Lam(Box<AlphaTerm<Id>>),
+    AnnLam(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
+    Asc(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
+    SC(AlphaTermSC<Id>, Box<AlphaTerm<Id>>),
+    App(Box<AlphaTerm<Id>>, Box<AlphaTerm<Id>>),
+}
+#+end_src
+
+We parameterize ~AlphaTerm~ by ~Id~ which is the data representation of symbols.
+In the specific implementation we consider a ~&str~, which is a reference to a fixed sized string.
+We use this type over a ~String~ type because it is more efficient and there is no need for a term to
+own the string.
+Having terms parameterized by the ~Id~ type allow for easily convertion to De Bruijn levels instead of
+string identifiers.

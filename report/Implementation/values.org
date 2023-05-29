@@ -1,0 +1,67 @@
+Since we consider typechecking using normalization by evaluation we need a new type to describe the result of evaluation.
+We define them as such:\footnote{Notice here that Z and Q should actually have unbounded integers as fields}
+
+#+begin_src rust
+pub enum Value<'term, Id: BuiltIn> {
+    Pi(bool, RT<'term, Id>, Closure<'term, Id>),
+    Lam(Closure<'term, Id>),
+    Box, // Universe
+    Star,
+    ZT,
+    Z(i32), // TODO: should in fact be unbounded
+    QT,
+    Q(i32, i32), // TODO: should in fact be unbounded
+    Neutral(RT<'term, Id>, Rc<Neutral<'term, Id>>),
+    Run(&'term AlphaTermSC<Id>, RT<'term, Id>, Rc<LocalContext<'term, Id>>),
+    Prog(Vec<RT<'term, Id>>, &'term AlphaTermSC<Id>),
+}
+#+end_src
+
+Just as ~AlphaTerm~, ~Value~ is parameterized by an ~Id~ type.
+Now we require ~Id~ to implement the trait ~BuiltIn~.
+The trait is bound by other traits:
+~pub trait BuiltIn: Eq + Ord + Hash + Copy~.
+It must be ~PartialEq~ to be able to look up the ~T~ in the environment.
+It must also be ~Copy~. We uses this stricter trait than ~Clone~, as it allows for quick "copying" and is a satisfied criteria for both ~&str~ and ~u32~'s that could be used for De Bruijn levels.
+Hash and Ord is not strictly necessary but is required to use Hashmaps or Btrees for Signatures.
+The BuiltIn trait itself defines how the builtin types *type*, *mpz* and *mpq* is defined.
+For &str this is simply a stringification of the literals, for u32 prepresented De bruijn indices these may be 0,1,2.
+
+The ~'term~ type parameter is the lifetime of the reference to an ~AlphaTerm~, we need this since many of the values have references to
+terms.
+
+A value might be one of the abstractions in the term language, as these cannot be reduced further.
+Abstractions \Pi and \lambda contain a closure with type $RT \longrightarrow \Sigma -> RT$, which when constructed closes over a local context and the some term, where $RT$ is a reference counted pointer to ~Value~.
+The reason $\Sigma$ must be passed as argument to the closure is purely a matter of the borrowing rules.
+If a closure is constructed with a reference to $\Sigma$ then we cannot extend \Sigma anymore.
+The Pi value further contain its domain and a boolean value.
+The boolean describes the freeness of the variable in the term captured by the closure.
+This is extremely important for performance reasons which we describe more in detail in Section \ref{sec:speed}.
+
+Values can then also be one of the built in types, where
+- ~Box~ correspond to keyword *kind*
+- ~Star~ correspond *type*.
+- and ~ZT~ and ~QT~ is *integer* and *rational*.
+It can then be a value of \mathcal{Z} or \mathcal{Q} or a ~Run~, which is simply a sidecondition \(\{S \; M\}\).
+
+Neutral expressions, consists of an RT which is the type describing it, and a the neutral expression it describe.
+The ~Neutral~ type be either a neutral variable of global or local scope,
+It can then be a hole, or an application of a neutral term to a normal form.
+#+begin_src rust
+#[derive(Debug, Clone)]
+pub enum Neutral<'a, T: Copy>
+{
+    Var(T),
+    DBI(u32),
+    Hole(RefCell<Option<RT<'a, T>>>),
+    App(Rc<Neutral<'a, T>>, Normal<'a, T>),
+}
+
+#[derive(Debug, Clone)]
+pub struct Normal<'a, T: Copy>(pub Rc<Type<'a, T>>, pub Rc<Value<'a, T>>);
+#+end_src
+
+Lastly ~Value~ can be programs and run commands.
+Programs cannot directly be constructed by inference or evaluation, instead ~Program~ is used to describe the type
+of a side condition program, since the ~Pi~ constructor is insufficient.
+~Run~ is defined for pure convenience.

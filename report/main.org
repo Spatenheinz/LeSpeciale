@@ -5,9 +5,9 @@
 #+DATE: 2023-05-31
 #+LATEX_HEADER_EXTRA: \assignment{Msc. Thesis}
 #+LATEX_HEADER_EXTRA: \subtitle{Ivestigation of feasibility of checking Verification conditions for as part of the eBPF syscall}
-#+LATEX_HEADER_EXTRA: \repo{github.com}
+#+LATEX_HEADER_EXTRA: \repo{https://github.com/Spatenheinz/LeSpeciale}
 #+LATEX_HEADER_EXTRA: \advisor{Advisor: Ken Friis Larsen}
-#+LATEX_HEADER_EXTRA: #\frontpageimage{croissant.png}
+#+LATEX_HEADER_EXTRA: \frontpageimage{pi.png}
 #+OPTIONS: toc:nil
 
 #+BEGIN_abstract
@@ -15,7 +15,7 @@ eBPF (extended Berkley Package Filter) is a Linux functionality that allow users
 run code of a limited assembly like language inside the Linux kernel.
 This can potentially be dangerous in the hands of a malicious or even uncareful users.
 To combat this, the Linux kernel provides a static analysis of eBPF programs to reject harmful programs.
-This static analysis have in the past shown to be unsound, meaning harmful programs have been rejected.
+This static analysis have in the past shown to be unsound, meaning harmful programs have been accepted.
 In this project we investigate the feasibility of making a logical proof checker that runs inside the kernel, implemented in Rust.
 We do so by considering the Logical Framework with Side Conditions (LFSC) language.
 The motivation behind such a proof checker is to be able to formally prove the correctness of eBPF programs.
@@ -23,6 +23,7 @@ We consider the feasibility not only as a standalone tool but as a hypothetical 
 By this we provide an analysis of how eBPF programs are loaded and what the static analysis consists of
 and hereby describe a vision for a PCC architecture.
 The main focus of the report is to describe and evaluate the implementation of LFSC with respect to eBPF, PCC and Rust in the Linux kernel.
+Although the implementation is not as fast as other LFSC proof checkers it does show decent promise for a part of a PCC system for eBPF.
 #+END_abstract
 
 \newpage

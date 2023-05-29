@@ -53,6 +53,12 @@ an unsatisfiable result. This is a problem somewhere in the pipeline but I have 
 For now we settle on generating a new program of same size and try again.
 In the process it showed to be unfeasible to prove the validity of programs of size 1000 in CVC5 on my i7-1165G7 CPU with 16 GB of ram, thus in the evaluation we only consider programs up to 100.
 
+*** LFSC - without side conditions?
+One interesting finding about the experiments, is that they do not include any side conditions.
+Therefore it may be interesting to see if a VC generator can be encoded in such a way that it produces
+terms with side conditions instead of purely logical connectives. If this can efficiently be done, then
+it may reduce both the size of the proof as well as making the typechecking faster.
+
 
 * Evaluation
 In the following section we evaluate the implementation, /lfscr/ by runtime speed and memory usage.
@@ -71,7 +77,7 @@ Already for 10 instructions my implementation was using 4 times as long to check
 | lfscc        | 9.0 \pm 3.3 ms  | 9.0 \pm 3.2 ms  | 59.6 \pm 0.7 ms |
 | lfscr        | 12.7 \pm 0.7 ms | 36.6 \pm 1.3 ms | 8.3 \pm 0.9 s   |
 
-Inspecting the proofs, which can be found at the repository, in the vcgen folder as, benchmark_n.plf, one can notice that there are more than 1000 local bindings for a 100 line program. This lead be to belive that using cons lists would maybe not be optimal,
+Inspecting the proofs, which can be found at the repository, in the ~vcgen~ folder as, ~benchmark_n.plf~, one can notice that there are more than 1000 local bindings for a 100 line program. This lead be to belive that using cons lists would maybe not be optimal,
 switching to an approach that uses ~Vec~ as the underlying datastructure and truncating similar to the approach described in Section \ref{sec:converter} gave a decent improvement in speed, being a couple of seconds faster than the first implementation.
 
 | instructions | 1              | 10            | 100         |
@@ -183,23 +189,18 @@ typechecking errors.
 Hereby the ~?~ shortcut can be used, and no types should changes as they already implement ~Result~ types.
 
 * Is PCC a good idea?
-Even with a Rust implementation that shows okay performance, promises memory safety and no unexpected errors that can crash the program, the answer is not definite.
+Even with a Rust implementation that promises memory safety and has no unexpected errors that can crash the program, the answer is not definite at this time.
 It might still not be feasible to use LFSC for an in kernel proof checker as part of a larger proof carrying code architecture, since a lot of questions are still unanswered.
-The eBPF verifier does a lot more than just validating instructions of a bytecode format. It check validity in memory alignment, user-rights, does simple program optimizations, such as deadcode elimination and much more.
-Although some of these can be embedded into a proof, code optimizations is inherent to the bytecode not the proof and user-rights should be checked seperately anyway.
-None of this discards the use of PCC but merely accept it as an alternative to some of responsibility of the verifier.
+The eBPF verifier does a lot more than just validating instructions of a bytecode format. It check validity in memory alignment, user-rights, does program rewrites and much more.
+Some of these can definitely be encoded into a proof, but others may be harder to realize. Especially user-rights can prove as a challenge, since it either requires the code producer to make the proof themselves, meaning eBPF programs are not that easily distributed over machines, or they have to be patched in some way.
+Another possibility is only checking capabilities as a seperate stage before checking the proof, but this may reduce some functionality some "features" of eBPF in its current form for some users.
+Thus there is still a lot more work to be done in the architectural construction of a PCC system.
 
-The more pressing matter is that of execution time.
-Although typechecking LFSC is decidable, it is still a dependent language in which typechecking can invoke evaluation and having this in the kernel essentially means
-that untrusted sources may execute code inside the kernel.
-LFSC has no recursion (if we regard the fact that sideconditions are, but these must be trusted to terminate) and hence typechecking will be decidable and terminate.
-However there is no mechanism stopping a malicious user to construct complex proofs that can block the kernel, not indefinitely, but for a long time, a good old school denial of services.
-The verifier solves the matter by only allowing a certain amount of instructions.
-This is much easier for eBPF as instructions are atomic, but for applications,
-they may be arbitrarily nested and specifying a limit will require deeper analysis.
-For instance the LFSC proof for the validity of a 100 line eBPF program has a nesting dept 1850, and this could potentially appear in many let bindings.
-If we can reach performance similar to that of /lfscc/ then this problem does not seem to be as big of an issue.
-But the performance of the implementation presented here can be problematic.
+Another pressing matter is that of the execution time. We have seen that proof-checking of validity of eBPF programs (atleast straight line programs) can be efficiently done, but with this implementation we are not quite there yet.
+The benchmarking showed promises in a few different places. Using ~Vec~ instead of cons lists may be useful for larger proofs, and it would further be interesting to investigate if a modified version of the data layout would prove useful.
+For instance, we might be able to used tagged pointers or atleast a more compact data format for ~Value~'s and ~Neutral~'s to make the program both more memory and runtime efficient.
+Furthermore, the benchmarking we have done may not be entirely appropriate for determining the feasibility as we have only included straight line programs and no control flow constructs. In the end this can make proofs more complicated.
 
-Despite all this the implementation is rather small and consist of only 2400 lines of code compared to 19000 in the verifier.
+Despite all this the implementation we present is rather small and consist of only 2400 lines of code compared to 19000 in the verifier.
 Bugs are hence less likely to appear.
+In any case, we do not completely discard the idea of PCC in the kernel as it does show promises and with time could be a generally decent replacement for the eBPF verifier.

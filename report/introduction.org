@@ -9,13 +9,13 @@ The program can then be executed when certain events happen.
 This technology enables many interesting features, such as high-speed package filtering
 (which was the initial intend with the system)
 and Express Data Path (XDP) by circumventing the network stack of the operating system.
-Furthermore it can be used as system monitoring by access to kernel probes etc.
+Furthermore it can be used for system monitoring by access to kernel probes etc.
 
 eBPF allows untrusted users to run arbitrary code in the kernel, which in itself is no problem if the
 program is non-malicious, but can be detremental if not.
 Programs that run in the Linux kernel must therefore be both safe and secure.
-An unsafe program in the linux kernel might break the system alltogether,
-whilst a malicious users could get access to secrets.
+An unsafe program in the Linux kernel might break the system alltogether,
+whilst a malicious users could get access to confidential information.
 To prevent this the eBPF subsystem will perform an abstract interpretation of a program
 and then reject unsafe programs, before they are loaded into the kernel.
 This process is called the verifier.
@@ -29,19 +29,21 @@ An automatic way to do this is to reduce the problem of program verification to 
 This is done by generating a logical formula that describe the properties of a program, a so-called verification condition, and then checking the satisfiability of the negated formula.
 The process of generating a verification condition is cheap,
 however checking the validity of the formula can be a computationally heavy task.
-Proof Carrying Code is an architecture and security mechanism first introduced by Necula\cite{pcc} in 1998,
-which moves the responsibility of proving that a certain program follows a set of security parameters to the user and then the kernel only have to check this proof.
+Proof Carrying Code is an architecture and security mechanism first introduced by Necula in 1998\cite{pcc}.
+Here the user is responsible for proving that a certain program follows a set of security parameters and then the kernel only have to check this proof.
 The general concept is described in detail in Section \ref{pcc}.
-All in all these tasks are far cheaper task than producing a proof.
+All in all these tasks are far cheaper than producing a proof.
 
-In this project we investigate the feasibility of a proofchecker that can run inside the Linux kernel.
+In this project we investigate the feasibility of a proof checker that can run inside the Linux kernel.
 The implementation not only tests this subcomponent of proof carrying code, but also test if the Rust programming language, introduced in the Linux kernel 6.1 and forward, is a good tool for the job.
 The proof checker leverages the Curry-howard correspondence and thus
 checking a proof amounts to typechecking.
 We specifically consider the dependently typed meta framework, Logical Framework with Side Conditions (LFSC)\cite{lfsc}.
 We describe the semantics of the typecheking and present an implementation.
 
-The report is structured as follows. Section \ref{sec:linux} gives a brief introduction to the linux kernel
+The report is structured as follows.
+
+Section \ref{sec:linux} gives a brief introduction to the linux kernel
 and how the eBPF subsystem works. In this presentation we elaborate on how the kernel code for loading an eBPF program is
 structured to get an overview of what parts of the verifier is still necessary given a proof carrying code architecture and what parts that can be removed.
 We then describe proof carrying code and describe how this can replace parts of the verifier.

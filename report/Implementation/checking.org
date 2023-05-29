@@ -1,0 +1,35 @@
+We define two functions for typechecking. One takes a term ~term~ and a ~Value~ ~t2~ and check against it.
+The other takes a sideconditions as first argument, but essentially does the same.
+
+We match on ~term~ and if it an anonymous lambda then we check /LAM/-rule of Figure \ref{fig:tylfsc},
+otherwise we infer the type of the ~term~ to ~t1~ and check ~t2~ and ~t1~ for definitional equality.
+
+This process is two-fold. Firstly we do a value comparison between ~t1~ and ~t2~. If not succesful we convert them
+to their canonical form using reification and check for equality.
+Generally we cannot compare values, as functions such as ~Pi~ has a closures inside it that cannot easily be compared.
+The main reason for the ~ref_compare~ call, is to fill holes.
+The function return a boolean of the equality between the two values, and as long as the values are one of the simple types or
+syntactically same neutrals it returns true.
+If one of the arguments is a hole it is filled with the other value.
+This is done using the interior mutability of Refcells.
+We must do it this way, as holes cannot be filled after reading back values as a hole might occur in multiple places and we must ensure
+that it is filled with the same value.
+Empirically, the ~ref_compare~ will return ~true~ most of the time.
+In case it returns ~false~, we reify the values into their normal form and compare them.
+
+#+begin_src rust
+pub fn convert(&self,
+            t1: RT<'term, T>,
+            t2: RT<'term, T>,
+            tau: RT<'term, T>) -> TResult<(), T>
+{
+    if ref_compare(t1.clone(), t2.clone()) { return Ok(()) }
+    let e1 = self.readback(tau.clone(), t1)?;
+    let e2 = self.readback(tau, t2)?;
+    if e1 == e2 {
+        Ok(())
+    } else {
+        Err(TypecheckingErrors::Mismatch(e1, e2))
+    }
+}
+#+end_src

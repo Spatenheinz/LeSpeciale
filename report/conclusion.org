@@ -1,35 +1,34 @@
 * Conclusion
-I have in this report given a brief overview of how the eBPF verifier works,
+We have in this report given a brief overview of how the eBPF verifier works,
 and we have discussed some concerns with the current eBPF verifier.
 This motivates the intend of making a proof carrying code architecture as part of the Linux kernel.
 We have described how we can use the reasonably new feature of Rust inside the kernel,
 to make such an architecture.
-Although not complete, we have described an implementation of a typechecker for the dependently typed LFSC language
-which uses the curry howard isomorphism to construct logics.
+We have described the dependently typed language LFSC,
+which uses the curry howard isomorphism to construct logics, and although not complete, an implementation of a typechecker for the language.
 The typechecker in its current form, is not compileable inside of the kernel but uses only
 features of the Rust language, with some slight modifications, such as having to enable the Reference counted smart pointer.
 The implementation of the typechecker is reasonably simple in structure, with only 2400 lines of code and uses purely safe features
-in rust and thus provide necessary safety to run inside the kernel.
+in rust and thus provide the necessary safety to run inside the kernel.
 We have further done some experiments that generates arbitrary straight line eBPF programs and performs a naive
-verification condition on them to generate LFSC proofs with cvc5.
-We have used these experiments to ensure the correctness of the implementation
+verification condition on them to generate LFSC proofs with CVC5.
+We used these experiments to ensure the correctness of the implementation
 aswell as providing a framework for benchmarking the performance.
 In this process we have found the implementation described in this report
-to be inferior in performance to the /lfscc/ implementation from the cvc5 by up top 20 times slower execution time,
-which suggest a modular approach using normalization by evaluation is not the ideal approach,
-but this needs more investigation in the future.
-As a side effect of the experiments a realization arised, in which untrusted users can clog a kernel by
-cluttering proofs with unneccesary information.
-At the moment, we know not a good solution for this.
-The work done is inconclusive with respect to proof carrying code inside the linux kernel
-but without addressing some of the shortcommings presented here, it may not be feasible to
-replace the eBPF verifier.
+to be inferior in performance to the /lfscc/ proof checker from CVC5 by up to 10 times slower execution time,
+which suggest a modular approach using normalization by evaluation is not the ideal approach.
+Although the execution time is higher for this implementation it is still within reason and may, with some optimizations, be decent enough for an in kernel verifier.
+We have further by accident also facilitated the foundation for ensuring proofs correspond to the program it is supplied with in a PCC setting.
+The argumentation here is that the proof encodes the verification condition as an LFSC term, and if the in-kernel proof checker generates verification conditions in LFSC
+then checking the requirement is merely normalization followed by a equality check.
+
+Thus, while we cannot say anything definite at this point, we have provided a basis for future work to make a PCC architecture in the Linux kernel.
+
 
 * Future work
 We have presented only a small part of a proof carrying code architecture,
-so naturally for a final conclusion on the matter discussed in this work
-an in-kernel verification condition generator should be defined as well as
-a definitive communication of these two parts.
+so naturally for a final conclusion on the matter, discussed in this work,
+an in-kernel verification condition generator should be defined.
 We suggest such a proof checker represents the logic in the form of LFSC.
 This is however dependent on getting a faster proof checker and to solve the
 problem of potential clogging.
@@ -37,6 +36,8 @@ problem of potential clogging.
 The implementation discussed, should be modified to run inside the kernel.
 Because of the preliminary work, this should be a minor task.
 
+More work should be done in making the implementation fast.
+
 Lastly, a more comprehensive analysis and design between PCC and the eBPF verifier should be conducted.
 Specifically, what parts of the verifier should co-exist with PCC.
-One such is example is checking of user-rights etc.
+One such is example is checking of user-rights.

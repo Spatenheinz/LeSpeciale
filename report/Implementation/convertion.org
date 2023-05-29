@@ -1,0 +1,64 @@
+To convert from ~Term~ to ~AlphaTerm~,
+we traverse the AST and use an lookup table to update symbols appropriately.
+The lookup is simply a ~Vec~ of names that need be substituted.
+When a new binder is found we push the identifier to the end of a the vector.
+When we meet a symbol is met we look it up in the vector and convert it into a De Bruijn index based on its location in the vector.
+#+begin_src rust
+fn lookup_(vars: &[&str], var: &str) -> Option<u32> {
+    vars.iter().rev()
+               .position(|&x| x == var)
+               .map(|x| (x as u32))
+}
+#+end_src
+and specifically map the option as follow:
+#+begin_src rust
+pub(crate) trait Lookup<'a> {
+    fn lookup(vars: &[&'a str], var: &'a str) -> Self;
+}
+
+impl<'a> Lookup<'a> for StrAlphaTerm<'a> {
+    fn lookup(vars: &[&'a str], var: &'a str) -> Self {
+        lookup_(vars, var).map(|x| Ident(DBI(x)))
+                          .unwrap_or(Ident(Symbol(var)))
+    }
+}
+#+end_src
+
+One thing to note is that this approach is errorprone without careful consideration.
+Consider the expression:
+\( \lambda x . ((\lambda y . x y) : (\lambda z. z)) \)
+We start by pushing x to the ~vars~ environment.
+In the body of the abstraction we have two branches to the ascription.
+When transforming the term, we push ~y~ to ~vars~, then we replace ~x~ with the index 1 and ~y~ with index 0.
+We then get to transforming the type of the ascription, and because vectors are a mutable structure
+when pushing z it will lie at ~vars[2]~.
+After taking a branch we must thus ensure to truncate the vector to its original length.
+For a simple solution, We define a function ~local~ inspired by the effectful function ~local~ of the Reader monad.
+
+#+begin_src rust
+fn local<'a, 'b, Input, Output>
+    (fun: impl Fn(Input, &mut Vec<&'a str>) -> Output + 'b,
+     vars: &'b mut Vec<&'a str>
+    ) -> Box<dyn FnMut(Input) -> Output + 'b>
+{
+    Box::new(move |term| {
+      let len = vars.len();
+      let aterm = fun(term, vars);
+      vars.truncate(len);
+      aterm
+    })
+}
+#+end_src
+We create a closure which takes in a term, the closure will call ~fun~ with the term and ~vars~ as arguments and then it will truncate the environment to its size before ~fun~ was called.
+
+We can then use the function as such:
+#+begin_src rust
+  Term::Ascription { ty, val } => {
+      let mut alpha_local = local(alpha_normalize, vars);
+      let ty = alpha_local(*ty);
+      let val = alpha_local(*val);
+      Asc(Box::new(ty), Box::new(val))
+  },
+#+end_src
+
+and hereby convert the AST to include De Bruin indices.
