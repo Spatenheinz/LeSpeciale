@@ -1,4 +1,4 @@
-In this section we give an example of how LFSC can be used to construct proofs.
+In this section, we give an example of how LFSC can be used to construct proofs.
 We do so, by explaining a proof that \(P \wedge \neg P \) is unsatisfiable.
 The proof can be encoded by the following commands:
 
@@ -21,7 +21,7 @@ This makes ~cvc.p~ unique.
 The proof is constructed by a check command.
 We first define ~a0~ stating that \(P \wedge (\neg P \wedge \top)\) holds.
 The reason ~true~ is also included is because SMT-lib considers applications as n-ary functions and these will be represented as
-a null-terminated curried form of higher order application.
+a null-terminated curried form of higher-order application.
 Specifically ~and~ is defined by:
 #+begin_src none -n
 (declare apply (! t1 term (! t2 term term)))
@@ -31,7 +31,7 @@ Specifically ~and~ is defined by:
 
 The body of the check is then an annotation stating that
 line 5-7 should have the type ~holds false~, meaning we can derive $\bot$ and unsatisfiable.
-We notice that there are quite a number of holes. These will get filled out as we go.
+We notice that there are quite several holes. These will get filled out as we go.
 
 ~resolution~ and ~and_elim~ are declared as follows:
 #+begin_src none -n
@@ -50,12 +50,12 @@ We notice that there are quite a number of holes. These will get filled out as w
                   (! r (^ (nary_extract f_and f1 n) f2)  (holds f2)))))))
 
 #+end_src
-We can from these declarations see that the 3 holes on line 5 in Figure \ref{fig:proof}, should match parameters ~c1, c2~ and ~c~. These occur later in the type and can therefore be derived from the latter arguments.
+We can from these declarations see that the 3 holes on line 5 in Figure \ref{fig:proof}, should match parameters ~c1, c2~, and ~c~. These occur later in the type and can therefore be derived from the latter arguments.
 Similarly for ~and_elim~ the hole used for argument ~f1~ will be filled by argument ~p~ because the types must match.
 
 Since the fourth argument of the ~and_elim~ applications are ~a0~ we can syntactically compare ~a0~ and ~(holds f1)~, letting ~f1~ = ~(and cvc.p (and (not cvc.p) true))~.
-Notice here that both applications of ~and_elim~ are provided with 4 arguments, even though the type suggest, that it should take 5. However from the typing rules the inner side condition of Figure \ref{fig:tylfsc} will be evaluated,
-hnce when all types are checked ~nary_extract~ is run.
+Notice here that both applications of ~and_elim~ are provided with 4 arguments, even though the type suggests, that it should take 5. However, from the typing rules the inner side condition of Figure \ref{fig:tylfsc} will be evaluated,
+hence when all types are checked ~nary_extract~ is run.
 ~nary_extract~ is defined as:
 #+begin_src none -n
 (function nary_extract ((f term) (t term) (n mpz)) term
@@ -71,7 +71,7 @@ so when ~nary_extract~ is called with ~f_and~, ~f1~ = ~(and cvc.p (and (not cvc.
 ~f1~ = ~(apply (apply f_and cvc.p) (and (not cvc.p) true))~
 the only branch of ~nary_extract~ matches this scrutinee and we check if ~n~ is ~0~.
 Since this is false we recursively call ~nary_extract~.
-In the next iteration we get:
+In the next iteration, we get:
 ~t~ = ~(apply (apply f_and (not cvc.p)) true))~,
 now ~n~ is also ~0~ and we call ~getarg~ defined as follows:
 #+begin_src none -n
@@ -81,8 +81,8 @@ now ~n~ is also ~0~ and we call ~getarg~ defined as follows:
 Now ~t~ = ~(apply f_and (not cvc.p))~.
 Since ~t1~ and ~f~ is both ~f_and~ we therefore get ~(not cvc.p)~ back.
 
-This is then checked agains ~f2~ (in the run case of ~and_elim~) and the body ~(holds f2)~ is then checked.
-By similar approch we get ~cvc.p~ from the other application of ~and_elim~.
+This is then checked against ~f2~ (in the run case of ~and_elim~) and the body ~(holds f2)~ is then checked.
+By a similar approach we get ~cvc.p~ from the other application of ~and_elim~.
 
 By now we have established all the arguments to ~resolution~,
 ~c1~ = ~(not cvc.p)~, ~c2~ = ~cvc.p~, ~c~ is still a hole and ~p1~ and ~p2~ is ~(holds (not cvc.p))~ and ~(holds cvc.p)~ respectively.
@@ -103,11 +103,11 @@ Finally ~sc_resolution~ is evaluated.
     false)
   false))
 #+end_src
-At the inner most applications we have calls to ~nary_intro~ which lifts a value into ~n~-ary form.
+At the innermost applications, we have calls to ~nary_intro~ which lifts a value into ~n~-ary form.
 The two calls will turn ~c1~ into ~(or c1 false)~ and vice versa.
-~nary_rm_first_or_self~ will then check if the result of ~nary_intro~ is equivalent to the ~ifequal~ call and return the fourth argument ~false~ if that is the case otherwise it will remove the first occurence of ~f_or~.
+~nary_rm_first_or_self~ will then check if the result of ~nary_intro~ is equivalent to the ~ifequal~ call and return the fourth argument ~false~ if that is the case otherwise it will remove the first occurrence of ~f_or~.
 For the application in line 4 the arguments are ~(or (not cvc.p) false) (apply f_not cvc.p) false~.
-The first two arguments are not equivalent and thus we remove the first occurence of ~f_or~ in the first argument.
+The first two arguments are not equivalent and thus we remove the first occurrence of ~f_or~ in the first argument.
 \beta-reducing the term results in ~(apply (apply f_or (not cvc.p)) false)~, hence the result will be ~false~.
 For line 5 we equally get ~false~.
 

@@ -27,7 +27,7 @@ The syntax means that to define ~BuiltIn~, ~PartialEq, Ord, Hash~ and ~Copy~ mus
 It must be ~PartialEq~ to be able to look up the ~T~ in the environment.
 It must also be ~Copy~. We uses this stricter trait than ~Clone~, as it allows for quick "copying" and is a satisfied criteria for both ~&str~ and ~u32~'s that could be used for De Bruijn levels.
 ~Hash~ and ~Ord~ is not strictly necessary but is required to use ~Hashmap~ or ~Btrees~ for Signatures.
-The ~BuiltIn~ trait itself defines how the builtin types *type*, *integer* and *rational* is defined.
+The ~BuiltIn~ trait itself defines how the builtin types *type*, *int* and *rational* is defined.
 For ~&str~ this is simply a stringification of the literals, for u32 represented De bruijn levels these may be 0,1,2.
 
 The ~'term~ type parameter is the lifetime of the reference to an ~AlphaTerm~. We need this since many of the values have references to
@@ -44,7 +44,7 @@ This is extremely important for performance reasons which we describe more in de
 Values can also be one of the built in types, where
 - ~Box~ correspond to keyword *kind*
 - ~Star~ correspond *type*.
-- and ~ZT~ and ~QT~ is *integer* and *rational*.
+- and ~ZT~ and ~QT~ is *int* and *rational*.
 Values can also be a value of \mathcal{Z} or \mathcal{Q} or a ~Run~, which is simply a side condition \(\{S \; M\}\).
 
 Neutral expressions consist of an ~RT~ which is the type describing it, and the neutral expression it describe.

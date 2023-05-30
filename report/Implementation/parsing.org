@@ -1,5 +1,4 @@
-We use ~nom~ for parsing. ~nom~ is a parser combinator library that has evolved over the years from being mainly driven by macros
-,to in version 7, using composable closures. It is mainly focused around parsing bytes and hereby also ~str~.
+We use ~nom~ for parsing. ~nom~ is a parser combinator library that has evolved over the years from being mainly driven by macros, to in version 7, using composable closures. It is mainly focused on parsing bytes and hereby also ~str~.
 
 Taking the topmost function ~parse_file~ we structure it by composition as such:
 #+begin_src rust
@@ -7,7 +6,7 @@ pub fn parse_file(it: &str) -> IResult<&str, Vec<StrCommand>> {
     delimited(ws, many0(parse_command), eof)(it)
 }
 #+end_src
-~delimited~ takes 3 parsers and constructs a closure from it. When supplied with argument ~it~, parse ~it~ with the first parser, the second and then the third and return the result of the second parser.
+~delimited~ takes 3 parsers and constructs a closure from it. When supplied with argument ~it~, parse ~it~ with the first parser, the second, and then the third and return the result of the second parser.
 
 We can parse term binders as such:
 #+begin_src rust
@@ -22,9 +21,9 @@ fn parse_binder(it: &str) -> IResult<&str, Term<&str>> {
     ))(it)
 }
 #+end_src
-We parse the different aspects of a binder, indentifier, binding term and the bound term, and then construct the appropriate binder.
+We parse the different aspects of a binder, identifier, binding term, and the bound term, and then construct the appropriate binder.
 
-For terms in general we must ensure the parser to be robust and able to handle arbitrary nesting of parentheses.
+For terms in general we must ensure the parser is robust and able to handle arbitrary nesting of parentheses.
 So, when parsing nonterminal terms, we first parse an open parenthesis followed by ~parse_term_~. We then try to parse a binder followed by a closed parenthesis\footnote{here binders also include : and \^}. If we fail it parse a term or, if we can parse multiple terms, an application, as shown below.
 #+begin_src rust
 pub fn parse_term(it: &str) -> IResult<&str, Term<&str>> {

@@ -1,5 +1,5 @@
-Now we present the operational semantic of the side condition language. It is show in Figure \ref{fig:operational}.
-The operational semantics are under the judgement of
+Now we present the operational semantics of the side condition language. It is shown in Figure \ref{fig:operational}.
+The operational semantics is under the judgment of
 \(\Delta \vdash \judge{1}{S}{T}{n} \), where \Delta describes all program definitions, and \(\sigma_1\) and \(\sigma_n\) describes states mapping symbols to markings. Here \(\sigma_1\) is the state $S$ is evaluated under, and \(\sigma_n\) is the state where $S$ has been evaluated to $T$.
 Markings are simply a collection of 32 boolean flags, which can then be used in *ifmarked* conditions.
 The \Delta is elided in all cases where it is unused.
@@ -9,15 +9,15 @@ a scrutinee does not match any pattern,
 a *markvar* or *ifmarked* does not evaluate to a variable or if division by 0 occurs.
 
 For a brief rundown of the rules we have:
-- /CST-O/, /VAR-O/ and /NUM-O/ simply evaluate to itself and the store is unchanged.
-- /CST-APP/ applies a constant to n side conditions, update the store with respect to all of them, and the resulting value is the constant applied to each updated /S'/.
-- /LET-O/ and /DO-O/ evaluates /S/, then evaluates /T/ with the updated store and, in the case of /LET-O/, substitutes occurences of /x/ in /T/.
+- /CST-O/, /VAR-O/, and /NUM-O/ simply evaluates to themselves and the store is unchanged.
+- /CST-APP/ applies a constant to n side conditions, updates the store with respect to all of them, and the resulting value is the constant applied to each updated /S'/.
+- /LET-O/ and /DO-O/ evaluate /S/, then evaluates /T/ with the updated store and, in the case of /LET-O/, substitute occurrences of /x/ in /T/.
 - The two rules /IFEQUAL-T/ and /IFEQUAL-T/ describes a standard semantic for equality checks. Two terms \(S_1'\) and \(S_2'\) are considered equivalent with respect to \(\beta\eta\)-equivalence.
-- Match constructs evaluate the scrutinee $S$ and matches the result with one of the patterns.
+- Match constructs evaluate the scrutinee $S$ and match the result with one of the patterns.
   If a pattern matches then the given branch is evaluated.
 - /FUN-APP/ refers to the application of a side condition program.
   /f/ must be a program in \Delta. All arguments are evaluated and then the results are substituted into the body of the program T which is finally evaluated.
-- /BINOP-O/ and /NEG-O/ works similar to any other language.
+- /BINOP-O/ and /NEG-O/ work similarly to any other language.
 - /ZTOQ-O/ evaluate S to an integer $z$ and then make the rational $z/z$.
 - /IFNEG/ and /IFZERO/ rules are very similar; based on the evaluation of S, either branch /T/ or branch /U/ is evaluated.
 - /IFMARKED/ is again similar however the branching depends on the marking of variable /x/ in the store.
@@ -27,21 +27,9 @@ For a brief rundown of the rules we have:
 #+label: fig:operational
 \begin{figure}[H]
 \begin{equation*}
-\inference[CST-O ]{ }
-{ \judge{1}{c}{c}{1} }
-\qquad
-\inference[VAR-O ]{ }
-{ \judge{1}{x}{x}{1} }
-\qquad
-\inference[NUM-O ]{ }
-{ \judge{1}{r}{r}{1} }
-\end{equation*}
-
-\begin{equation*}
 \inference[CST-APP ]{ \forall i \in \{ 1, \dots, n\} . (\judge{i}{S_i}{S_i'}{i+1}) }
 { \judge{1}{(c \; S_1 \dots S_n)}{(c \; S_1' \dots S_n')}{n+1} }
 \end{equation*}
-
 \begin{equation*}
 \inference[LET-O ]{ \judge{1}{S}{S'}{2} & \judge{2}{\subst{S'}{x}{T}}{T'}{3} }
 { \judge{1}{(\mathbf{let}\; x \; S \; T)}{T'}{3} }
@@ -78,39 +66,47 @@ For a brief rundown of the rules we have:
 \inference[BINOP-O ]{\judge{1}{S}{r_1}{2} & \judge{2}{T}{r_2}{3} & r = r_1 \oplus r_2 }
 {\judge{1}{S \oplus T}{r}{3} }\oplus \in \{+, *, / \}
 \end{equation*}
-
-\begin{equation*}
-\inference[NEG-O ]{\judge{1}{S}{r}{2} }
-{\judge{1}{- S}{r}{2} }
-\qquad
-\inference[ZTOQ-O ]{\judge{1}{S}{z}{2} & r = z/z }
-{\judge{1}{\mathbf{ztoq}\; S}{r}{2} }
-\end{equation*}
-
 \begin{equation*}
 \inference[IFNEG--T ]{ \judge{1}{S}{r}{2} &  r < 0 & \judge{2}{T}{T'}{3} }
 { \judge{1}{(\mathbf{ifneg} \; S \; T \; U)}{T'}{3} }
 \qquad
+\inference[CST-O ]{ }
+{ \judge{1}{c}{c}{1} }
+\end{equation*}
+\begin{equation*}
 \inference[IFNEG--F ]{ \judge{1}{S}{r}{2} &  r \ge 0 & \judge{2}{U}{U'}{3} }
 { \judge{1}{(\mathbf{ifneg} \; S \; T \; U)}{U'}{3} }
+\qquad
+\inference[VAR-O ]{ }
+{ \judge{1}{x}{x}{1} }
 \end{equation*}
 \begin{equation*}
 \inference[IFZERO--T ]{ \judge{1}{S}{r}{2} &  r = 0 & \judge{2}{T}{T'}{3} }
 { \judge{1}{(\mathbf{ifzero} \; S \; T \; U)}{T'}{3} }
 \qquad
+\inference[NUM-O ]{ }
+{ \judge{1}{r}{r}{1} }
+\end{equation*}
+\begin{equation*}
 \inference[IFZERO--F ]{ \judge{1}{S}{r}{2} &  r \ne 0 & \judge{2}{U}{U'}{3} }
 { \judge{1}{(\mathbf{ifzero} \; S \; T \; U)}{U'}{3} }
-\end{equation*}
-
-\begin{equation*}
-\inference[IFMARKED--T ]{ \judge{1}{S}{x}{2} &  \sigma_2 x & \judge{2}{T}{T'}{3} }
-{ \judge{1}{(\mathbf{ifmarked} \; S \; T \; U)}{T'}{3} }
 \qquad
-\inference[IFMARKED--F ]{ \judge{1}{S}{x}{2} &  \neg \sigma_2 x & \judge{2}{U}{U'}{3} }
-{ \judge{1}{(\mathbf{ifmarked} \; S \; T \; U)}{U'}{3} }
+\inference[NEG-O ]{\judge{1}{S}{r}{2} }
+{\judge{1}{- S}{r}{2} }
 \end{equation*}
 \begin{equation*}
+\inference[ZTOQ-O ]{\judge{1}{S}{z}{2} & r = z/1 }
+{\judge{1}{\mathbf{ztoq}\; S}{r}{2} }
+\qquad
 \inference[MARKVAR-O ]{ \judge{1}{S}{x}{2} }
 { \judge{1}{(\mathbf{markvar} \; S)}{x}{2}\lbrack x \mapsto \neg \sigma_2 x \rbrack }
+\end{equation*}
+\begin{equation*}
+\inference[IFMARKED--T ]{ \judge{1}{S}{x}{2} &  \sigma_2 \; x & \judge{2}{T}{T'}{3} }
+{ \judge{1}{(\mathbf{ifmarked} \; S \; T \; U)}{T'}{3} }
+\end{equation*}
+\begin{equation*}
+\inference[IFMARKED--F ]{ \judge{1}{S}{x}{2} &  \neg (\sigma_2 \; x) & \judge{2}{U}{U'}{3} }
+{ \judge{1}{(\mathbf{ifmarked} \; S \; T \; U)}{U'}{3} }
 \end{equation*}
 \end{figure}

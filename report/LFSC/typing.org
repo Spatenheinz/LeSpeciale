@@ -18,17 +18,15 @@ Constants can be inferred either as a kind or a type respectively if they appear
 \end{equation*}
 \begin{equation*}
 \inference[MPZ ]{\vdash \Gamma}
-{\Gamma \vdash \mathbf{integer} \Rightarrow \mathbf{type}}
+{\Gamma \vdash \mathbf{int} \Rightarrow \mathbf{type}}
 \qquad
 \inference[MPQ ]{\vdash \Gamma}
 {\Gamma \vdash \mathbf{rational} \Rightarrow \mathbf{type}}
 \end{equation*}
-
 \begin{equation*}
 \inference[LOOKUP-CTX ]{\vdash \Gamma & x: A \in \Gamma}
 {\Gamma \vdash \synth{x}{A} }
 \end{equation*}
-
 \begin{equation*}
 \inference[LOOKUP-KIND-SIG ]{\vdash \Gamma & a: K \in \Sigma}
 {\Gamma \vdash \synth{a}{K} }
@@ -46,18 +44,6 @@ Figure \ref{fig:tylfsc} describes the bidirectional typing of LFSC.
 #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
-\inference[Z ]{\vdash \Gamma}
-{\Gamma \vdash z \Rightarrow \mathbf{mpz}}
-\qquad
-\inference[Q ]{\vdash \Gamma}
-{\Gamma q \Rightarrow \mathbf{mpq}}
-\end{equation*}
-\begin{equation*}
-\inference[ANN ]{\context \tycheck{M}{A} }
-{\context \synth{M : A}{A} }
-\end{equation*}
-
-\begin{equation*}
 \inference[PI ]{\context \tycheck{A}{\mathbf{type}} & \contextcons{x : A} \synth{C}{\alpha} & \alpha \in \{ \mathbf{type}, \mathbf{type^c}, \mathbf{kind} \}  }
 {\context \synth{\Pi x : A. C}{\alpha} }
 \end{equation*}
@@ -70,16 +56,17 @@ Figure \ref{fig:tylfsc} describes the bidirectional typing of LFSC.
 \begin{equation*}
 \inference[TYPE-APP ]{\context \synth{A}{\Pi x : B. \ K} & \context \tycheck{M}{B} }
 {\context \synth{A \; M}{\subst{M}{x}{K}} }
+\qquad
+\inference[APP-HOLE ]{ \context \synth{M}{\Pi x : A. \ B}}
+{\context \synth{M \; *}{\subst{*}{x}{B}} }
 \end{equation*}
 
 \begin{equation*}
 \inference[APP ]{ \context \synth{M}{\Pi x : A. \ B} & \context \tycheck{N}{A} }
 {\context \synth{M \; N}{\subst{N}{x}{B}} }
-\end{equation*}
-
-\begin{equation*}
-\inference[APP-HOLE ]{ \context \synth{M}{\Pi x : A. \ B}}
-{\context \synth{M \; *}{\subst{*}{x}{B}} }
+\qquad
+\inference[ANN ]{\context \tycheck{M}{A} }
+{\context \synth{M : A}{A} }
 \end{equation*}
 
 \begin{equation*}
@@ -90,11 +77,17 @@ Figure \ref{fig:tylfsc} describes the bidirectional typing of LFSC.
 \begin{equation*}
 \inference[LAM-ANN ]{\context \synth{A}{\mathbf{type}} & \contextcons{x : A} \synth{M}{B}  }
 {\context \synth{\lambda x : A. \ M}{\Pi x : A. \ B} }
+\qquad
+\inference[Q ]{\vdash \Gamma}
+{\Gamma q \Rightarrow \mathbf{mpq}}
 \end{equation*}
 
 \begin{equation*}
 \inference[LAM ]{\contextcons{x : A} \synth{M}{B}  }
 {\context \tycheck{\lambda x. \ M}{\Pi x : A. \ B} }
+\qquad
+\inference[Z ]{\vdash \Gamma}
+{\Gamma \vdash z \Rightarrow \mathbf{mpz}}
 \end{equation*}
 \caption{Bidirectional typing rules for LFSC}
 \label{fig:tylfsc}
@@ -125,26 +118,25 @@ For *numerical sideconditions* the rules are straight forward. They are represen
 #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
-\inference[INT ]{ }
-{\context \synth{n}{\mathbf{integer}}}
+\inference[BINOP ]{\context \synth{S}{\mathbf{int}} & \synth{T}{\mathbf{int}} }
+{\context \synth{S \oplus T}{\mathbf{int}} }\oplus \in \{+, *, / \}
 \qquad
-\inference[NEG ]{\context \synth{S}{\mathbf{integer}} }
-{\context \synth{- S}{\mathbf{integer}}}
-\qquad
-\inference[Z-TO-Q ]{\context \synth{S}{\mathbf{integer}} }
+\inference[Z-TO-Q ]{\context \synth{S}{\mathbf{int}} }
 {\context \synth{\mathbf{ztoq} \; S}{\mathbf{rational}}}
 \end{equation*}
 \begin{equation*}
-\inference[BINOP ]{\context \synth{S}{\mathbf{integer}} & \synth{T}{\mathbf{integer}} }
-{\context \synth{S \oplus T}{\mathbf{integer}} }\oplus \in \{+, *, / \}
-\end{equation*}
-\begin{equation*}
-\inference[IFNEG ]{\context \synth{S}{\mathbf{integer}} & \context \synth{T}{A} & \context \synth{U}{A} }
+\inference[IFNEG ]{\context \synth{S}{\mathbf{int}} & \context \synth{T}{A} & \context \synth{U}{A} }
 {\context \synth{\mathbf{ifneg} \; S \; T \; U}{A} }
+\qquad
+\inference[NEG ]{\context \synth{S}{\mathbf{int}} }
+{\context \synth{- S}{\mathbf{int}}}
 \end{equation*}
 \begin{equation*}
-\inference[IFZERO ]{\context \synth{S}{\mathbf{integer}} & \context \synth{T}{A} & \context \synth{U}{A} }
+\inference[IFZERO ]{\context \synth{S}{\mathbf{int}} & \context \synth{T}{A} & \context \synth{U}{A} }
 {\context \synth{\mathbf{ifzero} \; S \; T \; U}{A} }
+\qquad
+\inference[INT ]{ }
+{\context \synth{n}{\mathbf{int}}}
 \end{equation*}
 \caption{Typing rules for numerical sideconditions}
 \label{fig:tynum}
@@ -156,20 +148,18 @@ For *side effects* rules we have that /LET-SC/ works as its counter part, and /D
  #+begin_export latex
 \begin{figure}[h!]
 \begin{equation*}
+\inference[DO ]{\context \synth{S}{A} & \context \synth{T}{B} }
+{\context \synth{\mathbf{do} \; S \; T}{B} }
+\qquad
 \inference[IFMARKED ]{\context \synth{S}{A} & \synth{T}{B} & \synth{U}{B}}
 {\context \synth{\mathbf{ifmarked} \; n \; S \; T \; U}{B} }
 \end{equation*}
 \begin{equation*}
-\inference[MARKVAR ]{\context \synth{S}{A}}
-{\context \synth{\mathbf{markvar} \; n \; S}{A} }
-\end{equation*}
-\begin{equation*}
 \inference[Let ]{\context \synth{S}{A} & \contextcons{x: A} \synth{T}{B} }
 {\context \synth{\mathbf{let} \; x \; S \; T}{B} }
-\end{equation*}
-\begin{equation*}
-\inference[DO ]{\context \synth{S}{A} & \context \synth{T}{B} }
-{\context \synth{\mathbf{do} \; S \; T}{B} }
+\qquad
+\inference[MARKVAR ]{\context \synth{S}{A}}
+{\context \synth{\mathbf{markvar} \; n \; S}{A} }
 \end{equation*}
 \caption{Typing rules for side effects}
 \label{fig:tyside}
@@ -190,6 +180,9 @@ For applications the function point must not be a dependent function.
 \begin{equation*}
 \inference[SCAPP ]{\context \synth{S}{\Pi x : A. B} & \context \synth{T}{C} & x \notin FV(B) }
 {\context \synth{S \; T}{B}}
+\qquad
+\inference[FAIL ]{\context \synth{A}{\mathbf{type}}}
+{\context \synth{\mathbf{fail} \; A}{A} }
 \end{equation*}
 \begin{equation*}
 \inference[MATCH ]{\context \synth{S}{A} & \forall i \in \{ 1, \dots, n\}.(\context \synth{P_i}{A} & \contextcons{\mathbf{ctx}(P_i)} \synth{T_i}{B} ) }
@@ -198,10 +191,6 @@ For applications the function point must not be a dependent function.
 \begin{equation*}
 \inference[IFEQ ]{\context \synth{S_1}{A} & \context \synth{S_2}{A} & \context \synth{T_1}{B} & \context \synth{T_2}{B} }
 {\context \synth{\mathbf{ifequal} \; S_1 \; S_2 \; T_1 \; T_2}{B} }
-\end{equation*}
-\begin{equation*}
-\inference[FAIL ]{\context \synth{A}{\mathbf{type}}}
-{\context \synth{\mathbf{fail} \; A}{A} }
 \end{equation*}
 \caption{Typing rules for compound side conditions}
 \label{fig:tycompound}

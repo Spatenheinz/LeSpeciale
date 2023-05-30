@@ -1,7 +1,7 @@
 We define evaluation on two levels, namely on terms and on the functional side condition language.
 Evaluation of the term language is straightforward.
 Side conditions pairs and holes cannot be evaluated.
-Application have a similar structure to ~infer~.
+Application has a similar structure to ~infer~.
 We consider applications in applicative order evaluation with a loop over the arguments.
 The function ~do_app~ is then called with the function and the evaluated argument:
 #+begin_src rust
@@ -23,24 +23,24 @@ match f.borrow() {
 }
 #+end_src
 Functions can be either a concrete lambda abstraction in which we simply evaluate the closure, or
-a it can be unknown.
+it can be unknown.
 If this is the case we check that the type of the neutral value is a function type.
 We construct a new neutral value, where the type of the neutral value is the range of \Pi and the value is an application of the
 unknown value onto the normal expression (~dom~, ~arg~). stating that ~arg~ has type ~dom~.
-For instance if we consider the application $(f x y)$, where $f :: a -> b -> c$,
+For instance if we consider the application $(f \; x \; y)$, where $f :: a -> b -> c$,
 then we construct:
-\[Neu( b -> c, f (x : a))\]
+\[Neu( b -> c, f \; (x : a))\]
 by the first application and
-\[Neu(c, (f (x : a)) (y : b))\]
+\[Neu(c, (f \; (x : a)) \; (y : b))\]
 after the second application.
-To come full circle, if we want to read back, we will get $(f x y)$ since it is already in normal form.
+To come full circle, if we want to read back, we will get $(f \; x \; y)$ since it is already in normal form.
 
-Evaluation of \Pi terms are also interesting. For standard \Pi constructs,
+Evaluation of \Pi terms is also interesting. For standard \Pi constructs,
 we simply evaluate the domain, construct a closure around the body, check if the bound variable is free in the range
 and construct a ~Pi~ value.
-More interesting, if the domain of a \Pi is a sidecondition, we evaluate the side condition and the target and check for equivalence.
-Lastly the result is inserted in the local context and the body is evaluated.
-This is what enables execution of side conditions in the typechecking.
+If the domain of a \Pi is a side condition, we evaluate the side condition and the target and check for equivalence.
+Lastly, the result is inserted in the local context and the body is evaluated.
+This is what enables the execution of side conditions in the type checking.
 
-Side conditions on the other hand may only be evaluated, when part of \Pi type.
-We evaluate the sidecondition language by the ~sc~ function, which follow the operational semantics in Figure \ref{fig:operational}.
+Side conditions on the other hand may only be evaluated when part of \Pi type.
+We evaluate the side condition language by the ~sc~ function, which follows the operational semantics in Figure \ref{fig:operational}.

@@ -2,18 +2,18 @@
 :PROPERTIES:
 :CUSTOM_ID: sec:implementation
 :END:
-In this section we present the implementation, LFSCR. We first describe some high level design decisions taken
-to reduce the amount of memory needed and to make the typechecking algorithm efficient. We do so in Section \ref{sec:highlevelimpl}.
+In this section, we present the implementation, /lfscr/. We first describe some high-level design decisions taken
+to reduce the amount of memory needed and to make the type-checking algorithm efficient. We do so in Section \ref{sec:highlevelimpl}.
 In Section \ref{sec:readingimpl} we discuss how to read and format the proofs to a format appropriate for the Linux kernel.
-Lastly we go through the implementation of the typechecker in Section \ref{sec:typeimpl}
+Lastly, we go through the implementation of the type checker in Section \ref{sec:typeimpl}
 
 
 ** General implementation choices
 :PROPERTIES:
 :CUSTOM_ID: sec:highlevelimpl
 :END:
-In this section we describe some general consideration for the implementation w.r.t performance.
-In short LFSCR can uses normalization by evaluation with De Bruijn indices and explicit substitutions as techniques.
+In this section, we describe some general considerations for the implementation w.r.t performance.
+In short, LFSCR can use normalization by evaluation with De Bruijn indices and explicit substitutions as techniques.
 #+include: highlevel.org
 
 ** Reading and formatting proofs
@@ -26,11 +26,12 @@ In short LFSCR can uses normalization by evaluation with De Bruijn indices and e
 :PROPERTIES:
 :CUSTOM_ID: sec:typeimpl
 :END:
-In this section we describe the implementation of the type-checking semantics.
+In this section, we describe the implementation of the type-checking semantics.
 We start by introducing the value representation obtained by inference and evaluation in Section \ref{sec:valimpl}.
 Then we describe the Signature and Contexts in Section \ref{sec:sigimpl} and how we handle commands in \ref{sec:impl}.
-We describe inference in Section \ref{sec:inferimpl}, and typechecking by definitional equality in \ref{sec:checkimpl}.
-Lastly we go over the normalization process by desscribing reification and evaluation in Section \ref{sec:readback} and \ref{sec:eval}.
+We describe inference in Section \ref{sec:inferimpl}, and type checking by definitional equality in \ref{sec:checkimpl}.
+Lastly, we go over the normalization process by describing reification and evaluation in Section \ref{sec:readback} and \ref{sec:eval}.
+
 
 *** Values
 :PROPERTIES:

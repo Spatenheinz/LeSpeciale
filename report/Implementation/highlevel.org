@@ -23,19 +23,19 @@ We could potentially also consider using De Bruijn indices for free variables, h
 Although it could be interesting to consider De Bruijn levels since these are not relative to the scope.
 
 We also consider De Bruijn indices for other binders such as program definitions:
-#+begin_src
+#+begin_src none
 (function sc_arith_add_nary ((t1 term) (t2 term)) term
   (a.+ t1 t2))
 #+end_src
 This program definition will get converted into:
-#+begin_src
+#+begin_src none
 (function sc_arith_add_nary ((term) (term)) term
   (a.+ _1 _0))
 #+end_src
 Where _ prefixes De Bruijn index to distinguish them from integers.
 
 Similarly in pattern matching, when a constructor is applied to multiple arguments, the following
-#+begin_src
+#+begin_src none
   (match t
     ((apply t1 t2)
       (let t12 (getarg f t1)
@@ -43,7 +43,7 @@ Similarly in pattern matching, when a constructor is applied to multiple argumen
     (default ff))
 #+end_src
 gets converted into:
-#+begin_src
+#+begin_src none
   (match t
     ((apply 2)
       (let (getarg f _1)
@@ -54,7 +54,7 @@ Notice here that the arguments ~t1~ and ~t2~ are substituted by ~2~ as argument 
 
 *** Explicit substitutions
 We have already touched upon substitution, but another matter at which we shall consider is the sheer cost of direct substitution.
-Performing direct substitution on terms we cause an explosion in the size of the term and unnecessarily waste both memory and execution time because we have to copy the struct at each occurence and also traverse terms multiple times.
+Performing direct substitution on terms we can cause an explosion in the size of the term and unnecessarily waste both memory and execution time because we have to copy the struct at each occurence and also traverse terms multiple times.
 On the other hand explicit substitution allow us to not generate anything unnecessarily large and keep the computation at a minimum.
 
 We consider a substitution which is lazy, meaning we use the result of a substititution, by lookup, when necessary and then proceed, but does not generate any explicit substitutions.

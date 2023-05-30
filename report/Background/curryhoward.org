@@ -1,1 +1,34 @@
+The Curry-Howard isomorphism states that a proposition is the type of its proofs, and is an equivalence between proof calculi and formal type systems.
+Concretely the isomorphism is a 2-level equivalence between logical formulas and types on one level, and logical proofs and computational programs on the other.
+For formulas and types, we have the following correspondence:
 
+| logic                                 | type                   |
+|---------------------------------------+------------------------|
+| \top (\text{true})                       | ()                     |
+| \bot (\text{false})                      | void                   |
+| \wedge (conjunction)                       | product type           |
+| \vee (disjunction)                       | sum type               |
+| \longrightarrow (\text{implication})                | function type          |
+| \forall (\text{universal quantification})   | \Pi (dependent type)     |
+| \exists (\text{existential quantification}) | \Sigma (dependent sum type) |
+
+Take for example the formula \(A \wedge P \longrightarrow P\). Informally, when we have evidence for both \(A\) and \(P\) then we can get a \(P\), and similarly for types if we can give a pair \((A,P)\) then we can get the inhabitant \(P\).
+
+For proof to such a proposition we consider the correspondence between natural deduction and lambda calculus, where
+
+| deduction rule           | lambda term   |
+|--------------------------+---------------|
+| hypothesis               | free variable |
+| implication elimination  | application   |
+| implication introduction | abstraction   |
+
+We then further consider destructors for sum and product types.
+For proposition such as \(P \wedge (Q \vee R) \longrightarrow ((P \wedge Q) \vee (P \wedge R)\):
+we can construct a program, in a Haskell-like syntax:
+#+begin_src
+f :: (P, Either Q R) -> Either (P, Q) (P, R)
+f (p, Left q) = Left (p, q)
+f (p, Right r) = Right (p, r)
+#+end_src
+Given a pair of type \((P, Either Q R)\) we may construct a type \(Either (P, Q) (P, R))\), hence constituting a proof for the proposition.
+One thing to note however is that we require programs to be total, as we could otherwise give evidence for the uninhabited void type.

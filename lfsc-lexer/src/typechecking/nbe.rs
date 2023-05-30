@@ -3,6 +3,7 @@ use super::values::{Neutral, Normal, Value, RT, ResRT};
 use lfsc_syntax::ast::{AlphaTerm, Num, BuiltIn};
 use lfsc_syntax::ast::AlphaTerm::*;
 use lfsc_syntax::free::FreeVar;
+use crate::typechecking::errors::TypecheckingErrors::*;
 
 use std::rc::Rc;
 use std::borrow::Borrow;
@@ -47,8 +48,8 @@ where T: BuiltIn
                 Ok(Rc::new(Value::Lam(closure)))
             },
             Asc(_, val) => self.eval(val),
-            SC(..) => todo!("eval SC"),
-            Hole => todo!("eval Hole"),
+            SC(..) => Err(CannotEvalSC),
+            Hole => Err(CannotEvalHole),
         }
     }
 
@@ -62,10 +63,10 @@ where T: BuiltIn
                     ran(arg.clone(), self.gctx)?,
                     Rc::new(Neutral::App(neu.clone(), Normal(dom.clone(), arg))))))
             } else {
-                Err(super::errors::TypecheckingErrors::NotPi)
+                Err(NotPi)
             }
         }
-        _ => Err(super::errors::TypecheckingErrors::NotPi)
+        _ => Err(NotPi)
     }
     }
 }

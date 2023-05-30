@@ -1,6 +1,12 @@
 We are interested in investigating Proof Carrying Code as an alternative to the eBPF verifier.
 Proof Carrying Code (PCC) is a mechanism designed to ensure the safe execution of programs from untrusted sources. The PCC process is presented in Figure \ref{fig:pccimg}. In this project we specifically consider the marked parts of the process.
 
+#+CAPTION: Structure of Proof Carrying Code
+#+NAME:   fig:pccimg
+#+ATTR_LATEX: :width 0.7\linewidth
+[[./Background/pccimg.png]]
+
+
 The PCC architecture can be divided into two spaces, namely the code producer and the code consumer.
 The code producer aims to execute some code at the expense of the code consumer.
 In case there is not perfect trust between code consumer and code producer,

@@ -1,33 +1,4 @@
-* Conclusion
-:PROPERTIES:
-:CUSTOM_ID: sec:conclusion2
-:END:
-We have in this report given a brief overview of how the eBPF verifier works,
-and we have discussed some concerns with the current eBPF verifier.
-This motivates the intend of making a proof carrying code architecture as part of the Linux kernel.
-We have described how we can use the reasonably new feature of Rust inside the kernel,
-to make such an architecture.
-We have described the dependently typed language LFSC,
-which uses the curry howard isomorphism to construct logics, and although not complete, an implementation of a typechecker for the language.
-The typechecker in its current form, is not compileable inside of the kernel but uses only
-features of the Rust language, with some slight modifications, such as having to enable the Reference counted smart pointer.
-The implementation of the typechecker is reasonably simple in structure, with only 2400 lines of code and uses purely safe features
-in rust and thus provide the necessary safety to run inside the kernel.
-We have further done some experiments that generates arbitrary straight line eBPF programs and performs a naive
-verification condition on them to generate LFSC proofs with CVC5.
-We used these experiments to ensure the correctness of the implementation
-aswell as providing a framework for benchmarking the performance.
-In this process we have found the implementation described in this report
-to be inferior in performance to the /lfscc/ proof checker from CVC5 by up to 10 times slower execution time,
-which suggest a modular approach using normalization by evaluation is not the ideal approach.
-Although the execution time is higher for this implementation it is still within reason and may, with some optimizations, be decent enough for an in kernel verifier.
-We have further by accident also facilitated the foundation for ensuring proofs correspond to the program it is supplied with in a PCC setting.
-The argumentation here is that the proof encodes the verification condition as an LFSC term, and if the in-kernel proof checker generates verification conditions in LFSC
-then checking the requirement is merely normalization followed by a equality check.
-
-Thus, while we cannot say anything definite at this point, we have provided a basis for future work to make a PCC architecture in the Linux kernel.
-
-** Future work
+* Future work
 We have presented only a small part of a proof-carrying code architecture,
 so naturally for a final conclusion on the matter, discussed in this work,
 an in-kernel verification condition generator should be defined.
@@ -41,3 +12,36 @@ More work should be done in making the implementation fast.
 Lastly, a more comprehensive analysis and design between PCC and the eBPF verifier should be conducted.
 Specifically, which parts of the verifier should co-exist with PCC.
 One such example is checking of user-rights.
+
+* Conclusion
+:PROPERTIES:
+:CUSTOM_ID: sec:conclusion2
+:END:
+We have in this report given a brief overview of how the eBPF verifier works,
+and we have discussed some concerns with the current eBPF verifier.
+This motivates the intend of making a proof carrying code architecture as part of the Linux kernel.
+In this project we have
+- Described how we can use the reasonably new feature of Rust inside the kernel,
+  to make a PCC architecture.
+- Described the dependently typed language LFSC,
+  which uses the Curry-Howard isomorphism to construct logics.
+- Described and implemented, although not completely, a typechecker for the LFSC language.
+  The typechecker in its current form is not compileable inside of the kernel but uses only
+  features of the Rust language, with some slight modifications, such as enabling the reference-counted smart-pointer.
+  The implementation of the typechecker is reasonably simple in structure, with only 2400 lines of code and uses purely safe features
+  in Rust and thus provide the necessary safety to run inside the kernel.
+- Done experiments that generates arbitrary straight line eBPF programs and performs a naive
+  verification condition on them to generate LFSC proofs with CVC5.
+  We used these experiments to ensure the correctness of the implementation as well as providing a framework for benchmarking the performance.
+- Found that for verification conditions for straight-line programs consists of no side conditions, which suggest they might be unneccessary.
+- By accident also facilitated the foundation for ensuring proofs correspond to the program it is supplied with in a PCC setting.
+  The argumentation here is that the proof encodes the verification condition as an LFSC term, and if the in-kernel proof checker generates verification conditions in LFSC,
+  then checking the requirement is merely normalization followed by a equality check.
+
+In this process we have found the implementation described in this report
+to be inferior in performance to the /lfscc/ proof checker from CVC5, by up to 12 times slower execution time,
+which suggest a modular approach using normalization by evaluation is not the ideal approach.
+Although the execution time is higher for this implementation it is still within reason and may, with some optimizations, be decent enough for an in kernel verifier.
+
+Thus, while we cannot say anything definite at this point, we have provided a basis for future work to make a PCC architecture in the Linux kernel.
+

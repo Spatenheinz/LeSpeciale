@@ -135,8 +135,15 @@ where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
                     _ => Err(NaN)
                 }
             },
-            ZtoQ(z) => todo!(),
-            ZBranch { n, tbranch, fbranch } | NegBranch { n, tbranch, fbranch } => {
+            ZtoQ(z) => {
+              if let Value::Z(x) = self.run_sc(z)?.borrow() {
+                Ok(Rc::new(Value::Q(*x, 1)))
+              } else {
+                Err(NaN)
+              }
+            },
+            ZBranch { n, tbranch, fbranch } |
+            NegBranch { n, tbranch, fbranch } => {
                 let n = self.run_sc(n)?;
                 let val = match n.borrow() {
                         Value::Z(x) => x,

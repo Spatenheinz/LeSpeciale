@@ -1,6 +1,6 @@
 To infer types of LFSC we define an ~infer~ function for each of the constructs in the language,
-The functions are implemented as inherent implementations (concrete associated functions) and has the types:
-#+begin_src rust
+The functions are implemented as inherent implementations (concrete associated functions) and have the types:
+#+begin_src none
 impl<'global, 'term, T> EnvWrapper<'global, 'term, T>
 where T: BuiltIn
 {
@@ -14,15 +14,15 @@ where T: BuiltIn
 }
 #+end_src
 The functions follow closely the rules in Figure \ref{fig:tylfsc}.
-Taking ~infer~ as example it pattern-matches on ~term~,
-and for \lambda, side conditions and holes the inference fails.
+Taking ~infer~ as an example it pattern-matches on ~term~,
+and for \lambda, side conditions, and holes the inference fails.
 And variables and symbols are simply looked up in either \Sigma or \Gamma respectively.
 Now for some of the more complicated rules:
 
 inferring a ~Pi~ can be seen in Figure \ref{fig:inferpi}. We first check if the domain is a side condition.
-If that is the case, we infer the type of the side condition and check it to have the same type as type of the second part of the pair. We create a Run type ~val~ which will be bound in the inference of the ~b~.
-In case it is not a sidecondition, we simply infer the domain to have *type* and then evaluate it, to get its value.
-We can then update the local environment stating that De Bruijn index 0 in the localcontext ~IsA { val }~ type.
+If that is the case, we infer the type of the side condition and check it to have the same type as the type of the second part of the pair. We create a Run type ~val~ which will be bound in the inference of the ~b~.
+In case it is not a side condition, we simply infer the domain to have *type* and then evaluate it, to get its value.
+We can then update the local environment stating that De Bruijn index 0 in the local context ~IsA { val }~ type.
 #+begin_export latex
 \begin{figure}[h!]
 \begin{lstlisting}
@@ -45,9 +45,9 @@ AlphaTerm::Pi(a, b) => {
 #+end_export
 
 For application instead of interpreting multiple continuous applications as curried form, we use a flat approach in which we evaluate each argument in a loop, as presented in Figure \ref{fig:inferapp}.
-First we infer the function point, which is saved in a mutable variable updated each iteration of the following loop.
-Each argument is checked against the domain of the \Pi type. If the variable bound by the \Pi is free in the body, then we evaluate it. Otherwise we return an arbitrary value.
-Lastly the body is evaluated, with either the new value or a default value added to the local environment. The result is bound to ~f_ty~. This happens for each iteration and lastly we return the bound value.
+First, we infer the function point, which is saved in a mutable variable updated at each iteration of the following loop.
+Each argument is checked against the domain of the \Pi type. If the variable bound by the \Pi is free in the body, then we evaluate it. Otherwise, we return an arbitrary value.
+Lastly, the body is evaluated, with either the new value or a default value added to the local environment. The result is bound to ~f_ty~. This happens for each iteration and lastly, we return the bound value.
 In case the argument is a hole we do not check it, as it is trivially the correct type at this point. We add it to the environment and evaluate the body.
 #+begin_export latex
 \begin{figure}[h!]
