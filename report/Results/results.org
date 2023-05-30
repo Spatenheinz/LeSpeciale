@@ -5,12 +5,12 @@
 Since the purpose of this project is to check the feasibility of an in-kernel proof-checker that can replace the eBPF verifier,
 we want to evaluate the implementation with proofs that resemble what would occur in a PCC context. To do so, we consider a simple verification condition
 generator based on the weakest precondition predicate transformers.
-Specifically we consider a limited subset of eBPF consisting only of the following instructions:
+Specifically, we consider a limited subset of eBPF consisting only of the following instructions:
 
 \begin{align*}
-(\text{Mov } r_d &:= src\\
-(\text{Update} r_d &:= r_d \oplus src\\
-(\text{Neg and assign} r_d &:= -src\\
+(\text{Mov }) \qquad r_d &:= src\\
+(\text{Update}) \qquad r_d &:= r_d \oplus src\\
+(\text{Neg and assign}) \qquad r_d &:= -src\\
 \oplus &\in \{+, -, **, /, mod, xor, \&, |, \ll, \gg \}
 \end{align*}
 
@@ -18,9 +18,9 @@ $r_d$ denotes an arbitrary register, and $src$ may be either, a register or a co
 Instructions can be:
 - A move from $src$ into $r_d$.
 - A negation of a $src$ value into $r_d$
-- An update with one of the binary operators \oplus where & and | is binary con- and disjunction, and << >> is logical left and right shifts.
+- An update with one of the binary operators \oplus where & and | is binary con- and disjunction, and \(\ll\) \(\gg\) is logical left and right shifts.
 
-With this we want to do some positive testing by constructing valid programs and then check the proofs.
+With this, we want to do some positive testing by constructing valid programs and then check the proofs.
 We consider only valid programs as CVC5 does not generate proofs for satisfiable terms but rather satisfying models.
 
 We use QuickCheck to generate arbitrary instructions with the property that
@@ -28,56 +28,56 @@ register $r_0$ should be greater than 0 and smaller than some arbitrary value, 8
 This simulates a sequence of instructions followed by a memory access.
 This is a situation the eBPF verifier has been shown to be faulty at previously\cite{manfred}.
 We ensure this property by evaluating the program by interpretation written in Haskell.
-If the program satisfy the property we add a prolog and epilog to the program to make a program that can be validated by the verifier.
-Specifically, we initialize the registers we use and iclude an exit command.
-We create the verification condition, with the post condition that
+If the program satisfies the property we add a prolog and epilog to the program to make a program that can be validated by the verifier.
+Specifically, we initialize the registers we use and include an exit command.
+We create the verification condition, with the postcondition that
 $0 \le r_0 < n$.
-We convert the representation of the verification condition into SMT2 and discharg it to CVC5.
+We convert the representation of the verification condition into SMT2 and discharge it to CVC5.
 If the negation of the verification condition is unsatisfiable by CVC5,
 then we can discharge an LFSC proof.
-We compare the implementation represented in this report, from now on called /lfscr/ with the proof checker in C++ provided by CVC5 called /lfscc/. We use this both for finding any bugs but also to benchmark the performance of /lfscr/ with a high performance tool.
+We compare the implementation represented in this report, from now on called /lfscr/ with the proof checker in C++ provided by CVC5 called /lfscc/. We use this both for finding any bugs and also to benchmark the performance of /lfscr/ with a high-performance tool.
 
 We can also check the runtime speed of loading an eBPF program into the kernel for comparison.
-Although this comparison is not very precise, because loading of an eBPF program does more than just verifying it,
+Although this comparison is not very precise, because the loading of an eBPF program does more than just verify it,
 it still gives a good indication if proof checking is far more intensive than static analysis.
 
 In creating this experiment some credit should be attributed to
 Ken Friis Larsen, Mads Obitsøe and Matilde Broløs.
 To discharge eBPF, we use Larsens \url{https://github.com/kfl/ebpf-tools} and to interact with eBPF we use a collection
 of FFI-bindings in Haskell by Obitsøe.
-The generation of code and evaluation is part of ongoing research by all three and I.
-Lastly convertion of the verification condition to SMT2 takes heavy inspiration from
+The generation of code and evaluation is part of ongoing research by all three and me.
+Lastly, conversion of the verification condition to SMT2 takes heavy inspiration from
 Obitsøes Thesis.
 The VC generator is made specifically for this project.
 
-For the benchmarking, we create programs of size 1, 10, 100 and 1000.
-One small caviat that needs mention is that sometimes CVC5 will give a satisfiable result instead
+For the benchmarking, we create programs of size 1, 10, 100, and 1000.
+One small caveat that needs mention is that sometimes CVC5 will give a satisfiable result instead
 an unsatisfiable result. This is a problem somewhere in the pipeline but I have not had time to investigate this matter.
-For now we settle on generating a new program of same size and try again.
-In the process it showed to be unfeasible to prove the validity of programs of size 1000 in CVC5 on my i7-1165G7 CPU with 16 GB of ram, thus in the evaluation we only consider programs up to 100.
+For now, we settle on generating a new program of same size and try again.
+In the process, it showed to be unfeasible to prove the validity of programs of size 1000 in CVC5 on my i7-1165G7 CPU with 16 GB of ram, thus in the evaluation we only consider programs up to 100.
 
 *** LFSC - without side conditions?
-One interesting finding about the experiments, is that they do not include any side conditions.
+One interesting finding about the experiments is that they do not include any side conditions.
 Therefore it may be interesting to see if a VC generator can be encoded in such a way that it produces
 terms with side conditions instead of purely logical connectives. If this can efficiently be done, then
-it may reduce both the size of the proof as well as making the typechecking faster.
+it may reduce both the size of the proof as well as make the typechecking faster.
 
 
 * Evaluation
 :PROPERTIES:
 :CUSTOM_ID: sec:evaluation
 :END:
-In the following section we evaluate the implementation, /lfscr/ by runtime speed and memory usage.
-We further argue for the completeness and correctness aswell as general comparison compared to /lfscc./
+In the following section, we evaluate the implementation, /lfscr/ by runtime speed and memory usage.
+We further argue for the completeness and correctness as well as general comparison compared to /lfscc/.
 
 ** Speed
 :PROPERTIES:
 :CUSTOM_ID: sec:speed
 :END:
-In the first iteration of the code, the performance of /lfscr/ presented in this report were atrocious.
-From Table \ref{tab:slow} it should be clear that, /lfscr/ were extremely slow.
-For a single instruction, the performance are similar to /lfscc/. In this case we essentially just check all the signatures distributed by cvc5\cite{lfscsigs} along with a small proof.
-Already for 10 instructions my implementation was using 4 times as long to check a proof, and for a 100 instruction straight line program this difference was close to 140 times slower.
+In the first iteration of the code, the performance of /lfscr/ presented in this report was atrocious.
+From Table \ref{tab:slow} it should be clear that /lfscr/ was extremely slow.
+For a single instruction, the performance is similar to /lfscc/. In this case, we essentially just check all the signatures distributed by cvc5\cite{lfscsigs} along with a small proof.
+Already for 10 instructions, my implementation was using 4 times as long to check a proof, and for a 100-instruction straight line program this difference was close to 140 times slower.
 
 #+caption: First implementation lfscr Vs lfscc
 #+name: tab:slow
@@ -86,8 +86,8 @@ Already for 10 instructions my implementation was using 4 times as long to check
 | lfscc        | 9.0 \pm 3.3 ms  | 9.0 \pm 3.2 ms  | 59.6 \pm 0.7 ms |
 | lfscr        | 12.7 \pm 0.7 ms | 36.6 \pm 1.3 ms | 8.3 \pm 0.9 s   |
 
-Inspecting the proofs, which can be found at the repository, in the ~vcgen~ folder as, ~benchmark_n.plf~, one can notice that there are more than 1000 local bindings for a 100 line program. This lead be to belive that using cons lists would maybe not be optimal,
-switching to an approach that uses ~Vec~ as the underlying datastructure and truncating similar to the approach described in Section \ref{sec:converter} gave a decent improvement in speed, being a couple of seconds faster than the first implementation.
+Inspecting the proofs, which can be found in the repository, in the ~vcgen~ folder as, ~benchmark_n.plf~, one can notice that there are more than 1000 local bindings for a 100-line program. This lead me to believe that using cons lists would maybe not be optimal,
+switching to an approach that uses ~Vec~ as the underlying data structure and truncating similar to the approach described in Section \ref{sec:converter} gave a decent improvement in speed, being a couple of seconds faster than the first implementation.
 
 | instructions | 1              | 10            | 100         |
 |--------------+----------------+---------------+-------------|
@@ -98,15 +98,15 @@ This was still early in the development and the current implementation still use
 For smaller proofs cons lists are still faster but it might be interesting to reinvestigate if using ~Vec~ is more efficient, now that the implementation is complete.
 
 *** Massive speedup
-Analysing the code with perf, it got clear that most of the time was used in evaluating applications, namely about 60 percent of the time spend was in ~eval~ and ~do_app~. There is nothing inherently strange about this since proofs are mainly just applications and application chains get big for larger proofs.
-From analyzing the /lfscc/ implementation it got clear that my implementation did unecessary computations.
+Analyzing the code with perf, it got clear that most of the time was used in evaluating applications, namely about 60 percent of the time spent was in ~eval~ and ~do_app~. There is nothing inherently strange about this since proofs are mainly just applications and application chains get big for larger proofs.
+From analyzing the /lfscc/ implementation it got clear that my implementation did unnecessary computations.
 Considering the example from \ref{sec:example}, ~and_elim~ is a 4 argument symbol, of which ~p~ is used to destruct the ~holds~ of the fourth argument and fill ~f1~.
-In the example ~a0~ = ~(holds (and cvc.p (and (not cvc.p) true)))~ and while the typechecking that \(\text{a0} \Longleftarrow \text{holds} \; \text{f1}\) is necessary, the following call to ~eval~ to bind ~p~ in the range of the function is uneccesary since ~p~ does not occur free in the range. Already for this very small formula the application consists of 6 applications at the top level.
-This pattern appear often in LFSC proofs.
+In the example ~a0~ = ~(holds (and cvc.p (and (not cvc.p) true)))~ and while the type checking that \(\text{a0} \Longleftarrow \text{holds} \; \text{f1}\) is necessary, the following call to ~eval~ to bind ~p~ in the range of the function is unnecessary since ~p~ does not occur free in the range. Already for this very small formula the application consists of 6 applications at the top level.
+This pattern appears often in LFSC proofs.
 Often \Pi types will include a parameter that does not occur free in the body, but merely exist to destruct a pattern onto an unfilled hole.
-So including a calculation of whether a bound variable occurs in the body and then checking the condition before evaluation can save massive amount of computation.
+So including a calculation of whether a bound variable occurs in the body and then checking the condition before evaluation can save a massive amount of computation.
 
-This line from the application case in ~infer~ (along with the actual function for calculating ~free~) is enough to make /lfscr/ 43 times faster and relatively compareable to /lfscc/.
+This line from the application case in ~infer~ (along with the actual function for calculating ~free~) is enough to make /lfscr/ 43 times faster and relatively comparable to /lfscc/.
 #+begin_src rust
 let x = if *free { self.eval(n)? } else { a.clone() };
 #+end_src
@@ -118,27 +118,36 @@ Specifically we get:
 | lfscr        | 5.4 \pm 1.9 ms | 11.7 \pm 0.6 ms | 193.0 \pm 4.6 ms |
 
 Hence /lfscc/ is now merely 3 times faster than /lfscr./
-/lfscc/ takes a different approach than /lfscr. /lfscc/ does everything all at once, meaning lexing/parsing and inference and evaluation all occurs in the same function in an online approach.
-This approach seems to reduce a lot of overhead, but function which does all of this also implements tail calls by
-using goto statements to the top of the function. If tail calls are eliminated, performance are almost identical for the two approaches.
+/lfscc/ takes a different approach than /lfscr. /lfscc/ does everything all at once, meaning lexing/parsing and inference, and evaluation all occur in the same function in an online approach.
+This approach seems to reduce a lot of overhead, but the function which does all of this also implement tail calls by
+using goto statements to the top of the function. If tail calls are eliminated, performance is almost identical for the two approaches.
 
 *ADDENDUM*
-These benchmarks were done before, i realized that /lfscc/ can be build in both a debug and release version. In the release version it is consistently 2-3 times faster than the results presented here.
-This suggest that a proof checker can indeed be effeciently implemented, but the approach done in this project is not ideal.
+These benchmarks were done before, I realized that /lfscc/ can be built in both a debug and release version. In the release version, it is consistently 2-3 times faster than the results presented here.
+This suggests that a proof checker can indeed be efficiently implemented, but the approach done in this project is not ideal.
 
 *** formal checking vs static analysis.
-TODO
+We should not only consider the execution time of /lfscr/ in terms of other implementations. We should also compare the runtime with how long the verifier runs. It is not immediately as easy to benchmark the performance of kernel functions, although we could potentially have used eBPF to benchmark the verifier.
+Instead, we settle for a simpler but more inaccurate solution, where we benchmark the entire loading call.
+With this, we get the following running times:
+
+| Program size         |                  1 |                 10 |                 100 |                     1000 |
+|----------------------+--------------------+--------------------+---------------------+--------------------------|
+| Loading time of eBPF | 57.3 \pm 8.3 \(\mu s\) | 58.1 \pm 3.2 \(\mu s\) | 134.3 \pm 2.9 \(\mu s\) | 1.628 ms \pm 144.9 \(\mu s\) |
+
+It should here be clear that the verifier is a lot faster. Even a 100-line program only takes 134 nano-seconds, which percentage-wise is significantly faster than checking a proof. Instead of directly comparing the running times of formal checking vs static analysis, we should instead consider them from a pragmatic perspective. The question then becomes, is it worth spending a second or two, to load a program that is guaranteed to not be malicious, or is it more worth to be able to load programs extremely fast?
+
 
 ** Memory
 We should consider the memory usage of the implementation in two manners.
 
-First, the size of proofs plays a key role in the feasibility of using proof carrying code.
-A proof for a single instruction program (actually 4 with pre initialization and the epilog), is 2.7KB in size, while 10 instructions are 8.6KB and 100 instructions gives
-109KB. So the proofs, atleast for straight-line programs, scales linearly (or close) with roughly 1KB per instruction.
+First, the size of proofs plays a key role in the feasibility of using proof-carrying code.
+A proof for a single instruction program (actually 4 with pre-initialization and the epilog), is 2.7KB in size, while 10 instructions are 8.6KB and 100 instructions are
+109KB. So the proofs, at least for straight-line programs, scale linearly (or close) with roughly 1KB per instruction.
 Encoding the proofs in a more compact binary format could make these sizes even smaller.
 The sizes in themselves are not alarming and could still see use in devices with limited memory.
 
-Secondly we should also look at how much memory the typechecker uses.
+Secondly, we should also look at how much memory the type checker uses.
 Running both /lfscr/ with the 1,10 and 100 line proofs, we get the following memory usage:
 
 | Program size           | 1       | 10     | 100    |
@@ -147,72 +156,71 @@ Running both /lfscr/ with the 1,10 and 100 line proofs, we get the following mem
 | peak RSS               | 9MB     | 15.7MB | 25.3MB |
 | temporary allocations: | 50.13 % | 46 %   | 40 %   |
 
-From these results we see that that /lfscr/ does not use a massive amount of memory. At a single point in time we allocate 5.7MB for a 100 line program and for the entire of a program use 25.3MB.\footnote{Note that this memory also include some heaptrack overhead.} What is most interesting is that 40 % of allocations are temporary and for smaller programs even higher.
-This suggests that we do some uneccesary computations and that we maybe should use antoher approach than reference counted pointers.
-This especially become noticable, when similar diagnostics is done for /lfscc/
-For the 100 line program only 2,9MB memory is used at its peak, while it uses 10MB overall and only 6% of allocations are temporary.
-One thing to keep in mind is that about 1/4 of allocations are leaked. This is not ideal, but for very shortlived programs such as /lfscc/ it is not a big deal. On the other hand for a program that runs in the kernel memory leaks is problematic.
+From these results, we see that /lfscr/ does not use a massive amount of memory. At a single point in time, we allocate 5.7MB for a 100-line program, and for the entire lifetime of the program use 25.3MB.\footnote{Note that this memory also includes some heaptrack overhead.} What is most interesting is that 40 % of allocations are temporary and for smaller programs even higher.
+This suggests that we do some unnecessary computations and that we maybe should use another approach than reference counted pointers.
+This especially becomes noticeable, when similar diagnostics are done for /lfscc/
+For the 100-line program only 2,9MB of memory is used at its peak, while it uses 10MB overall and only 6% of allocations are temporary.
+One thing to keep in mind is that about 1/4 of allocations are leaked. This is not ideal, but for very shortlived programs such as /lfscc/ it is not a big deal. On the other hand for a program that runs in the kernel memory leaks are problematic.
 
 In any case, we can again see that we can check large proofs without many resources needed.
-But that a "all in one" solution presented by /lfscc/ could be worth prototyping in either pure C or in Rust.
+But that an "all in one" solution presented by /lfscc/ could be worth prototyping in either pure C or in Rust.
 
 ** LFSCR - strong suits and weaknesses.
 Although /lfscr/ is reasonable in both runtime and memory usage,
-the performance of /lfscc/ suggest that a more efficient approach exists.
-This implementation does have a couple of features that are worth taking into consideration aswell.
+the performance of /lfscc/suggests that a more efficient approach exists.
+This implementation does have a couple of features that are worth taking into consideration as well.
 It is implemented completely in safe Rust, meaning we cannot have any illegal memory that potentially crashes the program.
-This might be the most desireable property for a program that is designed to run inside the kernel,
+This might be the most desirable property for a program that is designed to run inside the kernel,
 as "proofs" could exploit such a vulnerability.
 
 Equally an implementation should be robust in the amount of time it takes to check the proof.
-We showed before the performance difference in checking if the occurence of a variable was free could improve the performance from by 43 times.
+We showed before the performance difference in checking if the occurrence of a variable was free could improve the performance by 43 times.
 This immediately shows that we should also consider some sort of time limit for how long a proof must be,
 since a malicious "proof" could slow down a system massively.
 
-/lfscr/ has an additional advantage over /lfscc/ when considering the positioon in a PCC architecture. Checking the proof has not been tampered with is straight forward and already implemented unintentionally.
-In its current state, the LFSC proofs discharged from CVC5 always contains the following pattern:
+/lfscr/ has an additional advantage over /lfscc/ when considering the position in a PCC architecture. Checking the proof has not been tampered with is straightforward and already implemented unintentionally.
+In its current state, the LFSC proofs discharged from CVC5 always contain the following pattern:
+
 #+begin_src
 ... POTENTIAL BINDINGS ...
 (# a0 (holds x)
 (: (holds false)
 ... ACTUAL PROOF...
 #+end_src
+
 here ~x~ is the formula unsatisfied by CVC5.
-Given that an in kernel VC generator construct its verification condition as a ~AlphaTerm~, then the check is nothing more than normalizing the verification condition and the ~a0~ of the proof and check for equality.
+Given that an in-kernel VC generator constructs its verification condition as a ~AlphaTerm~, then the check is nothing more than normalizing the verification condition and the ~a0~ of the proof and check for equality.
 
+The experiment has not only provided useful insight into the performance of the implementation; it also establishes confidence that the proof checker works as expected and follows the semantics from \ref{sec:typing}.
+Checking the signatures along with the generated proofs suggests that mostly all parts of the type checker are correct. All matters of the term language are covered, and most of the side condition language is also checked.
+At the moment ~markvar~ and ~if_marked~ are left incomplete.
+The main reason for this is that there are currently no signatures distributed by CVC5 that include them.
+The side condition language could be tested more thoroughly as only a single larger test has been conducted by the \(P \wedge \neg P\) unsatisfiability proof from \ref{sec:example}.
+Despite the example being rather small, it tests a large part of the side condition language, both constant and program application, match constructs, branching, and numerical functions.
+One point where the implementation is inherently wrong is the usage of i32s for the representation of integers and rationals these should be unbounded integers.
+This is not a problem for bit-vector proofs, but only for arithmetic logic. I have however left the representation as is for now, as I have not been able to find a library that
+efficiently implements unbounded integers and rationals and are compatible with the kernel requirements.
 
-The experiment has not only provided useful insight into the performance of the implementation; it also establishes confidence that the proof checker works as expected and follow the semantics from \ref{sec:typing}.
-Checking the signatures along with the generated proofs suggests that mostly all parts of the typechecker is correct. All matters of the term language is covered, and most of the side condition language is also checked.
-At the moment ~markvar~ and ~if_marked~ is left incomplete.
-The main reason for this is that there is currently no signatures distributed by CVC5 that include them.
-The side condition language could be tested more thoroughly as only a single larger tests has been conducted by the \(P \wedge \neg P\) unsatisfiability proof from \ref{sec:example}.
-Despite the example being rather small, it test a large part of the side condition language, both constant and program application, match constructs, branching and numerical functions.
-One point where the implementation is inherently wrong is the usage of i32's for the representation of integers and rationals, in fact these should be unbounded integers.
-This is not a problem for bitvector proofs, but only for arithmetic logics. I have however left the representation as is for now, as I have not been able to find a library that
-efficiently implements ubounded integers and rationals and are compatible with the kernel requirements.
-
-Albeit the implementation does not run in the kernel, the implementation only uses the ~core~ and ~alloc~ crate along with ~nom~, which I have been succesful in compiling and simple example of in a kernel module.
+Albeit the implementation does not run in the kernel, the implementation only uses the ~core~ and ~alloc~ crate along with ~nom~, which I have been successful in compiling and simple examples of in a kernel module.
 Hence there is nothing theoretical stopping us from compiling /lfscr/ into the kernel.
-The major work that should be done here is to make every allocation fallible by using the ~try_new~ counter parts to ~new~ allocations, and implementation a simple ~From~ trait to easily converting allocation errors into
-typechecking errors.
-Hereby the ~?~ shortcut can be used, and no types should changes as they already implement ~Result~ types.
+The major work that should be done here is to make every allocation fallible by using the ~try_new~ counterparts to ~new~ allocations and implementing a simple ~From~ trait to easily convert allocation errors intotype-checking errors.
 
 * Is PCC a good idea?
 :PROPERTIES:
 :CUSTOM_ID: sec:conclusion1
 :END:
 Even with a Rust implementation that promises memory safety and has no unexpected errors that can crash the program, the answer is not definite at this time.
-It might still not be feasible to use LFSC for an in kernel proof checker as part of a larger proof carrying code architecture, since a lot of questions are still unanswered.
-The eBPF verifier does a lot more than just validating instructions of a bytecode format. It check validity in memory alignment, user-rights, does program rewrites and much more.
-Some of these can definitely be encoded into a proof, but others may be harder to realize. Especially user-rights can prove as a challenge, since it either requires the code producer to make the proof themselves, meaning eBPF programs are not that easily distributed over machines, or they have to be patched in some way.
-Another possibility is only checking capabilities as a seperate stage before checking the proof, but this may reduce some functionality some "features" of eBPF in its current form for some users.
+It might still not be feasible to use LFSC for an in-kernel proof checker as part of a larger proof-carrying code architecture, since a lot of questions are still unanswered.
+The eBPF verifier does a lot more than just validate instructions of a bytecode format. It checks validity in memory alignment, user-rights, does program rewrites, and much more.
+Some of these can be encoded into a proof, but others may be harder to realize. Especially user-rights can prove as a challenge, since it either requires the code producer to make the proof themselves, meaning eBPF programs are not that easily distributed over machines, or they have to be patched in some way.
+Another possibility is only checking capabilities as a separate stage before checking the proof, but this may reduce some functionality of some "features" of eBPF in its current form for some users.
 Thus there is still a lot more work to be done in the architectural construction of a PCC system.
 
-Another pressing matter is that of the execution time. We have seen that proof-checking of validity of eBPF programs (atleast straight line programs) can be efficiently done, but with this implementation we are not quite there yet.
+Another pressing matter is the execution time. We have seen that proof-checking of validity in eBPF programs (at least straight-line programs) can be efficiently done, but with this implementation, we are not quite there yet.
 The benchmarking showed promises in a few different places. Using ~Vec~ instead of cons lists may be useful for larger proofs, and it would further be interesting to investigate if a modified version of the data layout would prove useful.
-For instance, we might be able to used tagged pointers or atleast a more compact data format for ~Value~'s and ~Neutral~'s to make the program both more memory and runtime efficient.
-Furthermore, the benchmarking we have done may not be entirely appropriate for determining the feasibility as we have only included straight line programs and no control flow constructs. In the end this can make proofs more complicated.
+For instance, we might be able to use tagged pointers or at least a more compact data format for ~Value~'s and ~Neutral~'s to make the program both more memory and runtime efficient.
+Furthermore, the benchmarking we have done may not be entirely appropriate for determining the feasibility as we have only included straight-line programs and no control flow constructs. In the end, this can make proofs more complicated.
 
-Despite all this the implementation we present is rather small and consist of only 2400 lines of code compared to 19000 in the verifier.
+Despite all this, the implementation we present is rather small and consists of only 2400 lines of code compared to 19000 in the verifier.
 Bugs are hence less likely to appear.
 In any case, we do not completely discard the idea of PCC in the kernel as it does show promises and with time could be a generally decent replacement for the eBPF verifier.

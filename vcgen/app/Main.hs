@@ -69,7 +69,7 @@ genAlu maxImm = frequency
     )
    -- ALU with shifts
   , (10, do
-      (rd,rs) <- genDestinationAndSource 63
+      (rd,rs) <- genDestinationAndSource 20
       binOp <- elements [I.Lsh, I.Rsh ] --, I.Arsh]
       size <- genSize
       return $ I.SetBin size rd (I.Reg rd) binOp rs
@@ -143,27 +143,27 @@ tens = 1 : [10 * x | x <- tens]
 test :: Int -> (String, B.ByteString) -> IO ()
 test n (prog, ebpf) = do
   putStrLn $ "bench for " <> show n
-  defaultMainWith defaultConfig $ [bench "ebpf" $ whnfIO $ (do p <- cLoadProgVerbose ebpf; if p < 0 then error "error" else return p)]
-  putStrLn $ "hyperfine for " <> show n
-  let filename = "benchmark_" <> show n
-  let smt2 = filename <> ".smt2"
-  writeFile smt2 prog
-  (exitcode, stdout, stderr) <-
-    readProcessWithExitCode "cvc5" (cvc5Args ++ [smt2]) ""
-  case exitcode of
-    ExitSuccess -> do
-      let (sat:proof) = lines stdout
-      when (sat /= "unsat") (putStrLn ("cvc5: Failure at " <> show n) >> mkprog n >>= test n)
-      if proof == [] then putStrLn "cvc5: No proof"
-      else do
-        writeFile (filename ++ ".plf") $ unlines $ tail proof
-        (_exitcode, stdout, stderr) <-
-          readProcessWithExitCode hyperfine (hyperfineArgs (filename <> ".plf") <> ["--show-output"]) ""
-        putStrLn stdout
-        -- removeFile $ filename <> ".smt2"
-        -- hyperfine --runs 10 --warmup 5 'target/release/lfsc-lexer' --export-markdown /tmp/hf.md && cat /tmp/hf.md"
-    ExitFailure _ -> do
-      putStr "cvc5: Failure\n\t" >> putStr stdout >> putStr stderr >> exitFailure
+  defaultMainWith defaultConfig $ [bench "ebpf" $ whnfIO $ (do p <- cLoadProg ebpf; if p < 0 then putStrLn "false" >> return False else cCloseFd p >> return True)]
+  -- putStrLn $ "hyperfine for " <> show n
+  -- let filename = "benchmark_" <> show n
+  -- let smt2 = filename <> ".smt2"
+  -- writeFile smt2 prog
+  -- (exitcode, stdout, stderr) <-
+  --   readProcessWithExitCode "cvc5" (cvc5Args ++ [smt2]) ""
+  -- case exitcode of
+  --   ExitSuccess -> do
+  --     let (sat:proof) = lines stdout
+  --     when (sat /= "unsat") (putStrLn ("cvc5: Failure at " <> show n) >> mkprog n >>= test n)
+  --     if proof == [] then putStrLn "cvc5: No proof"
+  --     else do
+  --       writeFile (filename ++ ".plf") $ unlines $ tail proof
+  --       (_exitcode, stdout, stderr) <-
+  --         readProcessWithExitCode hyperfine (hyperfineArgs (filename <> ".plf") <> ["--show-output"]) ""
+  --       putStrLn stdout
+  --       -- removeFile $ filename <> ".smt2"
+  --       -- hyperfine --runs 10 --warmup 5 'target/release/lfsc-lexer' --export-markdown /tmp/hf.md && cat /tmp/hf.md"
+  --   ExitFailure _ -> do
+  --     putStr "cvc5: Failure\n\t" >> putStr stdout >> putStr stderr >> exitFailure
 
 r0InRange = Rel (RLE (RPrim $ C 0) (RPrim $ V "0")) ./\. Rel (RLT (RPrim $ V "0") (RPrim $ C 8192)) .=>. Rel RTrue
 
@@ -175,7 +175,6 @@ mkprog n = do
   let prog' = initRegisters prog [0,6,7]
   let wp' = wp prog' r0InRange
   let tran = encodeProgram $ transpile prog'
-  print $ transpile prog'
   return $ (prettyProg wp', tran)
 
 main :: IO ()

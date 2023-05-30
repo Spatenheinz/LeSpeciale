@@ -1,11 +1,11 @@
-In this section we give a short description of the Rust programming language to motivate why it is used as host language in this project.
+In this section, we give a short description of the Rust programming language to motivate why it is used as host language in this project.
 Rust is a modern systems programming language that was first introduced in 2010.
 It was designed to address common issues faced by developers in writing low-level, high-performance code, such as memory safety and thread safety.
 
 One of the key features of Rust is its ownership model, which ensures that memory is managed efficiently and safely.
 Rust's ownership model is based on the concept of ownership and borrowing, which allows the compiler to track the lifetime of objects and manage memory
 without the need for a garbage collector.
-This ensures that common issues like null pointer dereferences, use-after-free errors and buffer overflows can occur,
+This ensures that common issues such as null pointer dereferences, use-after-free errors, and buffer overflows can occur,
 while at the same time being comparable to C in performance.
 
 Rust's syntax is similar to that of C and C++, but it also includes modern language features like pattern matching, closures, and iterators.
@@ -25,20 +25,20 @@ fn main() {
 #+end_src
 
 Then the value 42 has an owner ~x~. When the ~main()~ function ends then the owner ~x~ goes out of scope and the value is dropped.
-This specific type of ~x~ is ~i32~ and will thus reside on the stack, however if we needed something that was heap allocated then we could create a value using a Box:
+This specific type of ~x~ is ~i32~ and will thus reside on the stack, however, if we needed something that was heap allocated then we could create a value using a Box:
 #+begin_src rust
 fn main() {
     let y : Box<i32> = Box::new(42);
 }
 #+end_src
 Then ~y~ will be a ~Box~ type, which is the simplest form of heap allocation.
-Objects in rust can implement a trait, essentially an interface, called ~Drop~, and define a ~drop~ function.
+Objects in Rust can implement a trait, essentially an interface, called ~Drop~, and define a ~drop~ function.
 When ~y~ goes out of scope a call to ~drop~ happens and the memory will be freed.
 
-Ownership can be transfered by either ~move~, ~copy~ or ~clone~.
+Ownership can be transferred by either ~move~, ~copy~, or ~clone~.
 For primitive types, those that usually reside on the stack, they can be ~copied~ from one variable to another.
-Heap allocated values can be either ~cloned~, which essentially works as a ~memcpy~, or by moving it.
-This means that the snippet below will get a compile time error at line 6, because the variable that owns
+Heap-allocated values can be either ~cloned~, which essentially works as a ~memcpy~, or by moving it.
+This means that the snippet below will get a compile-time error at line 6 because the variable that owns
 the box containing 42 is no longer owned by ~y~ but rather by ~a~.
 #+begin_src rust
 fn main() {
@@ -50,9 +50,9 @@ fn main() {
 }
 #+end_src
 
-Since cloning is a ~memcpy~ it can be pretty inefficient and should most often be avoided.
-Rust allow pass by reference in the form of borrowing.
-Borrowing literally describes the action of receiving something with the promise of return.
+Since cloning is a ~memcpy~ it can be quite inefficient and should most often be avoided.
+Rust allows pass-by-reference in the form of borrowing.
+Borrowing describes the action of receiving something with the promise of return.
 When borrowing a value the memory address of the value is referenced by an & and is essentially just a pointer.
 It is worth noting that a reference differs from pointers in C in that they cannot be ~NULL~ and thus by mere construction eliminates ~NULL~ pointer problems.
 There are two types of references, exclusive and shared references.
@@ -60,62 +60,63 @@ Exclusive references can mutate the borrowed value, while a shared reference may
 There are 3 rules that borrowing is subject to:
 
 1. There can exist either a single exclusive reference or multiple shared references at a given time.
-2. References must always be valid, which mean it is impossible the borrow a value after its owner has gone out of scope.
+2. References must always be valid, which means it is impossible the borrow a value after its owner has gone out of scope.
 3. A value cannot be modified whilst referenced.
 
 These rules invariantly ensure that a reference is always as perceived to the borrower.
 If multiple mutable borrows were allowed at the same time, or even simultaneously with a shared reference, then
 one of the mutable borrows may destroy the reference for the others.
-An example where this is extremely obvious is when we consider a reference to a datastructure that might need to be reallocated,
+An example where this is extremely obvious is when we consider a reference to a data structure that might need to be reallocated,
 such as dynamic arrays. In such a situation the address of the old array will no longer be valid.
 This is ensured to never happen according to rule 3.
 
-Rust also promises zero cost abstractions and high-level features such as sum types, pattern matching and traits/interfaces, while still having performance similar to C.
+Rust also promises zero-cost abstractions and high-level features such as sum types, pattern matching, and traits/interfaces, while still having performance similar to C.
 
-These promises of memory safety and high level abstractions is what constitutes the basics of the Rust programming language. The safe memory management without the overhead of a garbage collector has gained Rust popularity in recent years, especially in the systems programming community, due to its combination of performance, safety, and ease-of-use.
-This popularity also includes the Linux Development community, where safety, security and reliability is mission critical.
+These promises of memory safety and high-level abstractions are what constitute the basics of the Rust programming language. Safe memory management without the overhead of a garbage collector has gained Rust popularity in recent years, especially in the systems programming community, due to its combination of performance, safety, and ease of use.
+This popularity also includes the Linux Development community, where safety, security, and reliability are mission-critical.
 As of kernel 6.1 Rust is officially supported in the Linux kernel, albeit fairly limited as described throughout this report.
 
-Hence Rust seems like an appropriate tool for a program that has to run in the kernel, and where robustness is critical.
-Bu we must also consider what restrictions the kernel imposes on Rust.
+Hence Rust seems like an appropriate tool for a program that has to run in the kernel, and where robustness is critical,
+but we must also consider what restrictions the kernel imposes on Rust.
 
 *** Rust in the kernel?
 As of kernel version 6.2.8rc, the Rust kernel development framework not a lot of functionality is exposed.
-The crates/modules immediately exposed in the kernel is ~alloc~, ~core~, ~kernel~, ~compiler_builtins~ and ~macros~.
-The ~macros~ crate is tiny and exposes the ability to easily describe a LKMs meta-data.
-The ~compiler_builtins~ are compiler built in functionality which usually resides in the standard library ~std~. The builtins supported in the kernel at the moment is nothing more than a panics (exceptions).
-The ~kernel~ crate exposes the kernel APIs, such as character devices, file descriptors etc.
-The functionality of this crate is mostly intended for use in LKMs, but does provide some features that could be used elsewhere such as random numbers etc.
-The ~alloc~ and ~core~ crates constitutes most of the ~std~ library in Rust and is respectively the implementation of a memory allocator and core functionality. The ~alloc~ and ~core~ crates are often used
-in embedded systems and others situations where no operating system to provide the functionality of the standard library.
-The ~core~ crate exposes basic functionality such as primitive types, references etc.
+The crates/modules immediately exposed in the kernel are ~alloc~, ~core~, ~kernel~, ~compiler_builtins~, and ~macros~.
+The ~macros~ crate is tiny and exposes the ability to easily describe an LKMs meta-data.
+The ~compiler_builtins~ are compiler built-in functionality that usually resides in the standard library ~std~. The builtins supported in the kernel at the moment are nothing more than panics (exceptions).
+The ~kernel~ crate exposes the kernel APIs, such as character devices, file descriptors, etc.
+The functionality of this crate is mostly intended for use in LKMs but does provide some features that could be used elsewhere such as random numbers etc.
+The ~alloc~ and ~core~ crates constitute most of the ~std~ library in Rust and respectively the implementation of a memory allocator and core functionality. The ~alloc~ and ~core~ crates are often used
+in embedded systems and other situations where no operating system to provide the functionality of the standard library.
+The ~core~ crate exposes basic functionality such as primitive types, references, etc.
 The ~alloc~ crate exposes memory allocations and in userspace uses some exposure of malloc, while in kernel space may use either ~kmalloc~ or ~kvmalloc~ to allocate physical and virtual memory inside the kernel.
-In its current form the ~alloc~ crate does not provide much functionality.
+In its current form, the ~alloc~ crate does not provide much functionality.
 Only simple allocation types such as ~Box~ are exposed and their API is conservative.
-The reason behind is that the kernel has no way to handle Out-Of-Memory cases.
-Thus most datastructures are simply not allowed, because they dont expose a fallible way to allocate memory.
-Whenever a new allocation need to happen a ~try_new()~ function can be called, which will return a ~Result~ type with either a reference or an error.
-For infallible memory allocations with ~new()~ an out of memory will throw an exception, which there is no good way to handle.
-The only datastructure available is ~Vec~, a dynamic array.
-For faster performance on lookup, we might need other datastructures.
-Furthermore the ~alloc~ crate is compiled with a ~no_rc~ feature meaning there is no way to use the reference counted pointers defined in Rust.
+The reason behind this is that the kernel has no way to handle Out-Of-Memory cases.
+Thus most data structures are simply not allowed, because they do not expose a fallible way to allocate memory.
+Whenever a new allocation needs to happen a ~try_new()~ function can be called, which will return a ~Result~ type with either a reference or an error.
+For infallible memory allocations with ~new()~ an out-of-memory will throw an exception, which there is no good way to handle.
+The only data structure available is ~Vec~, a dynamic array.
+For faster performance on lookup, we might need other data structures.
+Furthermore, the ~alloc~ crate is compiled with a ~no_rc~ feature meaning there is no way to use the reference counted pointers defined in Rust.
 The reason for this is that maintainers of the Rust functionality in Linux have decided that it is unnecessary, since the C part of the kernel
 already defines a reference counting functionality.
-To the best of my knowledge there is no clear exposure of this functionality in any of the crates available.
+To the best of my knowledge, there is no clear exposure of this functionality in any of the crates available.
 We need reference counting for our implementation.
-It is easy to remove this restriction, but may make a potential PCC implementation harder to get merged into the upstream Linux.
+It is easy to remove this restriction but may make a potential PCC implementation harder to get merged into the upstream Linux.
 
-It is possible to compile crates that support a ~no_std~ feature (it relies on ~alloc~ and ~core~) and that also does no infallible memory allocations. One example of a library that does this is parser-combinator library ~nom~, which we use for parsing.
+It is possible to compile other crates than the ones defined above.
+The requirement is that the package must support a ~no_std~ feature, meaning it relies on ~alloc~ and ~core~ instead of ~std~, and that also has no infallible memory allocations. One example of a library that does this is parser-combinator library ~nom~, which we use for parsing.
 
 *** Reference Counting
-In the implementation we make heavye use of reference counting, and we must therefore forego the ~no_rc~ restriction.
+In the implementation, we make heavy use of reference counting, and we must therefore forego the ~no_rc~ restriction.
 We use compile time references when possible to not unnecessarily create new objects.
-When compile time references are not possible, because we dont know the owner of a value and thus also not the lifetime of it, we instead use reference counted pointers.
-Most of the functions we describe returns values. The ownership will then lie at the caller of the function,
-but in some cases the owner of a result value may be the context we does typechecking with respect to. This for instance happen when inferring the type of a constant.
-Furthermore because of the lifetime guarantee there is no way to create a value and return a reference to it.
+When compile-time references are not possible, because we don't know the owner of a value and thus also not the lifetime of it, we instead use reference-counted pointers.
+Most of the functions we describe return values. The ownership will then lie at the caller of the function,
+but in some cases, the owner of a result value may be the context we do type-checking with respect to. This for instance happens when inferring the type of a variable.
+Furthermore, because of the lifetime guarantee, there is no way to create a value and return a reference to it.
 
-The reference counted smartpointer looks as follows:
+The reference-counted smart pointer looks as follows:
 #+begin_src rust
 pub struct Rc<T: ?Sized> {
     ptr: NonNull<RcBox<T>>,
@@ -123,7 +124,7 @@ pub struct Rc<T: ?Sized> {
 }
 #+end_src
 An Rc is nothing more than a struct that contains a pointer to the inner value that is referenced and a phantom field.
-The phantom field is merely there to keep strong static typing in a similar way to a phantom type in Haskell.
+The phantom field is merely there to keep strong static typing similar to a phantom type in Haskell.
 The ~ptr~ in this struct points to the following struct:
 #+begin_src rust
 #[repr(C)]
@@ -133,6 +134,6 @@ struct RcBox<T: ?Sized> {
     value: T,
 }
 #+end_src
-This contains the values and the counts for strong and week reference counts.
+This contains the values and the counts for strong and weak reference counts.
 Whenever the ~Rc~ is cloned we simply take the ~RcBox~ inside of ~Rc~, increment the pointer, and construct a new ~Rc~ struct. The ease of use then comes from the ~Drop~ trait which will either decrement the count in the ~RcBox~ and drop the ~Rc~ or it will drop both if the strong count is 0.
-Hence we can easily create new references without knowing the owner, as it does not matter since they are deallocated automatically. This gives some overhead compared to regular references but is highly likely more efficient that cloning.
+Hence we can easily create new references without knowing the owner, as it does not matter since they are deallocated automatically. This gives some overhead compared to regular references but is highly likely more efficient than cloning.

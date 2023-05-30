@@ -27,20 +27,17 @@ then checking the requirement is merely normalization followed by a equality che
 
 Thus, while we cannot say anything definite at this point, we have provided a basis for future work to make a PCC architecture in the Linux kernel.
 
-
 ** Future work
-We have presented only a small part of a proof carrying code architecture,
+We have presented only a small part of a proof-carrying code architecture,
 so naturally for a final conclusion on the matter, discussed in this work,
 an in-kernel verification condition generator should be defined.
 We suggest such a proof checker represents the logic in the form of LFSC.
-This is however dependent on getting a faster proof checker and to solve the
-problem of potential clogging.
 
-The implementation discussed, should be modified to run inside the kernel.
+The implementation discussed should be modified to run inside the kernel.
 Because of the preliminary work, this should be a minor task.
 
 More work should be done in making the implementation fast.
 
 Lastly, a more comprehensive analysis and design between PCC and the eBPF verifier should be conducted.
-Specifically, what parts of the verifier should co-exist with PCC.
-One such is example is checking of user-rights.
+Specifically, which parts of the verifier should co-exist with PCC.
+One such example is checking of user-rights.

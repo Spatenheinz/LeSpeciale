@@ -78,10 +78,10 @@ We have in this work considered two output formats/languages, Alethe\cite{alethe
 supported by the CVC5 SMT solver.
 I will briefly describe why I have chosen to use the LFSC language over Alethe.
 
-Both formats follow the LISP family of languages and is therefore simple to parse.
+Both formats are based on S-expressions and therefore simple to parse.
 
 Alethe is designed to be easily readable by humans and strutured as a box style proof, with subproofs, conclusions etc. which makes understanding the proofs easy.
-This is not a property necessary for a PCC architecture where we want to automate the entire process, and dont care about the plain text format, but in fact rather would want a bytecode format.
+This is not a property necessary for a PCC architecture where we want to automate the entire process, and dont care about the plain text format, but in fact rather would want a binary format.
 By this construction the Alethe format provides a set of 91 inference rules\cite{alethe},
 on which proofs are built,
 As an example rule 20 is reflection often denoted as ~refl~ which states equality after applying a context.

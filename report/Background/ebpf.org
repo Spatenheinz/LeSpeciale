@@ -1,9 +1,8 @@
 BPF (Berkeley Package Filter) as it was originally presented is a system for effective filtering of network packages by allowing dynamical loading of package filters from userspace into the network stack in kernel space.
-The extended Berkeley Packet Filter (eBPF) was later introduced in the Linux kernel, offering a different approach to kernel extension.
+eBPF, an extension to BPF, was later introduced in the Linux kernel, offering a different approach to kernel extension. Since then many other eBPF's have appeared but we only consider the eBPF in the Linux kernel.
 The eBPF virtual machine leverages the privileges of the kernel to oversee the entire system, enabling more powerful control.
 The eBPF name furthermore refers to a just-in-time (JIT) compiled reduced instruction set computer (RISC). The ecosystem seeks to ensure security by performing static analysis of the limited language.
-This language is designed not to be turing complete,
-to reduce the number of rejected programs due to limitations in the static analysis.
+Whilst the language itself is turing complete, the static analysis explicitly disallow backwards jumps.
 In eBPF there are 11 registers, r0-r10, where r0 is used for return values of functions and r10 is a readonly framepointer to a 512 byte stack.
 Instructions can be moves, addition and jumps in a similar manner to other reduced instructions sets.
 

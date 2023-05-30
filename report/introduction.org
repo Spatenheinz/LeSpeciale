@@ -3,49 +3,48 @@
 :CUSTOM_ID: intro
 :END:
 
-Extended Berkeley Package Filters (eBPF) is a subsystem in the Linux kernel,
+eBPF is a sub-system in the Linux kernel,
 which allows users of the system to dynamically load eBPF bytecode into the kernel.
 The program can then be executed when certain events happen.
 This technology enables many interesting features, such as high-speed package filtering
-(which was the initial intend with the system)
+(which was the initial intent of the system)
 and Express Data Path (XDP) by circumventing the network stack of the operating system.
-Furthermore it can be used for system monitoring by access to kernel probes etc.
+Furthermore, it can be used for system monitoring by access to kernel probes, etc.
 
 eBPF allows untrusted users to run arbitrary code in the kernel, which in itself is no problem if the
-program is non-malicious, but can be detremental if not.
+program is non-malicious, but can be detrimental if not.
 Programs that run in the Linux kernel must therefore be both safe and secure.
-An unsafe program in the Linux kernel might break the system alltogether,
-whilst a malicious users could get access to confidential information.
-To prevent this the eBPF subsystem will perform an abstract interpretation of a program
+An unsafe program in the Linux kernel might break the system altogether,
+whilst a malicious user could get access to confidential information.
+To prevent this the eBPF sub-system will perform an abstract interpretation of a program
 and then reject unsafe programs, before they are loaded into the kernel.
 This process is called the verifier.
-The verifier has been subject to multiple bugs in the past, which can lead to priveledge escalation\cite{manfred}\cite{scanell}.
-On the other hand the verifier also limits the capabilities of eBPF programs, by outright rejecting programs with loops.
-This is a design choice, since non-halting programs should not live in the kernel, and there is no way to tell if a program will halt using static analysis, as per the halting problem.
+The verifier has been subject to multiple bugs in the past, which can lead to privilege escalation\cite{manfred}\cite{scanell}.
+On the other hand, the verifier also limits the capabilities of eBPF programs, by outright rejecting programs with loops.
+This is a design choice since non-halting programs should not live in the kernel, and there is no way to tell if a program will halt using static analysis, as per the halting problem.
 The result is a security mechanism that is both overly conservative in some cases and unsound.
 
 An alternative to static analysis is to verify the safety of programs using formal logic.
-An automatic way to do this is to reduce the problem of program verification to satisfiability of programs.
-This is done by generating a logical formula that describe the properties of a program, a so-called verification condition, and then checking the satisfiability of the negated formula.
+This can be done by generating a logical formula that describes the properties of a program, a so-called verification condition, and then checking the unsatisfiability of the negated formula, with an SMT solver, which makes the formula valid.
 The process of generating a verification condition is cheap,
-however checking the validity of the formula can be a computationally heavy task.
+however, checking the validity of the formula can be a computationally heavy task.
 Proof Carrying Code is an architecture and security mechanism first introduced by Necula in 1998\cite{pcc}.
-Here the user is responsible for proving that a certain program follows a set of security parameters and then the kernel only have to check this proof.
-The general concept is described in detail in Section \ref{pcc}.
+Here the user is responsible for proving that a certain program follows a set of security parameters and then the kernel only has to check this proof.
+The general concept is described in detail in Section \ref{sec:pcc}.
 All in all these tasks are far cheaper than producing a proof.
 
-In this project we investigate the feasibility of a proof checker that can run inside the Linux kernel.
-The implementation not only tests this subcomponent of proof carrying code, but also test if the Rust programming language, introduced in the Linux kernel 6.1 and forward, is a good tool for the job.
-The proof checker leverages the Curry-howard correspondence and thus
-checking a proof amounts to typechecking.
-We specifically consider the dependently typed meta framework, Logical Framework with Side Conditions (LFSC)\cite{lfsc}.
-We describe the semantics of the typecheking and present an implementation.
+In this project, we investigate the feasibility of a proof checker that can run inside the Linux kernel.
+The implementation not only tests this subcomponent of proof-carrying code but also tests if the Rust programming language, introduced in the Linux kernel 6.1 and forward, is a good tool for the job.
+The proof checker leverages the Curry-Howard correspondence and thus
+checking a proof amounts to type-checking.
+We specifically consider the dependently typed meta-framework, Logical Framework with Side Conditions (LFSC)\cite{lfsc}.
+We describe the semantics of the type checking and present an implementation.
 
 The report is structured as follows.
-In Section \ref{sec:background} we give a brief introduction to eBPF, Proof Carrying Code, Rust and what limitations.
+In Section \ref{sec:background} we give a brief introduction to eBPF as a sub-system in Linux, Proof Carrying Code, Rust, and its limitations.
 Then in Section \ref{sec:pccandebpf} we go into detail about how the eBPF verifier works and discuss Proof Carrying Code in the context of eBPF.
 We then present the syntax and semantics of the LFSC in Section \ref{sec:lfsc}, to serve as a basis for the implementation of the proof-checker.
 We do not prove any properties of the type system.
-In Section \ref{sec:implementation} we present the design choices and implementation details of the typechecker called LFSCR.
+In Section \ref{sec:implementation} we present the design choices and implementation details of the type-checker called LFSCR.
 We then evaluate the performance and general usability of LFSCR in a PCC system Section \ref{sec:evaluation}, by considering proofs generated from a simple verification condition generator, presented in Section \ref{sec:experiments}.
-Lastly we conclude the project and present some ideas for future work in \ref{sec:conclusion1} and \ref{sec:conclusion2}.
+Lastly, we conclude the project and present some ideas for future work in \ref{sec:conclusion1} and \ref{sec:conclusion2}.
