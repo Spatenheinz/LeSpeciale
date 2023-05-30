@@ -18,5 +18,5 @@
 ** Rust
 #+include: rust.org
 
-** TODO Curry Howard Isomorphism
+** Curry Howard Isomorphism
 #+include: curryhoward.org

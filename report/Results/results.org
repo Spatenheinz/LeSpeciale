@@ -71,7 +71,7 @@ If it is not the case, then side conditions might be removed altogether and a st
 :CUSTOM_ID: sec:evaluation
 :END:
 In this section we first represent the speed and memory usage of /lfscr/ compared to /lfscc/, in Section \ref{sec:speed}-\ref{sec:memory}. In this process we describe some optimizations done along the way to improve the performance.
-We then in Section \ref{sec:generaleval} evaluate the completeness and correctness of the implementation and TODO
+We then in Section \ref{sec:generaleval} evaluate the completeness, correctness and discuss some general properties of the implementation.
 
 ** Speed
 :PROPERTIES:
@@ -198,6 +198,9 @@ In any case, we can again see that we can check large proofs without many resour
 But that an "all in one" solution presented by /lfscc/ could be worth prototyping in either pure C or in Rust.
 
 ** LFSCR - strong suits and weaknesses
+:PROPERTIES:
+:CUSTOM_ID: sec:generaleval
+:END:
 As the previous section described the performance of /lfscc/ suggests that a more efficient approach exists, than we have at the moment.
 This implementation does have a couple of features that are worth taking into consideration as well.
 It is implemented completely in safe Rust, meaning we cannot have any illegal memory access. We have further ensured the implementation to be panic-free.
