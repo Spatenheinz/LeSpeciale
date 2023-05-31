@@ -1,0 +1,54 @@
+#+title: Optimisation
+
+
+pub fn mk_closure<'term, T>(body: &'term AlphaTerm<T>,
+                         lctx: super::context::Rlctx<'term, T>,
+                        ) -> Closure<'term, T>
+where T: Eq + Ord + Hash + std::fmt::Debug + Copy + BuiltIn
+{
+    Box::new(move |v, gctx, allow_dbi, hole_count| {
+             let lctx = LocalContext::insert(v, lctx.clone());
+             let env = EnvWrapper::new(lctx, gctx, allow_dbi, hole_count);
+             env.eval(body)})
+}
+
+does not do anything with the lctx before running the code.
+with this in mind we could ensure it is restored once used.
+
+Notice here we also save the local context for later use with run.
+            Pi(ty, body) => {
+                let dom =
+                    if let SC(sc, term) = &**ty {
+                        let t_ty = self.eval(term)?;
+                        Rc::new(Value::Run(sc, t_ty, self.lctx.clone()))
+                } else {
+                    self.eval(ty)?
+                };
+                let ran = mk_closure(body, self.lctx.clone());
+                return Ok(Rc::new(Value::Pi(dom, ran)));
+            },
+
+These on the other hand are common interface that can give us trouble:
+
+
+    pub fn insert_local(&self, val: RT<'term, T>) -> Self {
+        Self { lctx: LocalContext::insert(val, self.lctx.clone()),
+               gctx: self.gctx,
+               allow_dbi: self.allow_dbi,
+               hole_count: self.hole_count.clone()
+        }
+    }
+    pub fn define_local(&self, ty: RT<'term, T>, val: RT<'term, T>) -> Self {
+        Self { lctx: LocalContext::define(ty, val, self.lctx.clone()),
+               gctx: self.gctx,
+               allow_dbi: self.allow_dbi,
+               hole_count: self.hole_count.clone()
+        }
+    }
+    pub fn update_local(&self, val: RT<'term, T>) -> Self {
+        Self { lctx: LocalContext::decl(val, self.lctx.clone()),
+               gctx: self.gctx,
+               allow_dbi: self.allow_dbi,
+               hole_count: self.hole_count.clone()
+        }
+    }

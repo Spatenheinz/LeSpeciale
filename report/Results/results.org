@@ -124,8 +124,9 @@ Specifically we get:
 
 Hence we now see that the /lfscr/ implementation is within a 10x margin of /lfscc./
 /lfscc/ takes a different approach than /lfscr. lfscc/ does everything all at once, meaning lexing/parsing and inference, and evaluation all occur in the same function in an online approach.
-This approach seems to reduce a lot of overhead, but the function which does all of this also implement tail calls by
-using goto statements to the top of the function. If tail calls are eliminated, performance is almost identical for the two approaches.
+This approach seems to reduce a lot of overhead. Especially if we consider the /perf/ data, for /lfscr/, we notice that 40 percent of the time is still used ~eval~. We might therefore be able reduce the execution time by embedding evaluation into the ~infer~ function.
+One thing to note is that /lfscc/ also implements tail calls by goto statements to achieve additional performance. We may not do this in Rust, since memory management cannot easily be statically analyzed with unstructured controlflow.
+
 From the table we can see that the result are volatile and for a more definitive answer we should consider more program points.
 
 *** Complexity and Constants
@@ -177,7 +178,7 @@ First, the size of proofs plays a key role in the feasibility of using proof-car
 A proof for a single instruction program (actually 4 with pre-initialization and the epilog), is 2.7KB in size, while 10 instructions are 8.6KB and 100 instructions are
 109KB. For larger programs such as 400 and 500 lines, the size is 668KB and 706KB. So the proofs, at least for straight-line programs, scale linearly (or close) with roughly 1-2 KB per instruction.
 Encoding the proofs in a more compact binary format could make these sizes even smaller.
-The sizes in themselves are not alarming and could still see use in devices with limited memory.
+The sizes in themselves are not alarming and could still see use in devices with limited memory. For embedded devices the filesizes may be too big, but these devices will probably not run Linux.
 
 Secondly, we should also look at how much memory the type checker uses.
 Running both /lfscr/ with the 1,10 and 100 line proofs, we get the following memory usage:
@@ -188,7 +189,10 @@ Running both /lfscr/ with the 1,10 and 100 line proofs, we get the following mem
 | peak RSS               | 9MB     | 15.7MB | 25.3MB | 47.7MB | 51.6MB |
 | temporary allocations: | 50.13 % | 46 %   | 40 %   | 40.7 % | 40.2 % |
 
-From these results, we see that /lfscr/ does not use a massive amount of memory. At a single point in time, we allocate 23.6 MB for a 300-line program, and for the entire lifetime of the program use 51.6MB.\footnote{Note that this memory also includes some heaptrack overhead.} What is most interesting is that 40 % of allocations are temporary and for smaller programs even higher.
+From these results, we see that /lfscr/ does not use a massive amount of memory, for smaller programs.
+For a 100-line eBPF program we use at most 5.7 MB at a time.
+For larger programs, we allocate 23.6 MB for a 300-line program, and for the entire lifetime of the program use 51.6MB.\footnote{Note that this memory also includes some heaptrack overhead.}
+What is most interesting is that 40 % of allocations are temporary and for smaller programs even higher.
 This suggests that we do some unnecessary computations and that we maybe should use another approach than reference counted pointers.
 This especially becomes noticeable, when similar diagnostics are done for /lfscc/
 For the 300-line program only 6MB of memory is used at its peak, while it uses 14.2MB overall and only 6% of allocations are temporary.
