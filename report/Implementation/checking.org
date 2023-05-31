@@ -24,7 +24,7 @@ pub fn check(&self, term: &'ctx AlphaTerm<T>, tau: RT<'ctx, T>) -> TResult<(), T
 }
 \end{lstlisting}
 \caption{Typechecking a term}
-\label{fig:inferapp}
+\label{fig:checkimpl}
 \end{figure}
 #+end_export
 

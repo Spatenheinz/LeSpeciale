@@ -2,9 +2,9 @@ In this section, we give an example of how LFSC can be used to construct proofs.
 We do so, by explaining a proof that \(P \wedge \neg P \) is unsatisfiable.
 The proof can be encoded by the following commands:
 
-#+caption: Unsatisfiability proof of $P \wedge \neg P$ in LFSC
-#+name: fig:proof
-#+begin_src none -n
+#+begin_export latex
+\begin{figure}[h!]
+\begin{lstlisting}
 (define cvc.p (var 0 Bool))
 (check
 (# a0 (holds (and cvc.p (and (not cvc.p) true)))
@@ -12,7 +12,11 @@ The proof can be encoded by the following commands:
 (resolution _  _  _
 (and_elim _  _  1 a0)
 (and_elim _  _  0 a0) ff cvc.p))))
-#+end_src
+\end{lstlisting}
+\caption{Unsatisfiability proof of $P \wedge \neg P$ in LFSC}
+\label{fig:proof}
+\end{figure}
+#+end_export
 
 The program first defines a variable ~cvc.p~ by application of the function ~var~, a function used to define free constants under SMT-Lib, and it is specifically characterized by a unique number and a sort.
 This makes ~cvc.p~ unique.

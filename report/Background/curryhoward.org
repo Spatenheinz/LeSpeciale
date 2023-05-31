@@ -8,11 +8,11 @@ For formulas and types, we have the following correspondence:
 | \bot (\text{false})                      | void                   |
 | \wedge (conjunction)                       | product type           |
 | \vee (disjunction)                       | sum type               |
-| \longrightarrow (\text{implication})                | function type          |
+| \rightarrow (\text{implication})                | function type          |
 | \forall (\text{universal quantification})   | \Pi (dependent type)     |
 | \exists (\text{existential quantification}) | \Sigma (dependent sum type) |
 
-Take for example the formula \(A \wedge P \longrightarrow P\). Informally, when we have evidence for both \(A\) and \(P\) then we can get a \(P\), and similarly for types if we can give a pair \((A,P)\) then we can get the inhabitant \(P\).
+Take for example the formula \(A \wedge P \rightarrow P\). Informally, when we have evidence for both \(A\) and \(P\) then we can get a \(P\), and similarly for types if we can give a pair \((A,P)\) then we can get the inhabitant \(P\).
 
 For proof to such a proposition we consider the correspondence between natural deduction and lambda calculus, where
 
@@ -23,12 +23,18 @@ For proof to such a proposition we consider the correspondence between natural d
 | implication introduction | abstraction   |
 
 We then further consider destructors for sum and product types.
-For proposition such as \(P \wedge (Q \vee R) \longrightarrow ((P \wedge Q) \vee (P \wedge R)\):
+For proposition such as \(P \wedge (Q \vee R) \rightarrow ((P \wedge Q) \vee (P \wedge R)\):
 we can construct a program, in a Haskell-like syntax:
-#+begin_src
+#+begin_export latex
+\begin{minipage}{\linewidth}
+\begin{lstlisting}
 f :: (P, Either Q R) -> Either (P, Q) (P, R)
 f (p, Left q) = Left (p, q)
 f (p, Right r) = Right (p, r)
-#+end_src
-Given a pair of type \((P, Either Q R)\) we may construct a type \(Either (P, Q) (P, R))\), hence constituting a proof for the proposition.
+\end{lstlisting}
+\end{minipage}
+#+end_export
+
+Given a pair of type \((P, Either \; Q \; R)\) we may construct a type \(Either \; (P, Q) \; (P, R))\), hence constituting a proof for the proposition.
 One thing to note however is that we require programs to be total, as we could otherwise give evidence for the uninhabited void type.
+We will later see how we can construct more rigorous proofs using \Pi.

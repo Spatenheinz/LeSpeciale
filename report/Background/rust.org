@@ -126,14 +126,19 @@ pub struct Rc<T: ?Sized> {
 An Rc is nothing more than a struct that contains a pointer to the inner value that is referenced and a phantom field.
 The phantom field is merely there to keep strong static typing similar to a phantom type in Haskell.
 The ~ptr~ in this struct points to the following struct:
-#+begin_src rust
+#+begin_export latex
+\begin{minipage}{\linewidth}
+\begin{lstlisting}
 #[repr(C)]
 struct RcBox<T: ?Sized> {
     strong: Cell<usize>,
     weak: Cell<usize>,
     value: T,
 }
-#+end_src
+\end{lstlisting}
+\end{minipage}
+#+end_export
+
 This contains the values and the counts for strong and weak reference counts.
 Whenever the ~Rc~ is cloned we simply take the ~RcBox~ inside of ~Rc~, increment the pointer, and construct a new ~Rc~ struct. The ease of use then comes from the ~Drop~ trait which will either decrement the count in the ~RcBox~ and drop the ~Rc~ or it will drop both if the strong count is 0.
 Hence we can easily create new references without knowing the owner, as it does not matter since they are deallocated automatically. This gives some overhead compared to regular references but is highly likely more efficient than cloning.

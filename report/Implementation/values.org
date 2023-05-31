@@ -1,7 +1,8 @@
 Since we consider typechecking using normalization by evaluation we need a new type to describe the result of evaluation.
-We define them as such:\footnote{Notice here that Z and Q should actually have unbounded integers as fields}
-
-#+begin_src none -n
+We define them in Figure \ref{fig:valueimpl}.
+#+begin_export latex
+\begin{figure}[h!]
+\begin{lstlisting}
 pub enum Value<'term, Id: BuiltIn> {
     Pi(bool, RT<'term, Id>, Closure<'term, Id>),
     Lam(Closure<'term, Id>),
@@ -15,7 +16,11 @@ pub enum Value<'term, Id: BuiltIn> {
     Run(&'term AlphaTermSC<Id>, RT<'term, Id>, Rc<LocalContext<'term, Id>>),
     Prog(Vec<RT<'term, Id>>, &'term AlphaTermSC<Id>),
 }
-#+end_src
+\end{lstlisting}
+\caption{Value type for LFSC\footnote{Notice here that Z and Q should actually have unbounded integers as fields}}
+\label{fig:valueimpl}
+\end{figure}
+#+end_export
 
 Just as ~AlphaTerm~, ~Value~ is parameterized by an ~Id~ type.
 Now we require ~Id~ to implement the trait ~BuiltIn~.

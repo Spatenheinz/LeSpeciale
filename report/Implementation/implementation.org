@@ -28,7 +28,7 @@ In short, LFSCR can use normalization by evaluation with De Bruijn indices and e
 :END:
 In this section, we describe the implementation of the type-checking semantics.
 We start by introducing the value representation obtained by inference and evaluation in Section \ref{sec:valimpl}.
-Then we describe the Signature and Contexts in Section \ref{sec:sigimpl} and how we handle commands in \ref{sec:impl}.
+Then we describe the Signature and Contexts in Section \ref{sec:sigimpl} and how we handle commands in \ref{sec:comimpl}.
 We describe inference in Section \ref{sec:inferimpl}, and type checking by definitional equality in \ref{sec:checkimpl}.
 Lastly, we go over the normalization process by describing reification and evaluation in Section \ref{sec:readback} and \ref{sec:eval}.
 

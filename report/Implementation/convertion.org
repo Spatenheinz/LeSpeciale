@@ -52,7 +52,6 @@ fn local<'a, 'b, Input, Output>
 \end{minipage}
 #+end_export
 
-#+end_src
 We create a closure that takes in a term. The closure will call ~fun~ with the term and ~vars~ as arguments and then it will truncate the environment to its size before ~fun~ was called.
 
 We can then use the function as such:
