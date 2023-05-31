@@ -77,7 +77,7 @@ We then in Section \ref{sec:generaleval} evaluate the completeness, correctness 
 :PROPERTIES:
 :CUSTOM_ID: sec:speed
 :END:
-Before we describe the results for current solution, we should briefly discuss the performance of the initial solution and some other attempts at optimizing the code, to emphasize, what small changes can do to the performance.
+Before we describe the results for the current solution, we should briefly discuss the performance of the initial solution and some other attempts at optimizing the code to emphasize what small changes can do to performance.
 In the first iteration of the code, the performance of /lfscr/ presented in this report was atrocious.
 From Table \ref{tab:slow} it should be clear that /lfscr/ was extremely slow.
 For a single instruction, the performance is similar to /lfscc/. In this case, we essentially just check all the signatures distributed by cvc5\cite{lfscsigs} along with a small proof.
