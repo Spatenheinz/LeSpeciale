@@ -128,7 +128,7 @@ signatures = [ "core_defs.plf"
 
 sigDir = "../deps/share/lfsc/signatures/"
 lfscc = "../deps/bin/lfscc"
-lfsc_rust = "../lfsc-lexer/target/release/lfsc-lexer"
+lfsc_rust = "../lfscr/target/release/lfscr"
 
 sigs = unwords $ map (sigDir <>) signatures
 
@@ -149,7 +149,7 @@ test n (prog, ebpf) = do
   putStrLn $ "hyperfine for " <> show n
   let filename = "benchmark_" <> show n
   let smt2 = filename <> ".smt2"
-  writeFile smt2 prog
+  -- writeFile smt2 prog
   (exitcode, stdout, stderr) <-
     readProcessWithExitCode "cvc5" (cvc5Args ++ [smt2]) ""
   case exitcode of
@@ -183,7 +183,7 @@ main :: IO ()
 main = do
   (_, _, _, ph) <-
     createProcess (proc "cargo" ["build", "--release", "--quiet"])
-    { cwd = Just "../lfsc-lexer/"}
+    { cwd = Just "../lfscr/"}
   exitCode <- waitForProcess ph
   forM_ ((take 40 (1:tens))) $ \n -> do
     putStrLn "=========================="

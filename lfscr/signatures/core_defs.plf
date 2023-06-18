@@ -1,4 +1,4 @@
-; This file defines how SMT-LIB sorts and terms are represented in LFSC. Notice
+
 ; that we use an embedding where "sort" and "term" are LFSC types. This file
 ; contains the "core" definitions of SMT-LIB, e.g. those that are specified
 ; in the SMT-LIB standard, covering Boolean connectives, ITE, equality, and
